@@ -1,0 +1,16 @@
+# Build & Temporary Files
+*.b64
+*.mp4
+*.wav
+*.ab
+.idea/
+.gradle/
+build/
+app/build/
+__pycache__/
+*.pyc
+.env
+.venv/
+env/
+venv/
+*.log
