@@ -440,15 +440,17 @@ class VoipRepositoryImpl @Inject constructor(
     }
 
     override suspend fun toggleTask(id: String, completed: Boolean): Result<Unit> {
-        localDatabase.saveTask(id, "", completed)
+        val existing = localDatabase.getTasks().firstOrNull { it.id == id }
+        val title = existing?.title ?: "Tâche"
+        localDatabase.saveTask(id, title, completed)
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
         val payloadJson = org.json.JSONObject().apply {
             put("id", id)
-            put("title", "")
+            put("title", title)
             put("completed", completed)
         }.toString()
         return try {
-            val response = apiService.createTask(auth, com.example.appcall.data.model.TaskDto(id, "", completed))
+            val response = apiService.createTask(auth, com.example.appcall.data.model.TaskDto(id, title, completed))
             if (!response.isSuccessful) {
                 localDatabase.addToSyncQueue(id, "TOGGLE_TASK", payload = payloadJson)
             }
@@ -529,24 +531,10 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Failed to get transcript: ${response.code()}"))
+                Result.failure(Exception("Transcript non disponible (${response.code()})"))
             }
         } catch (e: Exception) {
-            // Offline fallback with speaker segments
-            Result.success(
-                TranscriptDto(
-                    id = "tr-$callId",
-                    callId = callId,
-                    rawText = "Bonjour Jean, c'est Marc. Je t'appelle pour confirmer notre rendez-vous mardi prochain à 14h dans vos bureaux.",
-                    language = "fr",
-                    confidenceScore = 95.0,
-                    speakerSegments = listOf(
-                        SpeakerSegmentDto("agent", 0.0, 2.5, "Bonjour Jean, c'est Marc."),
-                        SpeakerSegmentDto("agent", 2.6, 6.0, "Je t'appelle pour confirmer notre rendez-vous mardi prochain à 14h dans vos bureaux."),
-                        SpeakerSegmentDto("contact", 6.5, 9.8, "Mardi prochain à 14h... Oui, c'est parfait pour moi, je note ça.")
-                    )
-                )
-            )
+            Result.failure(e)
         }
     }
 

@@ -175,15 +175,20 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                val displayTitle = if (file.name.startsWith("Appel_")) {
+                                    "🎙️ ${file.name.removeSuffix(".mp4").removeSuffix(".wav").removeSuffix(".m4a")}"
+                                } else {
+                                    "🎙️ Appel du $dateFormatted"
+                                }
                                 Text(
-                                    text = file.name,
+                                    text = displayTitle,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "$dateFormatted | ${fileSizeKb} KB",
+                                    text = "${file.name} • ${fileSizeKb} KB",
                                     color = Color.Gray,
                                     fontSize = 11.sp
                                 )

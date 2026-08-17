@@ -177,14 +177,15 @@ def summarize_call(call_id: str, db) -> "CallSummary":
 
     # Resolve contact_id and user_id from the Call row
     call = db.query(Call).filter(Call.id == call_id).first()
-    contact_id = call.contact_id if call else None
-    user_id = call.user_id if call else None
+    contact_id = call.contact_id if call and call.contact_id else None
+    if not contact_id:
+        c = db.query(Contact).first()
+        contact_id = c.id if c else None
+    user_id = call.user_id if call and call.user_id else None
 
     # Create appointments detected
     appointment_id = None
     for rdv in result.get("rendez_vous", []):
-        if rdv.get("confiance", 0) < 0.5:
-            continue  # Skip low-confidence detections
         # Parse date/time
         scheduled_at = _parse_datetime(rdv.get("date"), rdv.get("heure"))
         if scheduled_at and contact_id:
@@ -194,7 +195,7 @@ def summarize_call(call_id: str, db) -> "CallSummary":
                 user_id=user_id,
                 scheduled_at=scheduled_at,
                 status="PROPOSED",
-                title=rdv.get("titre", "Rendez-vous détecté"),
+                title=rdv.get("titre", "Rendez-vous détecté par IA"),
             )
             db.add(appt)
             db.commit()
@@ -229,18 +230,62 @@ def summarize_call(call_id: str, db) -> "CallSummary":
 
 
 def _parse_datetime(date_str: Optional[str], time_str: Optional[str]) -> Optional[datetime]:
-    """Converts date/time strings from GPT output to a datetime object."""
-    if not date_str:
-        return None
-    try:
-        date_part = datetime.strptime(date_str, "%Y-%m-%d")
+    """Converts date/time strings from GPT output to a datetime object, handling relative dates and French terms."""
+    from datetime import timedelta
+    now = datetime.utcnow()
+    date_part = None
+
+    if date_str:
+        d_lower = date_str.lower().strip()
+        if "demain" in d_lower:
+            date_part = now + timedelta(days=1)
+        elif "après-demain" in d_lower or "apres-demain" in d_lower:
+            date_part = now + timedelta(days=2)
+        elif "aujourd" in d_lower:
+            date_part = now
+        elif any(day in d_lower for day in ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]):
+            day_names = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+            target_idx = 0
+            for idx, name in enumerate(day_names):
+                if name in d_lower:
+                    target_idx = idx
+                    break
+            current_idx = now.weekday()
+            days_ahead = (target_idx - current_idx) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+            date_part = now + timedelta(days=days_ahead)
+        else:
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+                try:
+                    date_part = datetime.strptime(date_str, fmt)
+                    break
+                except ValueError:
+                    pass
+
+    if date_part is None:
+        # Default to tomorrow if a time is specified
         if time_str:
+            date_part = now + timedelta(days=1)
+        else:
+            return None
+
+    # Parse time
+    hour = 14
+    minute = 0
+    if time_str:
+        t_clean = time_str.lower().replace("h", ":").replace("min", "").strip()
+        if ":" in t_clean:
+            parts = t_clean.split(":")
             try:
-                time_part = datetime.strptime(time_str, "%H:%M")
-                return date_part.replace(hour=time_part.hour, minute=time_part.minute)
+                hour = int(parts[0].strip())
+                minute = int(parts[1].strip()) if len(parts) > 1 and parts[1].strip() else 0
             except ValueError:
                 pass
-        return date_part
-    except ValueError:
-        logger.warning(f"Could not parse date: '{date_str}' time: '{time_str}'")
-        return None
+        else:
+            try:
+                hour = int(t_clean)
+            except ValueError:
+                pass
+
+    return date_part.replace(hour=hour, minute=minute, second=0, microsecond=0)

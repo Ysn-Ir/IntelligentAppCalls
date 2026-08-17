@@ -402,13 +402,32 @@ def get_calls(
 def get_transcript(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
     if not transcript:
+        call = db.query(Call).filter(Call.id == id).first()
+        if call and (call.ai_status == "PROCESSING" or call.status == "ONGOING"):
+            return {
+                "id": f"tr-{id}",
+                "call_id": id,
+                "raw_text": "Traitement de la transcription en cours...",
+                "language": "fr",
+                "confidence_score": 0.0,
+                "speaker_segments": []
+            }
         raise HTTPException(status_code=404, detail="Transcript not found")
+
+    segments = []
+    if transcript.speaker_segments:
+        try:
+            segments = json.loads(transcript.speaker_segments)
+        except Exception:
+            pass
+
     return {
         "id": transcript.id,
         "call_id": transcript.call_id,
         "raw_text": transcript.raw_text,
         "language": transcript.language,
-        "confidence_score": transcript.confidence_score
+        "confidence_score": transcript.confidence_score,
+        "speaker_segments": segments
     }
 
 # Helper to auto-create mock summaries, call records, and appointments for unknown/intercepted call IDs.

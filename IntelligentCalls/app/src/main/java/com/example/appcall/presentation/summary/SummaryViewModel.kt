@@ -57,6 +57,8 @@ class SummaryViewModel @Inject constructor(
     fun loadSummary(callId: String) {
         currentCallId = callId
         _uiState.value = SummaryScreenState.Loading
+        _transcript.value = null
+        _aiStatus.value = null
         pollingJob?.cancel()
 
         viewModelScope.launch {
@@ -67,18 +69,31 @@ class SummaryViewModel @Inject constructor(
                 }
             }
 
-            // Start AI status polling if needed
+            // Start AI status polling
             pollingJob = launch {
-                while (isActive) {
+                var attempts = 0
+                while (isActive && attempts < 40) {
+                    attempts++
                     voipRepository.getAiStatus(callId).onSuccess { statusDto ->
                         _aiStatus.value = statusDto
-                        if (statusDto.aiStatus == "DONE" || statusDto.aiStatus == "FAILED") {
+                        if (statusDto.aiStatus == "DONE") {
                             // Status finished, load latest summary & transcript
                             voipRepository.getTranscript(callId).onSuccess { _transcript.value = it }
+                            voipRepository.getCallSummary(callId).onSuccess { summary ->
+                                _uiState.value = SummaryScreenState.Success(summary)
+                                _summaryText.value = summary.summaryText
+                                val lowConf = summary.confidenceScore != null && summary.confidenceScore < 60.0
+                                _isLowConfidence.value = lowConf
+                                _isEditing.value = lowConf
+                            }
                             return@launch
                         }
                     }
-                    delay(3000)
+                    // Fetch intermediate transcript if available
+                    voipRepository.getTranscript(callId).onSuccess {
+                        if (it.rawText.isNotBlank()) _transcript.value = it
+                    }
+                    delay(2500)
                 }
             }
 
@@ -86,34 +101,31 @@ class SummaryViewModel @Inject constructor(
                 .onSuccess { summary ->
                     _uiState.value = SummaryScreenState.Success(summary)
                     _summaryText.value = summary.summaryText
-                    // LOW_CONFIDENCE is the ONLY trigger for the banner (Agent.md §4.2 / §5.3)
                     val lowConfidence = summary.confidenceScore != null && summary.confidenceScore < 60.0
                     _isLowConfidence.value = lowConfidence
                     _isEditing.value = lowConfidence
                 }
                 .onFailure {
-                    // Fallback for offline testing / development
-                    val mockSummary = CallSummary(
-                        id = "mock-summary-id",
+                    // Placeholder while processing
+                    val pendingSummary = CallSummary(
+                        id = "pending-$callId",
                         callId = callId,
-                        summaryText = "Rendez-vous fixé avec Marc mardi prochain à 14h dans vos bureaux.",
+                        summaryText = "Traitement IA en cours... Vos transcriptions et résumés seront affichés dès leur génération.",
                         status = SummaryStatusEnum.PROPOSED.name,
-                        confidenceScore = 95.0,
-                        detectedAppointmentId = "mock-appointment-id",
-                        appointment = Appointment(
-                            id = "mock-appointment-id",
-                            contactId = "1",
-                            scheduledAt = "2026-07-21T14:00:00Z",
-                            status = AppointmentUiState.PROPOSED.name
-                            // title intentionally omitted — backend migration not yet applied
-                        )
+                        confidenceScore = 0.0,
+                        detectedAppointmentId = null,
+                        appointment = null
                     )
-                    _uiState.value = SummaryScreenState.Success(mockSummary)
-                    _summaryText.value = mockSummary.summaryText
+                    _uiState.value = SummaryScreenState.Success(pendingSummary)
+                    _summaryText.value = pendingSummary.summaryText
                     _isLowConfidence.value = false
                     _isEditing.value = false
                 }
         }
+    }
+
+    fun refreshCurrent() {
+        currentCallId?.let { loadSummary(it) }
     }
 
     fun updateSummaryText(text: String) {

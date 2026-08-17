@@ -257,12 +257,27 @@ class AppLocalDatabase @Inject constructor(
 
     fun saveTask(id: String, title: String, completed: Boolean) {
         val db = writableDatabase
+        var resolvedTitle = title
+        if (resolvedTitle.isBlank()) {
+            val existing = getTasks().firstOrNull { it.id == id }
+            resolvedTitle = existing?.title ?: "Tâche"
+        }
         val values = ContentValues().apply {
             put(KEY_TASK_ID, id)
-            put(KEY_TASK_TITLE, title)
+            put(KEY_TASK_TITLE, resolvedTitle)
             put(KEY_TASK_COMPLETED, if (completed) 1 else 0)
         }
         db.insertWithOnConflict(TABLE_TASKS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun deleteTask(id: String) {
+        val db = writableDatabase
+        db.delete(TABLE_TASKS, "$KEY_TASK_ID = ?", arrayOf(id))
+    }
+
+    fun deleteAgendaAppointment(id: String) {
+        val db = writableDatabase
+        db.delete(TABLE_AGENDA, "$KEY_AGENDA_ID = ?", arrayOf(id))
     }
 
     fun getTasks(): List<LocalTask> {

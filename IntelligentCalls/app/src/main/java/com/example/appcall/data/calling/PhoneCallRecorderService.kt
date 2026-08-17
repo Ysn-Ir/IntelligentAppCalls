@@ -121,7 +121,8 @@ class PhoneCallRecorderService : Service() {
 
             val dir = File(filesDir, "recordings").also { it.mkdirs() }
             val callId = activeCallId ?: System.currentTimeMillis().toString()
-            val file = File(dir, "call_record_${callId}.mp4")
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val file = File(dir, "Appel_${timestamp}_${callId.take(8)}.mp4")
             recordingFile = file
 
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
