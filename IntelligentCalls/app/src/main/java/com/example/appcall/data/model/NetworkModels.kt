@@ -109,3 +109,64 @@ data class FileDto(
     @SerializedName("path") val path: String,
     @SerializedName("size") val size: String
 )
+
+// ── AI Status ────────────────────────────────────────────────────────────
+data class AiStatusDto(
+    @SerializedName("call_id") val callId: String,
+    @SerializedName("ai_status") val aiStatus: String,       // PENDING | PROCESSING | DONE | FAILED
+    @SerializedName("has_transcript") val hasTranscript: Boolean,
+    @SerializedName("has_summary") val hasSummary: Boolean,
+    @SerializedName("transcript_confidence") val transcriptConfidence: Double?
+)
+
+// ── Transcript + Speaker Diarisation ────────────────────────────────────
+data class SpeakerSegmentDto(
+    @SerializedName("speaker") val speaker: String,           // "agent" | "contact"
+    @SerializedName("start") val start: Double,
+    @SerializedName("end") val end: Double,
+    @SerializedName("text") val text: String
+)
+
+data class TranscriptDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("call_id") val callId: String,
+    @SerializedName("raw_text") val rawText: String,
+    @SerializedName("language") val language: String,
+    @SerializedName("confidence_score") val confidenceScore: Double,
+    @SerializedName("speaker_segments") val speakerSegments: List<SpeakerSegmentDto>?
+)
+
+// ── Chatbot RAG ──────────────────────────────────────────────────────────
+data class ChatRequest(
+    @SerializedName("message") val message: String,
+    @SerializedName("session_id") val sessionId: String? = null
+)
+
+data class ChatSourceDto(
+    @SerializedName("call_id") val callId: String?,
+    @SerializedName("call_date") val callDate: String?,
+    @SerializedName("excerpt") val excerpt: String?
+)
+
+data class ChatResponseDto(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("reply") val reply: String,
+    @SerializedName("sources") val sources: List<ChatSourceDto>
+)
+
+data class ChatMessageDto(
+    @SerializedName("role") val role: String,               // "user" | "assistant"
+    @SerializedName("content") val content: String
+)
+
+data class ChatHistoryResponse(
+    @SerializedName("session_id") val sessionId: String?,
+    @SerializedName("messages") val messages: List<ChatMessageDto>
+)
+
+// ── GDPR Full Account Deletion ─────────────────────────────────────────
+data class DeleteAccountResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("summary") val summary: Map<String, Any>?
+)
+

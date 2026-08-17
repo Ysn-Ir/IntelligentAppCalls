@@ -143,4 +143,66 @@ interface ApiService {
         @Path("id") callId: String,
         @Part file: MultipartBody.Part
     ): Response<ResponseBody>
+
+    // ── AI Pipeline & Transcript Endpoints ───────────────────────────────
+    @GET("calls/{id}/ai-status")
+    suspend fun getAiStatus(
+        @Header("Authorization") token: String,
+        @Path("id") callId: String
+    ): Response<AiStatusDto>
+
+    @GET("calls/{id}/transcript")
+    suspend fun getTranscript(
+        @Header("Authorization") token: String,
+        @Path("id") callId: String
+    ): Response<TranscriptDto>
+
+    // ── Contact-Scoped & Global Chatbot Endpoints ────────────────────────
+    @POST("contacts/{contact_id}/chat")
+    suspend fun chatWithContact(
+        @Header("Authorization") token: String,
+        @Path("contact_id") contactId: String,
+        @Body request: ChatRequest
+    ): Response<ChatResponseDto>
+
+    @POST("chat")
+    suspend fun globalChat(
+        @Header("Authorization") token: String,
+        @Body request: ChatRequest
+    ): Response<ChatResponseDto>
+
+    @GET("contacts/{contact_id}/chat/history")
+    suspend fun getContactChatHistory(
+        @Header("Authorization") token: String,
+        @Path("contact_id") contactId: String
+    ): Response<ChatHistoryResponse>
+
+    @DELETE("contacts/{contact_id}/chat")
+    suspend fun clearContactChat(
+        @Header("Authorization") token: String,
+        @Path("contact_id") contactId: String
+    ): Response<Unit>
+
+    // ── GDPR Endpoints (Full account, call data, contact anonymization) ──
+    @DELETE("me")
+    suspend fun deleteAccount(
+        @Header("Authorization") token: String
+    ): Response<DeleteAccountResponse>
+
+    @GET("me/export")
+    suspend fun exportAllData(
+        @Header("Authorization") token: String
+    ): Response<ResponseBody>
+
+    @DELETE("calls/{id}/data")
+    suspend fun deleteCallData(
+        @Header("Authorization") token: String,
+        @Path("id") callId: String
+    ): Response<Unit>
+
+    @DELETE("contacts/{id}/data")
+    suspend fun eraseContactData(
+        @Header("Authorization") token: String,
+        @Path("id") contactId: String
+    ): Response<Unit>
 }

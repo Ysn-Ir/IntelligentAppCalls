@@ -14,6 +14,10 @@ import javax.inject.Inject
 
 import com.example.appcall.data.reminder.ReminderManager
 import com.example.appcall.domain.model.Appointment
+import com.example.appcall.data.model.AiStatusDto
+import com.example.appcall.data.model.TranscriptDto
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 // Screen-level loading wrapper (separate from backend status enums)
 sealed interface SummaryScreenState {
@@ -41,13 +45,43 @@ class SummaryViewModel @Inject constructor(
     private val _isLowConfidence = MutableStateFlow(false)
     val isLowConfidence: StateFlow<Boolean> = _isLowConfidence
 
+    private val _aiStatus = MutableStateFlow<AiStatusDto?>(null)
+    val aiStatus: StateFlow<AiStatusDto?> = _aiStatus
+
+    private val _transcript = MutableStateFlow<TranscriptDto?>(null)
+    val transcript: StateFlow<TranscriptDto?> = _transcript
+
     private var currentCallId: String? = null
+    private var pollingJob: kotlinx.coroutines.Job? = null
 
     fun loadSummary(callId: String) {
         currentCallId = callId
         _uiState.value = SummaryScreenState.Loading
+        pollingJob?.cancel()
 
         viewModelScope.launch {
+            // Load transcript in parallel
+            launch {
+                voipRepository.getTranscript(callId).onSuccess {
+                    _transcript.value = it
+                }
+            }
+
+            // Start AI status polling if needed
+            pollingJob = launch {
+                while (isActive) {
+                    voipRepository.getAiStatus(callId).onSuccess { statusDto ->
+                        _aiStatus.value = statusDto
+                        if (statusDto.aiStatus == "DONE" || statusDto.aiStatus == "FAILED") {
+                            // Status finished, load latest summary & transcript
+                            voipRepository.getTranscript(callId).onSuccess { _transcript.value = it }
+                            return@launch
+                        }
+                    }
+                    delay(3000)
+                }
+            }
+
             voipRepository.getCallSummary(callId)
                 .onSuccess { summary ->
                     _uiState.value = SummaryScreenState.Success(summary)

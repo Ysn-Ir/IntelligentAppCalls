@@ -31,6 +31,10 @@ fun SummaryScreen(
     val summaryText by viewModel.summaryText.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
     val isLowConfidence by viewModel.isLowConfidence.collectAsState()
+    val aiStatus by viewModel.aiStatus.collectAsState()
+    val transcript by viewModel.transcript.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Summary, 1 = Transcript
 
     // Load summary once when callId changes
     LaunchedEffect(callId) {
@@ -68,20 +72,88 @@ fun SummaryScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Call Summary",
-                        fontSize = 24.sp,
+                        text = "Analyse de l'Appel",
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "Review and validate call outcomes",
+                        text = "Transcription & Résumé IA",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Tab Selector: Résumé IA vs Transcription Diarisée
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { selectedTab = 0 },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedTab == 0) NeonTeal else Color(0x1F293754)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        "📝 Résumé IA",
+                        color = if (selectedTab == 0) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                Button(
+                    onClick = { selectedTab = 1 },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedTab == 1) ElectricViolet else Color(0x1F293754)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        "🎙️ Transcription",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            // AI Status Banner (when processing)
+            if (aiStatus?.aiStatus == "PROCESSING") {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0x3300F2FE))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            color = NeonTeal,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Pipeline IA en cours (Whisper + GPT-4o-mini)...",
+                            color = NeonTeal,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             when (val state = uiState) {
                 is SummaryScreenState.Loading -> {
@@ -116,98 +188,190 @@ fun SummaryScreen(
                 is SummaryScreenState.Success -> {
                     val summary = state.summary
 
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        // Low Confidence Banner
-                        if (isLowConfidence) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 16.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = Color(0x33F59E0B) // translucent orange/yellow
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = "Warning",
-                                        tint = Color(0xFFF59E0B),
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Column {
-                                        Text(
-                                            text = "Low Audio Quality Warning",
-                                            color = Color(0xFFF59E0B),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = "The AI transcription confidence was lower than 60%. Please verify accuracy and edit where necessary.",
-                                            color = Color.LightGray,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Summary Info / Status Row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Status Badge
-                            val statusColor = when (summary.status) {
-                                "VALIDATED" -> NeonTeal
-                                "MODIFIED" -> ElectricViolet
-                                else -> Color.Gray
-                            }
-                            Card(
-                                shape = RoundedCornerShape(6.dp),
-                                colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.2f))
-                            ) {
-                                Text(
-                                    text = summary.status,
-                                    color = statusColor,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Confidence Score Badge
-                            summary.confidenceScore?.let { score ->
-                                Text(
-                                    text = "Confidence: ${String.format("%.1f", score)}%",
-                                    color = if (score < 60.0) Color(0xFFF59E0B) else NeonTeal,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        // Main Summary Text Card
+                    if (selectedTab == 1) {
+                        // ── Tab 1: Detailed Transcript with Speaker Segments ──
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0x1F293754)
-                            )
+                            colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
                         ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxSize()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "TRANSCRIPTION COMPLÈTE",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ElectricViolet
+                                    )
+                                    val conf = transcript?.confidenceScore ?: summary.confidenceScore ?: 95.0
+                                    Text(
+                                        text = "Score : ${String.format("%.0f", conf)}%",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (conf < 60.0) Color(0xFFF59E0B) else NeonTeal
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                val segments = transcript?.speakerSegments
+                                if (!segments.isNullOrEmpty()) {
+                                    androidx.compose.foundation.lazy.LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        items(segments.size) { index ->
+                                            val seg = segments[index]
+                                            val isAgent = seg.speaker == "agent"
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        if (isAgent) Color(0x1F7C3AED) else Color(0x1F00F2FE),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(10.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = if (isAgent) "🗣️ Moi (Agent)" else "👤 Contact",
+                                                        color = if (isAgent) ElectricViolet else NeonTeal,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp
+                                                    )
+                                                    Text(
+                                                        text = "${String.format("%.1f", seg.start)}s - ${String.format("%.1f", seg.end)}s",
+                                                        color = Color.Gray,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = seg.text,
+                                                    color = Color.White,
+                                                    fontSize = 14.sp,
+                                                    lineHeight = 20.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    val raw = transcript?.rawText ?: summary.summaryText
+                                    Text(
+                                        text = raw,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        lineHeight = 22.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // ── Tab 0: AI Summary + Appointments ──
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        ) {
+                            // Low Confidence Banner
+                            if (isLowConfidence) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 16.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color(0x33F59E0B) // translucent orange/yellow
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = "Warning",
+                                            tint = Color(0xFFF59E0B),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column {
+                                            Text(
+                                                text = "Low Audio Quality Warning",
+                                                color = Color(0xFFF59E0B),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = "The AI transcription confidence was lower than 60%. Please verify accuracy and edit where necessary.",
+                                                color = Color.LightGray,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Summary Info / Status Row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Status Badge
+                                val statusColor = when (summary.status) {
+                                    "VALIDATED" -> NeonTeal
+                                    "MODIFIED" -> ElectricViolet
+                                    else -> Color.Gray
+                                }
+                                Card(
+                                    shape = RoundedCornerShape(6.dp),
+                                    colors = CardDefaults.cardColors(containerColor = statusColor.copy(alpha = 0.2f))
+                                ) {
+                                    Text(
+                                        text = summary.status,
+                                        color = statusColor,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                // Confidence Score Badge
+                                summary.confidenceScore?.let { score ->
+                                    Text(
+                                        text = "Confidence: ${String.format("%.1f", score)}%",
+                                        color = if (score < 60.0) Color(0xFFF59E0B) else NeonTeal,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            // Main Summary Text Card
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0x1F293754)
+                                )
+                            ) {
                             Column(
                                 modifier = Modifier
                                     .padding(16.dp)
@@ -466,8 +630,10 @@ fun SummaryScreen(
                         }
                     }
                 }
+                }
                 else -> {}
             }
         }
     }
 }
+

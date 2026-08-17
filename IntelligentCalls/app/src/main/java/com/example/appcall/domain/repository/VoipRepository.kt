@@ -39,4 +39,20 @@ interface VoipRepository {
 
     suspend fun fetchAgenda(): Result<List<com.example.appcall.data.local.LocalAgendaItem>>
     suspend fun createAgenda(id: String, title: String, time: String): Result<Unit>
+
+    // ── AI Pipeline & Transcripts ─────────────────────────────────────────
+    suspend fun getAiStatus(callId: String): Result<com.example.appcall.data.model.AiStatusDto>
+    suspend fun getTranscript(callId: String): Result<com.example.appcall.data.model.TranscriptDto>
+
+    // ── Chatbot RAG ───────────────────────────────────────────────────────
+    suspend fun chatWithContact(contactId: String, message: String, sessionId: String? = null): Result<com.example.appcall.data.model.ChatResponseDto>
+    suspend fun globalChat(message: String, sessionId: String? = null): Result<com.example.appcall.data.model.ChatResponseDto>
+    suspend fun getContactChatHistory(contactId: String): Result<com.example.appcall.data.model.ChatHistoryResponse>
+    suspend fun clearContactChat(contactId: String): Result<Unit>
+
+    // ── GDPR Comprehensive Data Management ───────────────────────────────
+    suspend fun deleteAccount(): Result<Unit>
+    suspend fun exportAllData(): Result<String>
+    suspend fun deleteCallData(callId: String): Result<Unit>
+    suspend fun eraseContactData(contactId: String): Result<Unit>
 }
