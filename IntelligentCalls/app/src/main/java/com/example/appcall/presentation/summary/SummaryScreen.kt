@@ -518,7 +518,7 @@ fun SummaryScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = "PROPOSED APPOINTMENT",
+                                                text = "🎯 RENDEZ-VOUS DÉTECTÉ PAR IA",
                                                 color = NeonTeal,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
@@ -529,8 +529,14 @@ fun SummaryScreen(
                                                     containerColor = Color(0x1AFFFFFF)
                                                 )
                                             ) {
+                                                val statusLabel = when (appointment.status) {
+                                                    "CONFIRMED" -> "CONFIRMÉ"
+                                                    "PROPOSED" -> "PROPOSÉ"
+                                                    "MODIFIED" -> "MODIFIÉ"
+                                                    else -> appointment.status
+                                                }
                                                 Text(
-                                                    text = appointment.status,
+                                                    text = statusLabel,
                                                     color = Color.White,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -539,10 +545,10 @@ fun SummaryScreen(
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Spacer(modifier = Modifier.height(10.dp))
 
                                         Text(
-                                            text = appointment.title ?: "Réunion sans titre",
+                                            text = appointment.title ?: "Rendez-vous professionnel",
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 16.sp
@@ -550,15 +556,27 @@ fun SummaryScreen(
 
                                         Spacer(modifier = Modifier.height(4.dp))
 
-                                        // Stubbed date/time representation as per UI contract §4.3
+                                        val dateDisplay = try {
+                                            if (appointment.scheduledAt.contains("T")) {
+                                                val datePart = appointment.scheduledAt.substringBefore("T")
+                                                val timePart = appointment.scheduledAt.substringAfter("T").substringBefore("Z").take(5)
+                                                "📅 Date : $datePart • ⏰ Heure : $timePart"
+                                            } else {
+                                                "📅 $appointment.scheduledAt"
+                                            }
+                                        } catch (e: Exception) {
+                                            "📅 ${appointment.scheduledAt}"
+                                        }
+
                                         Text(
-                                            text = "Date: ${appointment.scheduledAt.substringBefore("T")}  •  Time: ${appointment.scheduledAt.substringAfter("T").substringBefore("Z").substring(0, 5)}",
-                                            color = Color.LightGray,
-                                            fontSize = 13.sp
+                                            text = dateDisplay,
+                                            color = Color(0xFF93C5FD),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
 
                                         if (appointment.status == "PROPOSED" || appointment.status == "MODIFIED") {
-                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Spacer(modifier = Modifier.height(14.dp))
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -567,10 +585,11 @@ fun SummaryScreen(
                                                     onClick = { viewModel.dismissAppointment() },
                                                     modifier = Modifier.weight(1f),
                                                     colors = ButtonDefaults.outlinedButtonColors(
-                                                        contentColor = Color.Red
-                                                    )
+                                                        contentColor = Color(0xFFEF4444)
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp)
                                                 ) {
-                                                    Text("Dismiss")
+                                                    Text("Ignorer", fontSize = 12.sp)
                                                 }
 
                                                 Button(
@@ -578,19 +597,21 @@ fun SummaryScreen(
                                                     modifier = Modifier.weight(1f),
                                                     colors = ButtonDefaults.buttonColors(
                                                         containerColor = ElectricViolet
-                                                    )
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp)
                                                 ) {
-                                                    Text("Voice Edit", color = Color.White)
+                                                    Text("Modifier", color = Color.White, fontSize = 12.sp)
                                                 }
 
                                                 Button(
                                                     onClick = { viewModel.validateAppointment() },
-                                                    modifier = Modifier.weight(1f),
+                                                    modifier = Modifier.weight(1.2f),
                                                     colors = ButtonDefaults.buttonColors(
                                                         containerColor = NeonTeal
-                                                    )
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp)
                                                 ) {
-                                                    Text("Confirm", color = Color.Black, fontWeight = FontWeight.Bold)
+                                                    Text("✅ Confirmer", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 }
                                             }
                                         }

@@ -488,14 +488,18 @@ def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
 def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
     summary = ensure_call_summary_exists(id, db)
     
+    appt = summary.appointment
+    if not appt and summary.detected_appointment_id:
+        appt = db.query(Appointment).filter(Appointment.id == summary.detected_appointment_id).first()
+    
     appt_dto = None
-    if summary.appointment:
+    if appt:
         appt_dto = schemas.AppointmentDto(
-            id=summary.appointment.id,
-            contact_id=summary.appointment.contact_id,
-            scheduled_at=summary.appointment.scheduled_at.isoformat() + "Z",
-            status=summary.appointment.status,
-            title=summary.appointment.title
+            id=appt.id,
+            contact_id=appt.contact_id or "contact-1111",
+            scheduled_at=appt.scheduled_at.isoformat() + "Z" if appt.scheduled_at else datetime.utcnow().isoformat() + "Z",
+            status=appt.status or "PROPOSED",
+            title=appt.title or "Rendez-vous détecté"
         )
         
     transcript_row = db.query(Transcript).filter(Transcript.call_id == id).first()
@@ -507,7 +511,7 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
         summary_text=summary.summary_text,
         status=summary.status,
         confidence_score=confidence,
-        detected_appointment_id=summary.detected_appointment_id,
+        detected_appointment_id=summary.detected_appointment_id or (appt.id if appt else None),
         appointment=appt_dto
     )
 

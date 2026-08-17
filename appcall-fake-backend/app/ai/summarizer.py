@@ -27,36 +27,38 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
 
 # ─────────────────────────────────────────────
-# System prompt (French only)
+# Dynamic System prompt
 # ─────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Tu es un assistant IA pour centre d'appels. 
-Tu analyses les transcriptions d'appels téléphoniques et extrais les informations clés.
+def get_system_prompt() -> str:
+    now = datetime.utcnow()
+    date_str = now.strftime("%A %d %B %Y")
+    iso_date = now.strftime("%Y-%m-%d")
+    return f"""Tu es un assistant IA pour centre d'appels téléphoniques.
+Aujourd'hui nous sommes le {date_str} (Date ISO: {iso_date}).
 
-Tu DOIS répondre UNIQUEMENT en JSON valide, sans texte avant ou après, avec cette structure exacte :
-{
-  "resume": "Résumé concis de l'appel en 2-3 phrases.",
+Tu DOIS analyser la transcription et répondre UNIQUEMENT en JSON valide, sans texte additionnel :
+{{
+  "resume": "Résumé clair et professionnel de l'appel en 2-3 phrases.",
   "sentiment": "POSITIF" | "NEUTRE" | "NEGATIF",
   "rendez_vous": [
-    {
-      "titre": "Titre du rendez-vous",
-      "date": "YYYY-MM-DD ou null si non précisé",
-      "heure": "HH:MM ou null si non précisé",
-      "confiance": 0.0 à 1.0
-    }
+    {{
+      "titre": "Titre explicite du rendez-vous (ex: Point commercial avec Marc)",
+      "date": "YYYY-MM-DD (Calcule la date exacte selon la date d'aujourd'hui {iso_date})",
+      "heure": "HH:MM (ex: 14:00, 09:30, 16:00)",
+      "confiance": 0.95
+    }}
   ],
   "actions": [
-    "Action 1 à effectuer",
-    "Action 2 à effectuer"
+    "Action concrète à réaliser"
   ]
-}
+}}
 
-Règles :
-- Le résumé doit être en français, factuel et professionnel.
-- rendez_vous est une liste vide [] si aucun rendez-vous n'est mentionné.
-- actions est une liste vide [] si aucune action n'est requise.
-- confiance reflète la certitude qu'il s'agit bien d'un rendez-vous (0.9 = très sûr).
-- Si la date/heure n'est pas mentionnée explicitement, utilise null.
+Règles pour la détection de rendez-vous :
+- Si un rendez-vous, une réunion, un rappel, un appel de suivi ou une entrevue est convenu ou proposé, EXTRAIS-LE dans "rendez_vous".
+- Si l'interlocuteur mentionne "demain", "mardi", "vendredi prochain", calcule la date exacte YYYY-MM-DD.
+- Si une heure est mentionnée (ex: "14h", "14h30", "à 10 heures"), formate en HH:MM.
+- Mets "rendez_vous": [] uniquement si aucun rendez-vous/réunion/rappel n'est mentionné.
 """
 
 
@@ -119,7 +121,7 @@ Analyse cet appel et retourne le JSON demandé."""
             model=model,
             response_format={"type": "json_object"},
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": get_system_prompt()},
                 {"role": "user", "content": user_message},
             ],
             temperature=0.2,
@@ -157,7 +159,7 @@ def summarize_call(call_id: str, db) -> "CallSummary":
     Reads the transcript for call_id, runs GPT summarization,
     creates/updates CallSummary and Appointment rows in the DB.
     """
-    from ..database import Transcript, CallSummary, Appointment, Call
+    from ..database import Transcript, CallSummary, Appointment, Call, Contact, AgendaModel
 
     # Load transcript
     transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
@@ -180,8 +182,8 @@ def summarize_call(call_id: str, db) -> "CallSummary":
     contact_id = call.contact_id if call and call.contact_id else None
     if not contact_id:
         c = db.query(Contact).first()
-        contact_id = c.id if c else None
-    user_id = call.user_id if call and call.user_id else None
+        contact_id = c.id if c else "contact-1111"
+    user_id = call.user_id if call and call.user_id else "system"
 
     # Create appointments detected
     appointment_id = None
@@ -198,6 +200,19 @@ def summarize_call(call_id: str, db) -> "CallSummary":
                 title=rdv.get("titre", "Rendez-vous détecté par IA"),
             )
             db.add(appt)
+
+            # Sync with agenda_backend
+            try:
+                agenda_item = AgendaModel(
+                    id=appt.id,
+                    user_id=user_id,
+                    title=appt.title,
+                    scheduled_at=scheduled_at
+                )
+                db.add(agenda_item)
+            except Exception as e_ag:
+                logger.warning(f"Could not add to agenda_backend: {e_ag}")
+
             db.commit()
             db.refresh(appt)
             appointment_id = appt.id  # Use first/best appointment
