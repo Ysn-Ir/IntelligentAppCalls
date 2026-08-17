@@ -95,3 +95,21 @@ class FileDto(BaseModel):
     name: str
     path: str
     size: str
+
+class CallInitiateRequest(BaseModel):
+    contact_id: str
+    direction: str = "OUTBOUND"
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None  # If provided, continues existing session
+
+class ChatSourceDto(BaseModel):
+    call_id: Optional[str] = None
+    call_date: Optional[str] = None
+    excerpt: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    session_id: str
+    reply: str
+    sources: List[ChatSourceDto] = []

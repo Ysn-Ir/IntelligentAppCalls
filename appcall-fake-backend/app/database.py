@@ -1,8 +1,16 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey, Text, Float, Integer
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey, Text, Float, Integer, JSON
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+
+# pgvector support (optional — falls back gracefully if not installed)
+try:
+    from pgvector.sqlalchemy import Vector
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+    Vector = None
 
 DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:@localhost:3306/appcall_db")
 
@@ -37,13 +45,15 @@ class Call(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     contact_id = Column(String(36), ForeignKey("contacts.id"))
     user_id = Column(String(36), ForeignKey("users.id"))
-    direction = Column(String(10)) # INBOUND, OUTBOUND
+    direction = Column(String(10))  # INBOUND, OUTBOUND
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
-    status = Column(String(15)) # COMPLETED, MISSED, FAILED, ONGOING
+    status = Column(String(15))  # COMPLETED, MISSED, FAILED, ONGOING
     consent_given = Column(Boolean, default=False)
     consent_timestamp = Column(DateTime, nullable=True)
     twilio_params = Column(Text, nullable=True)
+    audio_url = Column(String(512), nullable=True)  # S3/MinIO URL after upload
+    ai_status = Column(String(20), default="PENDING")  # PENDING, PROCESSING, DONE, FAILED
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact")
@@ -55,6 +65,7 @@ class Transcript(Base):
     raw_text = Column(Text, default="")
     language = Column(String(10), default="fr")
     confidence_score = Column(Float, default=0.0)
+    speaker_segments = Column(Text, nullable=True)  # JSON array of {speaker, start, end, text}
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class CallSummary(Base):
@@ -113,6 +124,38 @@ class FileModel(Base):
     path = Column(String(512))
     size = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TranscriptEmbedding(Base):
+    """
+    Stores vector embeddings of transcript chunks for RAG chatbot.
+    Uses pgvector if available, otherwise stores as JSON text.
+    """
+    __tablename__ = "transcript_embeddings"
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    transcript_id = Column(String(36), ForeignKey("transcripts.id"), nullable=False)
+    contact_id = Column(String(36), ForeignKey("contacts.id"), nullable=True)
+    chunk_text = Column(Text, nullable=False)
+    # Store embedding as Text (JSON array) for SQLite/MySQL compat.
+    # On PostgreSQL with pgvector, this can be cast to vector(1536).
+    embedding = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    transcript = relationship("Transcript")
+
+
+class ChatbotSession(Base):
+    """
+    Stores conversation history for the contact-based AI chatbot.
+    One session per (user, contact) pair — or (user, None) for global chat.
+    """
+    __tablename__ = "chatbot_sessions"
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    contact_id = Column(String(36), ForeignKey("contacts.id"), nullable=True)  # NULL = global
+    messages = Column(Text, default="[]")  # JSON array of {role, content}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 def init_db():
     Base.metadata.create_all(bind=engine)

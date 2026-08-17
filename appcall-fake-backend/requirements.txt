@@ -1,9 +1,35 @@
+# ── Core Web Framework ──────────────────────────────────────────────────────
 fastapi>=0.110.0
 uvicorn>=0.28.0
-sqlalchemy>=2.0.0
 python-multipart>=0.0.9
 websockets>=12.0
-pymysql>=1.1.0
+
+# ── Database ─────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.0
+pymysql>=1.1.0          # MySQL driver (current DB)
+psycopg2-binary>=2.9.9  # PostgreSQL driver (target migration)
+pgvector>=0.3.0         # pgvector Python client for vector similarity search
+alembic>=1.13.0         # Database migrations
+
+# ── Auth ─────────────────────────────────────────────────────────────────────
 passlib[bcrypt]>=1.7.4
 pyjwt>=2.8.0
 cryptography>=42.0.0
+
+# ── AI — Transcription ────────────────────────────────────────────────────────
+faster-whisper>=1.0.3   # Local Whisper STT (runs on CPU or GPU)
+# pyannote.audio>=3.3.2 # Speaker diarization (uncomment + set HF_TOKEN)
+
+# ── AI — LLM / Embeddings ─────────────────────────────────────────────────────
+openai>=1.40.0          # GPT-4o-mini summarization + text-embedding-3-small
+
+# ── Background Jobs ───────────────────────────────────────────────────────────
+celery[redis]>=5.3.6    # Task queue for AI pipeline
+redis>=5.0.0            # Redis client
+
+# ── Object Storage ────────────────────────────────────────────────────────────
+minio>=7.2.0            # MinIO client (S3-compatible, local dev)
+# boto3>=1.34.0         # Uncomment for AWS S3 in production
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0    # .env file loading

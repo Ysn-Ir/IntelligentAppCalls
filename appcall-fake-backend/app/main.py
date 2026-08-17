@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from .database import engine, SessionLocal, init_db, User, Contact, Call, Transcript, CallSummary, Appointment, Reminder, TaskModel, AgendaModel, FileModel
+from .database import engine, SessionLocal, init_db, User, Contact, Call, Transcript, CallSummary, Appointment, Reminder, TaskModel, AgendaModel, FileModel, TranscriptEmbedding, ChatbotSession
 from . import schemas
 
 # Ensure upload directory exists
@@ -625,28 +625,87 @@ def create_reminder(reminder: schemas.ReminderDto, token: str = Depends(verify_t
     return {"status": "ok"}
 
 @app.get("/api/v1/users/me/voice-data/export")
-def export_voice_data(token: str = Depends(verify_token), db: Session = Depends(get_db)):
-    transcripts = db.query(Transcript).all()
-    data = []
-    for t in transcripts:
-        data.append({
-            "call_id": t.call_id,
-            "raw_text": t.raw_text,
-            "confidence_score": t.confidence_score
-        })
-    return {"exported_transcripts": data}
+def export_voice_data(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """RGPD Art. 15 — Droit d'accès: export de toutes les données de l'utilisateur."""
+    from .gdpr import export_user_data
+    return export_user_data(user_id, db)
 
 @app.delete("/api/v1/users/me/voice-data")
-def delete_voice_data(token: str = Depends(verify_token), db: Session = Depends(get_db)):
-    db.query(Transcript).delete()
+def delete_voice_data(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Deletes all transcripts for the current user (lightweight voice-data erasure)."""
+    calls = db.query(Call).filter(Call.user_id == user_id).all()
+    for call in calls:
+        t = db.query(Transcript).filter(Transcript.call_id == call.id).first()
+        if t:
+            db.query(TranscriptEmbedding).filter(TranscriptEmbedding.transcript_id == t.id).delete()
+            db.delete(t)
     db.commit()
     return {"status": "ok"}
 
+
+# ─────────────────────────────────────────────
+# GDPR Full Account Deletion (Art. 17 RGPD)
+# ─────────────────────────────────────────────
+
+@app.delete("/api/v1/me")
+def delete_account(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    RGPD Art. 17 — Droit à l'effacement ("droit à l'oubli").
+    Supprime définitivement le compte et toutes les données associées.
+    Délai légal: 30 jours. Cette implémentation est immédiate.
+    """
+    from .gdpr import delete_user_account
+    result = delete_user_account(user_id, db)
+    return {"status": "deleted", "summary": result}
+
+
+@app.get("/api/v1/me/export")
+def export_my_data(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    RGPD Art. 15 — Droit d'accès + Art. 20 — Portabilité.
+    Retourne un export JSON complet de toutes les données de l'utilisateur.
+    """
+    from .gdpr import export_user_data
+    return export_user_data(user_id, db)
+
+
+@app.delete("/api/v1/calls/{id}/data")
+def delete_call_gdpr(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """RGPD — Supprime un appel et toutes ses données (audio, transcription, résumé)."""
+    from .gdpr import delete_call_data
+    call = db.query(Call).filter(Call.id == id, Call.user_id == user_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Appel introuvable")
+    result = delete_call_data(id, db)
+    return {"status": "deleted", "summary": result}
+
+
+@app.delete("/api/v1/contacts/{id}/data")
+def erase_contact_gdpr(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """RGPD — Anonymise un contact et supprime tout l'historique d'appels lié."""
+    from .gdpr import erase_contact_data
+    contact = db.query(Contact).filter(Contact.id == id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    result = erase_contact_data(id, db)
+    return {"status": "erased", "summary": result}
+
 @app.post("/api/v1/calls/{id}/audio")
-def upload_audio(id: str, file: UploadFile = FastAPIFile(...), token: str = Depends(verify_token), db: Session = Depends(get_db)):
+async def upload_audio(
+    id: str,
+    file: UploadFile = FastAPIFile(...),
+    token: str = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Receives an audio recording from the Android app after a call ends.
+    Stores the file (local or MinIO), then queues the AI processing pipeline.
+
+    Consent gate: rejects upload if consent_given=False on the call.
+    """
+    # Self-heal: create call row if missing (native dialer calls)
     call = db.query(Call).filter(Call.id == id).first()
     if not call:
-        # Self-healing: auto-create call row so audio uploads for native calls don't 404
         user = db.query(User).first()
         contact = db.query(Contact).first()
         call = Call(
@@ -661,12 +720,75 @@ def upload_audio(id: str, file: UploadFile = FastAPIFile(...), token: str = Depe
         db.add(call)
         db.commit()
         db.refresh(call)
-        
-    file_path = os.path.join(UPLOAD_DIR, f"{id}_{file.filename}")
-    with open(file_path, "wb") as buffer:
-        buffer.write(file.file.read())
-        
-    return {"status": "ok", "filename": file.filename}
+
+    # GDPR Consent gate: do not store audio without consent
+    if not call.consent_given:
+        raise HTTPException(
+            status_code=403,
+            detail="Enregistrement refusé : le consentement n'a pas été donné pour cet appel."
+        )
+
+    # Read file bytes
+    file_bytes = await file.read()
+    content_type = file.content_type or "audio/mp4"
+
+    # Store in MinIO or local filesystem
+    from .storage import upload_audio_file
+    audio_url = upload_audio_file(id, file_bytes, content_type)
+
+    # Update call record
+    call.audio_url = audio_url
+    call.ai_status = "PROCESSING"
+    db.commit()
+
+    # Determine local path for the worker
+    ext = "wav" if "wav" in content_type else "m4a"
+    local_path = os.path.join(UPLOAD_DIR, f"{id}.{ext}")
+    if not os.path.exists(local_path):
+        # Save a local copy for the worker (faster-whisper needs a file path)
+        with open(local_path, "wb") as f:
+            f.write(file_bytes)
+
+    # Queue AI processing pipeline (Celery)
+    try:
+        from .worker import process_call_audio
+        process_call_audio.delay(id, local_path)
+    except Exception as e:
+        # If Celery/Redis not running, run synchronously as a background task
+        import asyncio
+        from fastapi import BackgroundTasks
+        from .ai.transcriber import transcribe_call
+        from .ai.summarizer import summarize_call
+        from .ai.embeddings import index_transcript
+        import threading
+
+        def _run_pipeline():
+            from .database import SessionLocal
+            _db = SessionLocal()
+            try:
+                t = transcribe_call(id, local_path, _db)
+                summarize_call(id, _db)
+                if call.contact_id:
+                    index_transcript(t.id, call.contact_id, t.raw_text, _db)
+                c = _db.query(Call).filter(Call.id == id).first()
+                if c:
+                    c.ai_status = "DONE"
+                    _db.commit()
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).error(f"Inline pipeline error: {ex}")
+            finally:
+                _db.close()
+
+        threading.Thread(target=_run_pipeline, daemon=True).start()
+
+    return {
+        "status": "ok",
+        "call_id": id,
+        "audio_url": audio_url,
+        "ai_status": "PROCESSING",
+        "message": "Fichier reçu. Transcription en cours."
+    }
 
 @app.get("/api/v1/calls/{id}/audio")
 def download_audio(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
@@ -831,6 +953,120 @@ def twilio_media_stream():
     return {"status": "ok"}
 
 # ----------------- WebSocket Live Transcript -----------------
+
+# ─────────────────────────────────────────────
+# AI Status Endpoint
+# ─────────────────────────────────────────────
+
+@app.get("/api/v1/calls/{id}/ai-status")
+def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Returns the current AI processing status for a call."""
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Appel introuvable")
+    transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
+    summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
+    return {
+        "call_id": id,
+        "ai_status": getattr(call, "ai_status", "UNKNOWN"),
+        "has_transcript": transcript is not None,
+        "has_summary": summary is not None,
+        "transcript_confidence": transcript.confidence_score if transcript else None,
+    }
+
+
+# ─────────────────────────────────────────────
+# Chatbot Endpoints (RAG Contact Chatbot)
+# ─────────────────────────────────────────────
+
+@app.post("/api/v1/contacts/{contact_id}/chat")
+def chat_with_contact(
+    contact_id: str,
+    body: schemas.ChatRequest,
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Sends a message to the contact-scoped AI chatbot.
+    The chatbot answers based on the full call history with this contact.
+
+    Example: "Qu'est-ce qu'Ahmed a dit la semaine dernière ?"
+    """
+    from .ai.chatbot import chat as ai_chat
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact introuvable")
+    result = ai_chat(
+        user_id=user_id,
+        message=body.message,
+        contact_id=contact_id,
+        db=db,
+        session_id=body.session_id,
+    )
+    return result
+
+
+@app.post("/api/v1/chat")
+def global_chat(
+    body: schemas.ChatRequest,
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Global chatbot — answers questions about all calls (not scoped to a contact).
+    Example: "Résume tous mes appels de cette semaine."
+    """
+    from .ai.chatbot import chat as ai_chat
+    result = ai_chat(
+        user_id=user_id,
+        message=body.message,
+        contact_id=None,
+        db=db,
+        session_id=body.session_id,
+    )
+    return result
+
+
+@app.get("/api/v1/contacts/{contact_id}/chat/history")
+def get_contact_chat_history(
+    contact_id: str,
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Returns the chatbot conversation history for a specific contact."""
+    session = db.query(ChatbotSession).filter(
+        ChatbotSession.user_id == user_id,
+        ChatbotSession.contact_id == contact_id,
+    ).order_by(ChatbotSession.updated_at.desc()).first()
+    if not session:
+        return {"session_id": None, "messages": []}
+    import json as _json
+    return {
+        "session_id": session.id,
+        "messages": _json.loads(session.messages) if session.messages else [],
+    }
+
+
+@app.delete("/api/v1/contacts/{contact_id}/chat")
+def clear_contact_chat(
+    contact_id: str,
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Clears the chatbot conversation history for a contact."""
+    from .ai.chatbot import clear_session
+    session = db.query(ChatbotSession).filter(
+        ChatbotSession.user_id == user_id,
+        ChatbotSession.contact_id == contact_id,
+    ).first()
+    if session:
+        clear_session(session.id, db)
+    return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────
+# WebSocket Live Transcript (Canned / Fallback)
+# ─────────────────────────────────────────────
 
 CANNED_TRANSCRIPT_LINES = [
     "Allo, bonjour ?",

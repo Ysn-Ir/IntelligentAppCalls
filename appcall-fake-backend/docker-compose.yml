@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  # ─── FastAPI Backend ─────────────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: appcall_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://appcall:appcall_password@postgres:5432/appcall_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BACKEND_URL=redis://redis:6379/1
+      - STORAGE_MODE=minio
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=appcall-audio
+      - MINIO_SECURE=false
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - WHISPER_MODEL=small
+      - WHISPER_DEVICE=cpu
+      - JWT_SECRET=${JWT_SECRET:-appcall_secret_jwt_key_2026}
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    restart: unless-stopped
+
+  # ─── Celery Worker (AI Pipeline) ─────────────────────────────────────────────
+  worker:
+    build: .
+    container_name: appcall_worker
+    command: celery -A app.worker worker --loglevel=info --concurrency=2
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://appcall:appcall_password@postgres:5432/appcall_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BACKEND_URL=redis://redis:6379/1
+      - STORAGE_MODE=minio
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=appcall-audio
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - WHISPER_MODEL=small
+      - WHISPER_DEVICE=cpu
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    restart: unless-stopped
+
+  # ─── Celery Beat (GDPR auto-purge scheduler) ─────────────────────────────────
+  beat:
+    build: .
+    container_name: appcall_beat
+    command: celery -A app.worker beat --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BACKEND_URL=redis://redis:6379/1
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: appcall_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: appcall_db
+      POSTGRES_USER: appcall
+      POSTGRES_PASSWORD: appcall_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ─── Redis (Celery broker) ────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: appcall_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # ─── MinIO (object storage — local S3) ───────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: appcall_minio
+    ports:
+      - "9000:9000"     # API
+      - "9001:9001"     # Web console (http://localhost:9001)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
