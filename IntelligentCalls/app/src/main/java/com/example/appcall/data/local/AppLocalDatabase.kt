@@ -245,6 +245,83 @@ class AppLocalDatabase @Inject constructor(
         }
     }
 
+    fun getChatSessions(contactId: String?): List<ChatSessionSummary> {
+        val list = mutableListOf<ChatSessionSummary>()
+        try {
+            val db = readableDatabase
+            val selection = if (contactId == null) "$KEY_CHAT_CONTACT_ID IS NULL" else "$KEY_CHAT_CONTACT_ID = ?"
+            val selectionArgs = if (contactId == null) null else arrayOf(contactId)
+            val cursor = db.query(TABLE_CHAT, null, selection, selectionArgs, null, null, "$KEY_CHAT_ID DESC")
+            val sessionMap = linkedMapOf<String, MutableList<LocalChatMessage>>()
+            cursor.use {
+                while (it.moveToNext()) {
+                    val sId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)) ?: "session-${it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID))}"
+                    val msg = LocalChatMessage(
+                        id = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID)),
+                        sessionId = sId,
+                        contactId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_CONTACT_ID)),
+                        isUser = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_IS_USER)) == 1,
+                        text = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_TEXT)),
+                        sourcesJson = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SOURCES)),
+                        createdAt = it.getLong(it.getColumnIndexOrThrow(KEY_CHAT_CREATED_AT))
+                    )
+                    sessionMap.getOrPut(sId) { mutableListOf() }.add(msg)
+                }
+            }
+            for ((sId, msgs) in sessionMap) {
+                val firstUserMsg = msgs.lastOrNull { it.isUser }?.text ?: msgs.lastOrNull()?.text ?: "Conversation"
+                val lastTs = msgs.firstOrNull()?.createdAt ?: System.currentTimeMillis()
+                list.add(
+                    ChatSessionSummary(
+                        sessionId = sId,
+                        contactId = contactId,
+                        previewText = firstUserMsg.take(60),
+                        messageCount = msgs.size,
+                        lastTimestamp = lastTs
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get chat sessions: ${e.message}")
+        }
+        return list
+    }
+
+    fun getSessionMessages(sessionId: String): List<LocalChatMessage> {
+        val list = mutableListOf<LocalChatMessage>()
+        try {
+            val db = readableDatabase
+            val cursor = db.query(TABLE_CHAT, null, "$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId), null, null, "$KEY_CHAT_ID ASC")
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(
+                        LocalChatMessage(
+                            id = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID)),
+                            sessionId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)),
+                            contactId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_CONTACT_ID)),
+                            isUser = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_IS_USER)) == 1,
+                            text = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_TEXT)),
+                            sourcesJson = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SOURCES)),
+                            createdAt = it.getLong(it.getColumnIndexOrThrow(KEY_CHAT_CREATED_AT))
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get session messages: ${e.message}")
+        }
+        return list
+    }
+
+    fun deleteSession(sessionId: String) {
+        try {
+            val db = writableDatabase
+            db.delete(TABLE_CHAT, "$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete session: ${e.message}")
+        }
+    }
+
     // --- Calls Table Operations ---
 
     fun saveCallSummary(summary: CallSummary) {
@@ -486,4 +563,5 @@ data class LocalTask(val id: String, val title: String, val completed: Boolean)
 data class LocalAgendaItem(val id: String, val title: String, val scheduledAt: String)
 data class LocalFileItem(val id: String, val name: String, val path: String, val size: String)
 data class LocalChatMessage(val id: Int, val sessionId: String?, val contactId: String?, val isUser: Boolean, val text: String, val sourcesJson: String?, val createdAt: Long)
+data class ChatSessionSummary(val sessionId: String, val contactId: String?, val previewText: String, val messageCount: Int, val lastTimestamp: Long)
 data class SyncItem(val id: Int, val callId: String, val actionType: String, val filePath: String?, val payload: String?)

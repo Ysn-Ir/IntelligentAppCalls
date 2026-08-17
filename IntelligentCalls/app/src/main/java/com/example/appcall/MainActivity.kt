@@ -34,6 +34,12 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,6 +55,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
@@ -468,18 +475,32 @@ fun AiAssistantSection(
     var selectedContactId by remember { mutableStateOf<String?>(null) }
     var currentSessionId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
+    var sessionList by remember { mutableStateOf<List<com.example.appcall.data.local.ChatSessionSummary>>(emptyList()) }
     val coroutineScope = rememberCoroutineScope()
 
+    fun startNewConversation() {
+        currentSessionId = "session-${System.currentTimeMillis()}"
+        chatMessages = listOf(
+            ChatDisplayItem(
+                isUser = false,
+                text = "Nouvelle conversation démarrée ! Posez votre question sur l'ensemble de vos appels."
+            )
+        )
+    }
+
     fun loadChatHistory(contactId: String?) {
-        val history = localDatabase.getChatHistory(contactId)
-        if (history.isNotEmpty()) {
-            chatMessages = history.map { item ->
+        val sessions = localDatabase.getChatSessions(contactId)
+        if (sessions.isNotEmpty()) {
+            val latestSessionId = sessions.first().sessionId
+            val msgs = localDatabase.getSessionMessages(latestSessionId)
+            chatMessages = msgs.map { item ->
                 ChatDisplayItem(
                     isUser = item.isUser,
                     text = item.text
                 )
             }
-            currentSessionId = history.lastOrNull()?.sessionId
+            currentSessionId = latestSessionId
         } else {
             chatMessages = listOf(
                 ChatDisplayItem(
@@ -491,6 +512,28 @@ fun AiAssistantSection(
         }
     }
 
+    fun openSession(sessionId: String) {
+        val msgs = localDatabase.getSessionMessages(sessionId)
+        if (msgs.isNotEmpty()) {
+            chatMessages = msgs.map { item ->
+                ChatDisplayItem(
+                    isUser = item.isUser,
+                    text = item.text
+                )
+            }
+            currentSessionId = sessionId
+        }
+        showHistoryDialog = false
+    }
+
+    fun deleteSessionItem(sessionId: String) {
+        localDatabase.deleteSession(sessionId)
+        sessionList = localDatabase.getChatSessions(selectedContactId)
+        if (currentSessionId == sessionId) {
+            startNewConversation()
+        }
+    }
+
     LaunchedEffect(Unit) {
         voipRepository.getContacts().onSuccess { contacts = it }
     }
@@ -499,16 +542,157 @@ fun AiAssistantSection(
         loadChatHistory(selectedContactId)
     }
 
+    // ── CONVERSATION HISTORY DIALOG ──
+    if (showHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showHistoryDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📜 Historique des Conversations",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                    Button(
+                        onClick = {
+                            startNewConversation()
+                            showHistoryDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F172A), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("+ Nouvelle Conversation", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    if (sessionList.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Aucune conversation enregistrée.", color = Color.Gray, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(sessionList) { session ->
+                                val dateStr = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRENCH).format(Date(session.lastTimestamp))
+                                val isCurrent = session.sessionId == currentSessionId
+
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isCurrent) Color(0x3300F2FE) else Color(0xFF1E293B)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = dateStr,
+                                                color = if (isCurrent) NeonTeal else Color.Gray,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Card(
+                                                shape = RoundedCornerShape(4.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF))
+                                            ) {
+                                                Text(
+                                                    text = "${session.messageCount} msg",
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = session.previewText,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 2
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(
+                                                onClick = { deleteSessionItem(session.sessionId) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Supprimer",
+                                                    tint = Color(0xFFEF4444),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Button(
+                                                onClick = { openSession(session.sessionId) },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isCurrent) NeonTeal else ElectricViolet
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isCurrent) "Actif" else "Ouvrir",
+                                                    color = if (isCurrent) Color.Black else Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHistoryDialog = false }) {
+                    Text("Fermer", color = NeonTeal, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0F172A))
             .padding(16.dp)
     ) {
+        // ── TOP HEADER WITH ACTIONS ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -516,30 +700,45 @@ fun AiAssistantSection(
                 Text(
                     text = "Assistant IA (RAG)",
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Recherche intelligente dans l'historique d'appels",
+                    text = "Recherche & conversations intelligentes",
                     color = Color.Gray,
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
 
-            if (chatMessages.size > 1) {
-                TextButton(
-                    onClick = {
-                        localDatabase.clearChatHistory(selectedContactId)
-                        chatMessages = listOf(
-                            ChatDisplayItem(
-                                isUser = false,
-                                text = "Historique réinitialisé. Posez une nouvelle question."
-                            )
-                        )
-                        currentSessionId = null
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                // + New Chat Button
+                Button(
+                    onClick = { startNewConversation() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x3300F2FE)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Effacer", color = Color.Gray, fontSize = 12.sp)
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = NeonTeal,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Nouveau", color = NeonTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // History Button
+                Button(
+                    onClick = {
+                        sessionList = localDatabase.getChatSessions(selectedContactId)
+                        showHistoryDialog = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x1F293754)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("📜 Historique", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -695,6 +894,12 @@ fun AiAssistantSection(
                     if (promptText.isNotBlank() && !isLoading) {
                         val userText = promptText.trim()
                         promptText = ""
+
+                        if (currentSessionId == null) {
+                            currentSessionId = "session-${System.currentTimeMillis()}"
+                        }
+                        val activeSessionId = currentSessionId
+
                         val newMessages = chatMessages.toMutableList()
                         newMessages.add(ChatDisplayItem(isUser = true, text = userText))
                         chatMessages = newMessages
@@ -705,7 +910,7 @@ fun AiAssistantSection(
                             contactId = selectedContactId,
                             isUser = true,
                             text = userText,
-                            sessionId = currentSessionId
+                            sessionId = activeSessionId
                         )
 
                         coroutineScope.launch {
@@ -720,7 +925,7 @@ fun AiAssistantSection(
                                         contactId = selectedContactId,
                                         isUser = false,
                                         text = reply,
-                                        sessionId = currentSessionId
+                                        sessionId = activeSessionId
                                     )
                                     chatMessages = chatMessages + ChatDisplayItem(isUser = false, text = reply)
                                     isLoading = false
@@ -731,9 +936,9 @@ fun AiAssistantSection(
                             // Otherwise execute RAG Chatbot query
                             val contactId = selectedContactId
                             val result = if (contactId != null) {
-                                voipRepository.chatWithContact(contactId, userText, currentSessionId)
+                                voipRepository.chatWithContact(contactId, userText, activeSessionId)
                             } else {
-                                voipRepository.globalChat(userText, currentSessionId)
+                                voipRepository.globalChat(userText, activeSessionId)
                             }
 
                             result.onSuccess { res ->
@@ -755,7 +960,7 @@ fun AiAssistantSection(
                                     contactId = selectedContactId,
                                     isUser = false,
                                     text = errReply,
-                                    sessionId = currentSessionId
+                                    sessionId = activeSessionId
                                 )
                                 chatMessages = chatMessages + ChatDisplayItem(
                                     isUser = false,
