@@ -237,12 +237,6 @@ def create_call(request: schemas.CallRequest, user_id: str = Depends(verify_toke
         status=new_call.status,
         twilio_params=json.loads(new_call.twilio_params) if new_call.twilio_params else None
     )
-        id=new_call.id,
-        contact_id=new_call.contact_id,
-        direction=new_call.direction,
-        status=new_call.status,
-        twilio_params=json.loads(new_call.twilio_params)
-    )
 
 @app.post("/api/v1/calls/bridge")
 def initiate_call_bridge(request: schemas.CallInitiateRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
