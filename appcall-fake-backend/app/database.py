@@ -217,75 +217,14 @@ def init_db():
             db.commit()
             print("Seeded 3 fake contacts")
 
-        # Seed initial fake calls if empty
-        if db.query(Call).count() == 0:
-            user_id = "test-user-uuid-1111"
-            
-            # Call 1 (Completed with Summary & Appointment)
-            call1 = Call(
-                id="call-uuid-1111",
-                contact_id="contact-1111",
-                user_id=user_id,
-                direction="OUTBOUND",
-                started_at=datetime.utcnow() - timedelta(hours=24),
-                ended_at=datetime.utcnow() - timedelta(hours=23, minutes=55),
-                status="COMPLETED",
-                consent_given=True,
-                consent_timestamp=datetime.utcnow() - timedelta(hours=24)
-            )
-            
-            # Call 2 (Missed Call)
-            call2 = Call(
-                id="call-uuid-2222",
-                contact_id="contact-2222",
-                user_id=user_id,
-                direction="INBOUND",
-                started_at=datetime.utcnow() - timedelta(hours=5),
-                status="MISSED",
-                consent_given=False
-            )
-            
-            db.add_all([call1, call2])
+        # Clean up legacy mock calls if present
+        try:
+            legacy_calls = db.query(Call).filter(Call.id.in_(["call-uuid-1111", "call-uuid-2222"])).all()
+            for lc in legacy_calls:
+                db.delete(lc)
             db.commit()
-            print("Seeded call records")
-
-            # Seed Transcript for Call 1
-            transcript = Transcript(
-                id="trans-uuid-1111",
-                call_id="call-uuid-1111",
-                raw_text="Bonjour Jean, c'est Marc. Je t'appelle pour confirmer notre rendez-vous. Je te propose mardi prochain à 14h dans vos bureaux. Parfait, c'est noté. Bonne journée !",
-                language="fr",
-                confidence_score=94.5
-            )
-            db.add(transcript)
-            db.commit()
-            print("Seeded transcript records")
-
-            # Seed Appointment for Call 1
-            appt = Appointment(
-                id="appt-uuid-1111",
-                contact_id="contact-1111",
-                user_id=user_id,
-                scheduled_at=datetime.utcnow() + timedelta(days=4, hours=2),
-                status="PROPOSED",
-                title="Point commercial"
-            )
-            db.add(appt)
-            db.commit()
-            print("Seeded appointment records")
-
-            # Seed Summary for Call 1
-            summary = CallSummary(
-                id="sum-uuid-1111",
-                call_id="call-uuid-1111",
-                summary_text="Marc a proposé un rendez-vous mardi prochain à 14h dans les bureaux. Jean a accepté.",
-                detected_appointment_id="appt-uuid-1111",
-                status="PROPOSED",
-                modified_count=0
-            )
-            db.add(summary)
-            db.commit()
-            print("Seeded summary records")
+        except Exception:
+            pass
 
             # Seed Reminder for Call 1 Appointment
             reminder = Reminder(

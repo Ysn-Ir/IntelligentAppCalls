@@ -731,6 +731,8 @@ def erase_contact_gdpr(id: str, user_id: str = Depends(verify_token), db: Sessio
 async def upload_audio(
     id: str,
     file: UploadFile = FastAPIFile(...),
+    x_contact_name: Optional[str] = Header(None),
+    x_phone_number: Optional[str] = Header(None),
     token: str = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
@@ -740,23 +742,52 @@ async def upload_audio(
 
     Consent gate: rejects upload if consent_given=False on the call.
     """
+    # Resolve or create Contact for this caller
+    contact_id = None
+    if x_phone_number and x_phone_number.strip():
+        clean_num = x_phone_number.strip()
+        c = db.query(Contact).filter(Contact.phone_number == clean_num).first()
+        if not c:
+            parts = (x_contact_name or clean_num).split(" ", 1)
+            c = Contact(
+                id=str(uuid.uuid4()),
+                first_name=parts[0],
+                last_name=parts[1] if len(parts) > 1 else "",
+                phone_number=clean_num,
+                email=f"{parts[0].lower()}@contact.phone",
+                global_gdpr_consent=True
+            )
+            db.add(c)
+            db.commit()
+            db.refresh(c)
+        contact_id = c.id
+    elif x_contact_name and x_contact_name.strip() and x_contact_name not in ["Appel Téléphonique", "Unknown Contact"]:
+        c = db.query(Contact).filter(Contact.first_name.ilike(f"%{x_contact_name.strip()}%")).first()
+        if c:
+            contact_id = c.id
+
     # Self-heal: create call row if missing (native dialer calls)
     call = db.query(Call).filter(Call.id == id).first()
     if not call:
         user = db.query(User).first()
-        contact = db.query(Contact).first()
         call = Call(
             id=id,
-            contact_id=contact.id if contact else "unknown",
+            contact_id=contact_id,
             user_id=user.id if user else "system",
             direction="OUTBOUND",
             status="COMPLETED",
             consent_given=True,
-            twilio_params=json.dumps({"caller_id": "+331234567", "room_name": f"native_{id}"})
+            twilio_params=json.dumps({"caller_id": x_phone_number or "+331234567", "contact_name": x_contact_name or "Appel"})
         )
         db.add(call)
         db.commit()
         db.refresh(call)
+    else:
+        if contact_id and not call.contact_id:
+            call.contact_id = contact_id
+        if x_phone_number:
+            call.twilio_params = json.dumps({"caller_id": x_phone_number, "contact_name": x_contact_name or "Appel"})
+        db.commit()
 
     # Ensure consent is marked granted when audio is received from device
     call.consent_given = True

@@ -429,12 +429,15 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun uploadCallAudio(callId: String, audioFile: java.io.File): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        val prefs = context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE)
+        val contactName = prefs.getString("active_contact_name", null)
+        val phoneNumber = prefs.getString("active_phone_number", null)
         return try {
             val requestBody = requestBodyOf(audioFile)
             val multipartBody = MultipartBody.Part.createFormData("file", audioFile.name, requestBody)
-            val response = apiService.uploadCallAudio(auth, callId, multipartBody)
+            val response = apiService.uploadCallAudio(auth, callId, multipartBody, contactName, phoneNumber)
             if (response.isSuccessful) {
-                Log.d("VoipRepository", "Audio uploaded successfully: $callId")
+                Log.d("VoipRepository", "Audio uploaded successfully: $callId for $contactName ($phoneNumber)")
                 Result.success(Unit)
             } else {
                 Log.w("VoipRepository", "Upload failed with response code ${response.code()}, adding to sync queue")

@@ -19,7 +19,7 @@ class AppLocalDatabase @Inject constructor(
     companion object {
         private const val TAG = "AppLocalDatabase"
         private const val DATABASE_NAME = "appcall_local.db"
-        private const val DATABASE_VERSION = 5
+        private const val DATABASE_VERSION = 6
 
         // Table Calls (Summaries cache)
         private const val TABLE_CALLS = "calls"
@@ -147,10 +147,6 @@ class AppLocalDatabase @Inject constructor(
 
         // Mock Agenda
         db.execSQL("INSERT INTO $TABLE_AGENDA ($KEY_AGENDA_ID, $KEY_AGENDA_TITLE, $KEY_AGENDA_DATE) VALUES ('agenda-1', 'Réunion d''équipe hebdomadaire', '2026-07-17T10:00:00Z')")
-
-        // Mock Call History
-        db.execSQL("INSERT INTO $TABLE_CALL_HISTORY ($KEY_HIST_ID, $KEY_HIST_CONTACT_ID, $KEY_HIST_CONTACT_NAME, $KEY_HIST_DIRECTION, $KEY_HIST_STATUS, $KEY_HIST_STARTED_AT, $KEY_HIST_ENDED_AT) VALUES ('call-1', '1', 'Jean Dupont', 'OUTBOUND', 'COMPLETED', '2026-07-16T10:30:00Z', '2026-07-16T10:34:25Z')")
-        db.execSQL("INSERT INTO $TABLE_CALL_HISTORY ($KEY_HIST_ID, $KEY_HIST_CONTACT_ID, $KEY_HIST_CONTACT_NAME, $KEY_HIST_DIRECTION, $KEY_HIST_STATUS, $KEY_HIST_STARTED_AT, $KEY_HIST_ENDED_AT) VALUES ('call-2', '2', 'Marie Martin', 'INBOUND', 'MISSED', '2026-07-16T09:15:00Z', NULL)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {

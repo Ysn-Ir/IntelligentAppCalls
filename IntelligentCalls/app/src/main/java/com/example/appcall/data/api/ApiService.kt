@@ -141,7 +141,9 @@ interface ApiService {
     suspend fun uploadCallAudio(
         @Header("Authorization") token: String,
         @Path("id") callId: String,
-        @Part file: MultipartBody.Part
+        @Part file: MultipartBody.Part,
+        @Header("X-Contact-Name") contactName: String? = null,
+        @Header("X-Phone-Number") phoneNumber: String? = null
     ): Response<ResponseBody>
 
     // ── AI Pipeline & Transcript Endpoints ───────────────────────────────
