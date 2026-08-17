@@ -798,13 +798,13 @@ fun SettingsSection(
                     var customUrlText by remember { 
                         mutableStateOf(
                             context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                .getString("custom_base_url", "") ?: ""
+                                .getString("custom_base_url", "http://127.0.0.1:8000") ?: "http://127.0.0.1:8000"
                         ) 
                     }
                     OutlinedTextField(
                         value = customUrlText,
                         onValueChange = { customUrlText = it },
-                        label = { Text("URL du serveur (ex: http://192.168.1.50:8000)", color = Color.Gray) },
+                        label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Color.Gray) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = NeonTeal,
@@ -814,18 +814,96 @@ fun SettingsSection(
                         )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                .edit()
-                                .putString("custom_base_url", customUrlText.trim())
-                                .apply()
-                            Toast.makeText(context, "URL du serveur mise à jour", Toast.LENGTH_SHORT).show()
-                        },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonTeal)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Enregistrer l'URL", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = {
+                                customUrlText = "http://127.0.0.1:8000"
+                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("custom_base_url", "http://127.0.0.1:8000")
+                                    .apply()
+                                Toast.makeText(context, "Mode USB sélectionné (127.0.0.1:8000)", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("🔌 Mode USB", color = NeonTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = {
+                                customUrlText = "http://192.168.1.177:8000"
+                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("custom_base_url", "http://192.168.1.177:8000")
+                                    .apply()
+                                Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.177:8000)", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("📶 Mode Wi-Fi", color = Color(0xFF60A5FA), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val trimmed = customUrlText.trim()
+                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("custom_base_url", trimmed)
+                                    .apply()
+                                Toast.makeText(context, "URL enregistrée", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Enregistrer", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = {
+                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                    try {
+                                        var testUrl = customUrlText.trim()
+                                        if (!testUrl.startsWith("http://") && !testUrl.startsWith("https://")) {
+                                            testUrl = "http://$testUrl"
+                                        }
+                                        if (!testUrl.endsWith("/")) testUrl += "/"
+                                        val url = java.net.URL("${testUrl}api/v1/calls")
+                                        val conn = url.openConnection() as java.net.HttpURLConnection
+                                        conn.connectTimeout = 3000
+                                        conn.readTimeout = 3000
+                                        conn.requestMethod = "GET"
+                                        val code = conn.responseCode
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            if (code in 200..499) {
+                                                Toast.makeText(context, "✅ Backend connecté (HTTP $code)", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "⚠️ Réponse inattendue: HTTP $code", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            Toast.makeText(context, "❌ Impossible de joindre le serveur: ${e.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("🔄 Tester", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

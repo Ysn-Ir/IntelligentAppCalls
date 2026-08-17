@@ -26,21 +26,23 @@ class DynamicUrlInterceptor @Inject constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         var request = chain.request()
-        val customUrl = customBaseUrl
+        val rawCustomUrl = customBaseUrl?.trim()
 
-        if (!customUrl.isNullOrEmpty() && customUrl.isNotBlank()) {
-            val newHttpUrl = customUrl.toHttpUrlOrNull()
+        if (!rawCustomUrl.isNullOrEmpty()) {
+            var normalizedUrl = rawCustomUrl
+            if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+                normalizedUrl = "http://$normalizedUrl"
+            }
+            val newHttpUrl = normalizedUrl.toHttpUrlOrNull()
             if (newHttpUrl != null) {
                 val updatedUrl = request.url.newBuilder()
                     .scheme(newHttpUrl.scheme)
                     .host(newHttpUrl.host)
-                    .port(newHttpUrl.port)
+                    .port(if (newHttpUrl.port != 80 && newHttpUrl.port != 443) newHttpUrl.port else if (rawCustomUrl.contains(":8000")) 8000 else newHttpUrl.port)
                     .build()
                 request = request.newBuilder().url(updatedUrl).build()
             }
         }
         return chain.proceed(request)
     }
-
-    private fun String?.isNull_or_empty(): Boolean = this.isNullOrEmpty() || this.isBlank()
 }
