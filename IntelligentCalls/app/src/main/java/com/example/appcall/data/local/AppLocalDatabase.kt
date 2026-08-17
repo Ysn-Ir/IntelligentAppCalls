@@ -382,6 +382,48 @@ class AppLocalDatabase @Inject constructor(
         val db = writableDatabase
         db.delete(TABLE_SYNC_QUEUE, "$KEY_SYNC_ID = ?", arrayOf(id.toString()))
     }
+
+    // --- Deletion Operations ---
+
+    fun deleteTask(id: String): Boolean {
+        val db = writableDatabase
+        return db.delete(TABLE_TASKS, "$KEY_TASK_ID = ?", arrayOf(id)) > 0
+    }
+
+    fun deleteAgendaAppointment(id: String): Boolean {
+        val db = writableDatabase
+        return db.delete(TABLE_AGENDA, "$KEY_AGENDA_ID = ?", arrayOf(id)) > 0
+    }
+
+    fun deleteFile(id: String): Boolean {
+        val db = writableDatabase
+        return db.delete(TABLE_FILES, "$KEY_FILE_ID = ?", arrayOf(id)) > 0
+    }
+
+    fun deleteCallSummary(callId: String): Boolean {
+        val db = writableDatabase
+        return db.delete(TABLE_CALLS, "$KEY_CALL_ID = ?", arrayOf(callId)) > 0
+    }
+
+    fun deleteCallHistoryItem(id: String): Boolean {
+        val db = writableDatabase
+        return db.delete(TABLE_CALL_HISTORY, "$KEY_HIST_ID = ?", arrayOf(id)) > 0
+    }
+
+    fun clearVoiceData() {
+        val db = writableDatabase
+        db.delete(TABLE_CALLS, null, null)
+    }
+
+    fun clearAllData() {
+        val db = writableDatabase
+        db.delete(TABLE_CALLS, null, null)
+        db.delete(TABLE_SYNC_QUEUE, null, null)
+        db.delete(TABLE_TASKS, null, null)
+        db.delete(TABLE_AGENDA, null, null)
+        db.delete(TABLE_FILES, null, null)
+        db.delete(TABLE_CALL_HISTORY, null, null)
+    }
 }
 
 data class LocalCallHistoryItem(val id: String, val contactId: String, val contactName: String, val direction: String, val status: String, val startedAt: String, val endedAt: String?)

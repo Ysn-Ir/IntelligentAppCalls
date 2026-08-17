@@ -219,6 +219,17 @@ class MainActivity : ComponentActivity() {
                 var showInterceptConsent by showInterceptConsentState
                 val interceptedNumber by interceptedNumberState
 
+                androidx.activity.compose.BackHandler {
+                    when {
+                        currentScreen == AppScreen.SUMMARY -> currentScreen = AppScreen.DASHBOARD
+                        currentScreen == AppScreen.REGISTER -> currentScreen = AppScreen.LOGIN
+                        currentScreen == AppScreen.DASHBOARD && selectedSection != 4 -> selectedSection = 4
+                        else -> {
+                            moveTaskToBack(true)
+                        }
+                    }
+                }
+
                 // Consent dialog — appears when a native call is detected
                 if (showInterceptConsent) {
                     AlertDialog(

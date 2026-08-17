@@ -113,10 +113,21 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             color = if (task.completed) Color.Gray else Color.White,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
+                            modifier = Modifier.weight(1f),
                             style = androidx.compose.ui.text.TextStyle(
                                 textDecoration = if (task.completed) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                             )
                         )
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    voipRepository.deleteTask(task.id)
+                                    tasks = localDatabase.getTasks()
+                                }
+                            }
+                        ) {
+                            Text("🗑️", fontSize = 14.sp)
+                        }
                     }
                 }
             }

@@ -114,6 +114,12 @@ interface ApiService {
         @Body task: TaskDto
     ): Response<TaskDto>
 
+    @DELETE("tasks/{id}")
+    suspend fun deleteTask(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
     @GET("agenda")
     suspend fun getAgenda(
         @Header("Authorization") token: String
@@ -125,11 +131,35 @@ interface ApiService {
         @Body item: AgendaDto
     ): Response<AgendaDto>
 
+    @DELETE("agenda/{id}")
+    suspend fun deleteAgendaItem(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
     @POST("files")
     suspend fun createFileItem(
         @Header("Authorization") token: String,
         @Body file: FileDto
     ): Response<FileDto>
+
+    @DELETE("files/{id}")
+    suspend fun deleteFileItem(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
+    @DELETE("calls/{id}")
+    suspend fun deleteCall(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
+    @DELETE("contacts/{id}")
+    suspend fun deleteContact(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
 
     /**
      * Upload the recorded call audio for server-side STT processing.

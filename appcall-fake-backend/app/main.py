@@ -901,6 +901,47 @@ def create_file_item(file: schemas.FileDto, user_id: str = Depends(verify_token)
     db.commit()
     db.refresh(new_f)
     return schemas.FileDto(id=new_f.id, name=new_f.name, path=new_f.path, size=new_f.size)
+
+@app.delete("/api/v1/tasks/{id}")
+def delete_task_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    existing = db.query(TaskModel).filter(TaskModel.id == id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    return {"status": "ok", "deleted_id": id}
+
+@app.delete("/api/v1/agenda/{id}")
+def delete_agenda_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    existing = db.query(AgendaModel).filter(AgendaModel.id == id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    return {"status": "ok", "deleted_id": id}
+
+@app.delete("/api/v1/files/{id}")
+def delete_file_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    existing = db.query(FileModel).filter(FileModel.id == id).first()
+    if existing:
+        if existing.path and os.path.exists(existing.path):
+            try:
+                os.remove(existing.path)
+            except Exception:
+                pass
+        db.delete(existing)
+        db.commit()
+    return {"status": "ok", "deleted_id": id}
+
+@app.delete("/api/v1/calls/{id}")
+def delete_call_endpoint(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    from .gdpr import delete_call_data
+    result = delete_call_data(id, db)
+    return {"status": "ok", "summary": result}
+
+@app.delete("/api/v1/contacts/{id}")
+def delete_contact_endpoint(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    from .gdpr import erase_contact_data
+    result = erase_contact_data(id, db)
+    return {"status": "ok", "summary": result}
     db.add(new_f)
     db.commit()
     db.refresh(new_f)

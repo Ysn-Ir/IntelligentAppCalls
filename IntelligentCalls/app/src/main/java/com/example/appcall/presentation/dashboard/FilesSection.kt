@@ -70,11 +70,37 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
-            Button(
-                onClick = { recordingFiles = getRecordingsList() },
-                colors = ButtonDefaults.buttonColors(containerColor = NeonTeal)
-            ) {
-                Text("Actualiser", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (recordingFiles.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            try {
+                                mediaPlayer?.stop()
+                                mediaPlayer?.release()
+                                mediaPlayer = null
+                                currentlyPlayingPath = null
+                                recordingFiles.forEach { it.delete() }
+                                recordingFiles = getRecordingsList()
+                                Toast.makeText(context, "Tous les enregistrements ont été supprimés", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Erreur: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Text("🗑️ Tout Effacer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Button(
+                    onClick = { recordingFiles = getRecordingsList() },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text("Actualiser", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -182,13 +208,36 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isPlaying) Color.Red else NeonTeal
-                                )
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = if (isPlaying) "Stop" else "Écouter",
                                     color = if (isPlaying) Color.White else Color(0xFF0F172A),
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
                                 )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        if (isPlaying) {
+                                            mediaPlayer?.stop()
+                                            mediaPlayer?.release()
+                                            mediaPlayer = null
+                                            currentlyPlayingPath = null
+                                        }
+                                        file.delete()
+                                        recordingFiles = getRecordingsList()
+                                        Toast.makeText(context, "Fichier audio supprimé", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Erreur suppression: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Text("🗑️", fontSize = 14.sp)
                             }
                         }
                     }
