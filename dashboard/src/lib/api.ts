@@ -10,7 +10,7 @@ function getToken(): string | null {
 function headers(): Record<string, string> {
   const token = getToken();
   const h: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) h["Authorization"] = `Bearer ${token}`;
+  h["Authorization"] = token ? `Bearer ${token}` : "Bearer dummy_test_token";
   return h;
 }
 

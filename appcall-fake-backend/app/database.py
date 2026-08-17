@@ -219,25 +219,15 @@ def init_db():
 
         # Clean up legacy mock calls if present
         try:
-            legacy_calls = db.query(Call).filter(Call.id.in_(["call-uuid-1111", "call-uuid-2222"])).all()
-            for lc in legacy_calls:
-                db.delete(lc)
-            db.commit()
+            from .gdpr import delete_call_data
+            for legacy_id in ["call-uuid-1111", "call-uuid-2222"]:
+                call = db.query(Call).filter(Call.id == legacy_id).first()
+                if call:
+                    delete_call_data(legacy_id, db)
         except Exception:
-            pass
+            db.rollback()
 
-            # Seed Reminder for Call 1 Appointment
-            reminder = Reminder(
-                id="rem-uuid-1111",
-                appointment_id="appt-uuid-1111",
-                call_id="call-uuid-1111",
-                scheduled_at=appt.scheduled_at - timedelta(hours=1),
-                type="APPOINTMENT"
-            )
-            db.add(reminder)
-            db.commit()
-            print("Seeded reminder records")
-
+        if db.query(TaskModel).count() == 0:
             # Seed Tasks
             tasks = [
                 TaskModel(id="task-uuid-1", title="Appeler le client pour validation", completed=False),
