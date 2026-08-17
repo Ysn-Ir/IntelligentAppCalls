@@ -113,36 +113,19 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = app.title,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Prévu : ${app.scheduledAt}",
-                                color = Color.LightGray,
-                                fontSize = 13.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    voipRepository.deleteAgenda(app.id)
-                                    appointments = localDatabase.getAgendaAppointments()
-                                }
-                            }
-                        ) {
-                            Text("🗑️", fontSize = 14.sp)
-                        }
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = app.title,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Prévu : ${app.scheduledAt}",
+                            color = Color.LightGray,
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }

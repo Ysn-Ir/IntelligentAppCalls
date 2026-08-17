@@ -36,14 +36,9 @@ interface VoipRepository {
     suspend fun fetchTasks(): Result<List<com.example.appcall.data.local.LocalTask>>
     suspend fun createTask(id: String, title: String, completed: Boolean): Result<Unit>
     suspend fun toggleTask(id: String, completed: Boolean): Result<Unit>
-    suspend fun deleteTask(id: String): Result<Unit>
 
     suspend fun fetchAgenda(): Result<List<com.example.appcall.data.local.LocalAgendaItem>>
     suspend fun createAgenda(id: String, title: String, time: String): Result<Unit>
-    suspend fun deleteAgenda(id: String): Result<Unit>
-
-    suspend fun deleteFile(id: String): Result<Unit>
-    suspend fun deleteCallHistoryItem(id: String): Result<Unit>
 
     // ── AI Pipeline & Transcripts ─────────────────────────────────────────
     suspend fun getAiStatus(callId: String): Result<com.example.appcall.data.model.AiStatusDto>

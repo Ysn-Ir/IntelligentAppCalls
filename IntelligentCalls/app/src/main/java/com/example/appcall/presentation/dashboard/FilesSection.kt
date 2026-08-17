@@ -1,6 +1,7 @@
 package com.example.appcall.presentation.dashboard
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -10,6 +11,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,10 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.example.appcall.data.local.AppLocalDatabase
 import com.example.appcall.presentation.theme.NeonTeal
 import java.io.File
-import java.io.FileInputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,10 +36,12 @@ import java.util.Locale
 fun FilesSection(localDatabase: AppLocalDatabase) {
     val context = LocalContext.current
     val recordingsDir = remember { File(context.filesDir, "recordings") }
-    
+
     fun getRecordingsList(): List<File> {
         return if (recordingsDir.exists() && recordingsDir.isDirectory) {
-            recordingsDir.listFiles()?.filter { it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4")) && it.length() > 512 }?.sortedByDescending { it.lastModified() } ?: emptyList()
+            recordingsDir.listFiles()
+                ?.filter { it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 512 }
+                ?.sortedByDescending { it.lastModified() } ?: emptyList()
         } else {
             emptyList()
         }
@@ -44,11 +50,46 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
     var recordingFiles by remember { mutableStateOf(getRecordingsList()) }
     var currentlyPlayingPath by remember { mutableStateOf<String?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
             mediaPlayer?.release()
         }
+    }
+
+    if (showDeleteAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAllDialog = false },
+            title = { Text("Supprimer tous les fichiers ?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text("Tous les enregistrements audio locaux seront définitivement effacés de cet appareil.", color = Color.LightGray) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        mediaPlayer?.stop()
+                        mediaPlayer?.release()
+                        mediaPlayer = null
+                        currentlyPlayingPath = null
+
+                        if (recordingsDir.exists() && recordingsDir.isDirectory) {
+                            recordingsDir.listFiles()?.forEach { it.delete() }
+                        }
+                        recordingFiles = getRecordingsList()
+                        showDeleteAllDialog = false
+                        Toast.makeText(context, "Tous les enregistrements locaux ont été supprimés", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("Supprimer", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteAllDialog = false }) {
+                    Text("Annuler", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
+        )
     }
 
     Column(
@@ -64,49 +105,44 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Enregistrements Audio",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column {
+                Text(
+                    text = "Enregistrements Audio",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${recordingFiles.size} fichier(s) disponible(s)",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (recordingFiles.isNotEmpty()) {
-                    Button(
-                        onClick = {
-                            try {
-                                mediaPlayer?.stop()
-                                mediaPlayer?.release()
-                                mediaPlayer = null
-                                currentlyPlayingPath = null
-                                recordingFiles.forEach { it.delete() }
-                                recordingFiles = getRecordingsList()
-                                Toast.makeText(context, "Tous les enregistrements ont été supprimés", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Erreur: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    OutlinedButton(
+                        onClick = { showDeleteAllDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text("🗑️ Tout Effacer", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Vider tout", color = Color(0xFFEF4444), fontSize = 11.sp)
                     }
                 }
                 Button(
                     onClick = { recordingFiles = getRecordingsList() },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Text("Actualiser", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Actualiser", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
 
         if (recordingFiles.isEmpty()) {
             Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -143,15 +179,17 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                     text = file.name,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 13.sp
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "$dateFormatted | ${fileSizeKb} KB",
                                     color = Color.Gray,
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             }
+
+                            // ── PLAY / STOP BUTTON ──
                             Button(
                                 onClick = {
                                     try {
@@ -209,35 +247,71 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isPlaying) Color.Red else NeonTeal
                                 ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = if (isPlaying) "Stop" else "Écouter",
                                     color = if (isPlaying) Color.White else Color(0xFF0F172A),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             }
+
                             Spacer(modifier = Modifier.width(6.dp))
+
+                            // ── EXPORT / SHARE BUTTON ──
                             IconButton(
                                 onClick = {
                                     try {
-                                        if (isPlaying) {
-                                            mediaPlayer?.stop()
-                                            mediaPlayer?.release()
-                                            mediaPlayer = null
-                                            currentlyPlayingPath = null
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            file
+                                        )
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = if (file.name.endsWith(".wav")) "audio/wav" else "audio/mp4"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
-                                        file.delete()
-                                        recordingFiles = getRecordingsList()
-                                        Toast.makeText(context, "Fichier audio supprimé", Toast.LENGTH_SHORT).show()
+                                        context.startActivity(Intent.createChooser(shareIntent, "Exporter l'enregistrement"))
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Erreur suppression: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
-                                }
+                                },
+                                modifier = Modifier.size(36.dp)
                             ) {
-                                Text("🗑️", fontSize = 14.sp)
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Exporter",
+                                    tint = NeonTeal,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            // ── DELETE BUTTON ──
+                            IconButton(
+                                onClick = {
+                                    if (isPlaying) {
+                                        mediaPlayer?.stop()
+                                        mediaPlayer?.release()
+                                        mediaPlayer = null
+                                        currentlyPlayingPath = null
+                                    }
+                                    if (file.delete()) {
+                                        recordingFiles = getRecordingsList()
+                                        Toast.makeText(context, "Fichier supprimé", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Impossible de supprimer", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Supprimer",
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }

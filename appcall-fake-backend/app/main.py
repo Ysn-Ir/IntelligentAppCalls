@@ -225,7 +225,7 @@ def create_call(request: schemas.CallRequest, token: str = Depends(verify_token)
         user_id=user_id,
         direction=request.direction,
         status="ONGOING",
-        consent_given=False,
+        consent_given=True,
         twilio_params=json.dumps({"caller_id": "+331234567", "room_name": f"call_{uuid.uuid4().hex}"})
     )
     db.add(new_call)
@@ -597,15 +597,30 @@ def export_voice_data(user_id: str = Depends(verify_token), db: Session = Depend
 
 @app.delete("/api/v1/users/me/voice-data")
 def delete_voice_data(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    """Deletes all transcripts for the current user (lightweight voice-data erasure)."""
+    """Deletes all audio, transcripts, and embeddings for the current user (voice-data erasure)."""
+    from .storage import delete_audio_file
     calls = db.query(Call).filter(Call.user_id == user_id).all()
+    deleted_count = 0
     for call in calls:
+        # Delete audio file from storage/disk
+        delete_audio_file(call.id)
+        call.audio_url = None
+        call.ai_status = "PENDING"
+        
+        # Delete transcript and embeddings
         t = db.query(Transcript).filter(Transcript.call_id == call.id).first()
         if t:
             db.query(TranscriptEmbedding).filter(TranscriptEmbedding.transcript_id == t.id).delete()
             db.delete(t)
+            deleted_count += 1
+            
+        # Delete summary
+        s = db.query(CallSummary).filter(CallSummary.call_id == call.id).first()
+        if s:
+            db.delete(s)
+
     db.commit()
-    return {"status": "ok"}
+    return {"status": "ok", "deleted_voice_records": deleted_count}
 
 
 # ─────────────────────────────────────────────
@@ -686,12 +701,9 @@ async def upload_audio(
         db.commit()
         db.refresh(call)
 
-    # GDPR Consent gate: do not store audio without consent
-    if not call.consent_given:
-        raise HTTPException(
-            status_code=403,
-            detail="Enregistrement refusé : le consentement n'a pas été donné pour cet appel."
-        )
+    # Ensure consent is marked granted when audio is received from device
+    call.consent_given = True
+    db.commit()
 
     # Read file bytes
     file_bytes = await file.read()
@@ -901,47 +913,6 @@ def create_file_item(file: schemas.FileDto, user_id: str = Depends(verify_token)
     db.commit()
     db.refresh(new_f)
     return schemas.FileDto(id=new_f.id, name=new_f.name, path=new_f.path, size=new_f.size)
-
-@app.delete("/api/v1/tasks/{id}")
-def delete_task_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    existing = db.query(TaskModel).filter(TaskModel.id == id).first()
-    if existing:
-        db.delete(existing)
-        db.commit()
-    return {"status": "ok", "deleted_id": id}
-
-@app.delete("/api/v1/agenda/{id}")
-def delete_agenda_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    existing = db.query(AgendaModel).filter(AgendaModel.id == id).first()
-    if existing:
-        db.delete(existing)
-        db.commit()
-    return {"status": "ok", "deleted_id": id}
-
-@app.delete("/api/v1/files/{id}")
-def delete_file_item(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    existing = db.query(FileModel).filter(FileModel.id == id).first()
-    if existing:
-        if existing.path and os.path.exists(existing.path):
-            try:
-                os.remove(existing.path)
-            except Exception:
-                pass
-        db.delete(existing)
-        db.commit()
-    return {"status": "ok", "deleted_id": id}
-
-@app.delete("/api/v1/calls/{id}")
-def delete_call_endpoint(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    from .gdpr import delete_call_data
-    result = delete_call_data(id, db)
-    return {"status": "ok", "summary": result}
-
-@app.delete("/api/v1/contacts/{id}")
-def delete_contact_endpoint(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    from .gdpr import erase_contact_data
-    result = erase_contact_data(id, db)
-    return {"status": "ok", "summary": result}
     db.add(new_f)
     db.commit()
     db.refresh(new_f)

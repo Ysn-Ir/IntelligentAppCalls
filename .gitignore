@@ -14,3 +14,6 @@ __pycache__/
 env/
 venv/
 *.log
+
+appcall-fake-backend/uploads/*
+!appcall-fake-backend/uploads/.gitkeep

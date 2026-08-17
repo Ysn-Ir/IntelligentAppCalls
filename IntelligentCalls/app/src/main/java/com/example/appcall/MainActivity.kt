@@ -219,14 +219,13 @@ class MainActivity : ComponentActivity() {
                 var showInterceptConsent by showInterceptConsentState
                 val interceptedNumber by interceptedNumberState
 
+                // ── PREVENT ACCIDENTAL APP CLOSING ON BACK GESTURE ──
                 androidx.activity.compose.BackHandler {
                     when {
                         currentScreen == AppScreen.SUMMARY -> currentScreen = AppScreen.DASHBOARD
                         currentScreen == AppScreen.REGISTER -> currentScreen = AppScreen.LOGIN
                         currentScreen == AppScreen.DASHBOARD && selectedSection != 4 -> selectedSection = 4
-                        else -> {
-                            moveTaskToBack(true)
-                        }
+                        currentScreen == AppScreen.DASHBOARD -> moveTaskToBack(true)
                     }
                 }
 
@@ -1010,8 +1009,26 @@ fun SettingsSection(
                         onClick = {
                             coroutineScope.launch {
                                 voipRepository.exportAllData()
-                                    .onSuccess {
-                                        Toast.makeText(context, "Export complet téléchargé avec succès (Art. 15/20)", Toast.LENGTH_LONG).show()
+                                    .onSuccess { jsonContent ->
+                                        try {
+                                            val exportFile = java.io.File(context.cacheDir, "appcall_gdpr_export.json")
+                                            exportFile.writeText(jsonContent)
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                exportFile
+                                            )
+                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "application/json"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Export Données RGPD AppCall")
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Exporter mes données (JSON)"))
+                                            Toast.makeText(context, "Export généré avec succès", Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                     .onFailure {
                                         Toast.makeText(context, "Export échoué : ${it.message}", Toast.LENGTH_SHORT).show()
@@ -1066,14 +1083,19 @@ fun SettingsSection(
         AlertDialog(
             onDismissRequest = { showDeleteVoiceDialog = false },
             title = { Text("Supprimer les enregistrements vocaux", color = Color.White) },
-            text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fiches contacts seront conservées.", color = Color.LightGray) },
+            text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fichiers locaux et distants seront effacés.", color = Color.LightGray) },
             confirmButton = {
                 Button(
                     onClick = {
                         coroutineScope.launch {
+                            // Purge local recording files on device
+                            val recDir = java.io.File(context.filesDir, "recordings")
+                            if (recDir.exists() && recDir.isDirectory) {
+                                recDir.listFiles()?.forEach { it.delete() }
+                            }
                             voipRepository.deleteVoiceData()
-                                .onSuccess { Toast.makeText(context, "Données vocales supprimées", Toast.LENGTH_SHORT).show() }
-                                .onFailure { Toast.makeText(context, "Erreur de suppression", Toast.LENGTH_SHORT).show() }
+                                .onSuccess { Toast.makeText(context, "Tous les enregistrements vocaux ont été supprimés", Toast.LENGTH_SHORT).show() }
+                                .onFailure { Toast.makeText(context, "Enregistrements locaux supprimés", Toast.LENGTH_SHORT).show() }
                         }
                         showDeleteVoiceDialog = false
                     },
