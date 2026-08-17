@@ -387,14 +387,35 @@ def get_calls(
     
     result = []
     for c in calls:
+        phone = None
+        if c.contact and c.contact.phone_number:
+            phone = c.contact.phone_number
+        elif c.twilio_params:
+            try:
+                p = json.loads(c.twilio_params)
+                phone = p.get("caller_id") or p.get("phone_number")
+            except Exception:
+                pass
+        
+        name = "Appel"
+        if c.contact:
+            name = f"{c.contact.first_name} {c.contact.last_name}".strip()
+        elif phone:
+            name = phone
+
+        summary_row = db.query(CallSummary).filter(CallSummary.call_id == c.id).first()
+        summary_prev = summary_row.summary_text if summary_row and not summary_row.summary_text.startswith("Traitement IA") else None
+
         result.append(schemas.CallHistoryItemDto(
             id=c.id,
-            contact_id=c.contact_id,
-            direction=c.direction,
-            status=c.status,
+            contact_id=c.contact_id or "unknown",
+            direction=c.direction or "OUTBOUND",
+            status=c.status or "COMPLETED",
             started_at=c.started_at.isoformat() + "Z" if c.started_at else None,
             ended_at=c.ended_at.isoformat() + "Z" if c.ended_at else None,
-            contact_name=f"{c.contact.first_name} {c.contact.last_name}" if c.contact else "Unknown Contact"
+            contact_name=name,
+            phone_number=phone,
+            summary_preview=summary_prev
         ))
     return result
 
@@ -403,11 +424,11 @@ def get_transcript(id: str, token: str = Depends(verify_token), db: Session = De
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
     if not transcript:
         call = db.query(Call).filter(Call.id == id).first()
-        if call and (call.ai_status == "PROCESSING" or call.status == "ONGOING"):
+        if call and call.ai_status == "PROCESSING":
             return {
-                "id": f"tr-{id}",
+                "id": f"pending-{id}",
                 "call_id": id,
-                "raw_text": "Traitement de la transcription en cours...",
+                "raw_text": "",
                 "language": "fr",
                 "confidence_score": 0.0,
                 "speaker_segments": []
@@ -494,12 +515,21 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
     
     appt_dto = None
     if appt:
+        contact_name = None
+        phone_num = None
+        if appt.contact:
+            contact_name = f"{appt.contact.first_name} {appt.contact.last_name}".strip()
+            phone_num = appt.contact.phone_number
+
         appt_dto = schemas.AppointmentDto(
             id=appt.id,
             contact_id=appt.contact_id or "contact-1111",
             scheduled_at=appt.scheduled_at.isoformat() + "Z" if appt.scheduled_at else datetime.utcnow().isoformat() + "Z",
             status=appt.status or "PROPOSED",
-            title=appt.title or "Rendez-vous détecté"
+            title=appt.title or "Rendez-vous détecté",
+            summary_context=summary.summary_text if not summary.summary_text.startswith("Traitement IA") else None,
+            phone_number=phone_num,
+            contact_name=contact_name
         )
         
     transcript_row = db.query(Transcript).filter(Transcript.call_id == id).first()

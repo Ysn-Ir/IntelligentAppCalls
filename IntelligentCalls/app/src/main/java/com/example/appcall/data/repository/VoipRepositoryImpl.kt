@@ -19,8 +19,61 @@ import javax.inject.Singleton
 class VoipRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
     private val tokenStorage: TokenStorage,
-    private val localDatabase: AppLocalDatabase
+    private val localDatabase: AppLocalDatabase,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : VoipRepository {
+
+    private fun getDeviceContacts(): List<Contact> {
+        val list = mutableListOf<Contact>()
+        try {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.READ_CONTACTS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                val cursor = context.contentResolver.query(
+                    android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(
+                        android.provider.ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                        android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
+                    ),
+                    null, null,
+                    android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+                )
+                cursor?.use { c ->
+                    val seenNumbers = mutableSetOf<String>()
+                    val idCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+                    val nameCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                    val numCol = c.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                    while (c.moveToNext()) {
+                        val id = if (idCol >= 0) c.getString(idCol) ?: java.util.UUID.randomUUID().toString() else java.util.UUID.randomUUID().toString()
+                        val name = if (nameCol >= 0) c.getString(nameCol) ?: "Contact" else "Contact"
+                        val rawNum = if (numCol >= 0) c.getString(numCol) ?: "" else ""
+                        val cleanNum = rawNum.replace("\\s".toRegex(), "")
+                        if (cleanNum.isNotBlank() && seenNumbers.add(cleanNum)) {
+                            val parts = name.split(" ", limit = 2)
+                            val firstName = parts.firstOrNull() ?: name
+                            val lastName = if (parts.size > 1) parts[1] else ""
+                            list.add(
+                                Contact(
+                                    id = "dev-$id",
+                                    firstName = firstName,
+                                    lastName = lastName,
+                                    phoneNumber = cleanNum,
+                                    email = "${firstName.lowercase()}@mobile.phone",
+                                    globalGdprConsent = true
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("VoipRepo", "Error reading device contacts: ${e.message}")
+        }
+        return list
+    }
 
     override suspend fun register(firstName: String, lastName: String, email: String, password: String, number: String?): Result<String> {
         return try {
@@ -80,7 +133,7 @@ class VoipRepositoryImpl @Inject constructor(
             localDatabase.saveCallHistoryItem(
                 id = session.id,
                 contactId = contactId,
-                contactName = "Jean Dupont",
+                contactName = "Appel Sortant",
                 direction = "OUTBOUND",
                 status = "COMPLETED",
                 startedAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date()),
@@ -116,22 +169,36 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun getContacts(): Result<List<Contact>> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        val deviceContacts = getDeviceContacts()
         return try {
             val response = apiService.getContacts(auth)
-            if (response.isSuccessful && response.body() != null) {
-                val contacts = response.body()!!.map {
+            val backendContacts = if (response.isSuccessful && response.body() != null) {
+                response.body()!!.map {
                     Contact(it.id, it.firstName, it.lastName, it.phoneNumber, it.email, it.globalGdprConsent)
                 }
-                Result.success(contacts)
             } else {
-                Result.failure(Exception("Failed to get contacts: ${response.code()}"))
+                emptyList()
+            }
+            val combined = (deviceContacts + backendContacts).distinctBy { it.phoneNumber.replace("\\s".toRegex(), "") }
+            if (combined.isNotEmpty()) {
+                Result.success(combined)
+            } else {
+                val mockContacts = listOf(
+                    Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", true),
+                    Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
+                )
+                Result.success(mockContacts)
             }
         } catch (e: Exception) {
-            val mockContacts = listOf(
-                Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", true),
-                Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
-            )
-            Result.success(mockContacts)
+            if (deviceContacts.isNotEmpty()) {
+                Result.success(deviceContacts)
+            } else {
+                val mockContacts = listOf(
+                    Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", true),
+                    Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
+                )
+                Result.success(mockContacts)
+            }
         }
     }
 
@@ -142,7 +209,16 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val dto = response.body()!!
                 val appointment = dto.appointment?.let {
-                    com.example.appcall.domain.model.Appointment(it.id, it.contactId, it.scheduledAt, it.status, it.title)
+                    com.example.appcall.domain.model.Appointment(
+                        id = it.id,
+                        contactId = it.contactId,
+                        scheduledAt = it.scheduledAt,
+                        status = it.status,
+                        title = it.title,
+                        summaryContext = it.summaryContext,
+                        phoneNumber = it.phoneNumber,
+                        contactName = it.contactName
+                    )
                 }
                 val summary = CallSummary(
                     id = dto.id,

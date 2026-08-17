@@ -65,7 +65,10 @@ data class AppointmentDto(
     @SerializedName("contact_id") val contactId: String,
     @SerializedName("scheduled_at") val scheduledAt: String,
     @SerializedName("status") val status: String,
-    @SerializedName("title") val title: String? = null
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("summary_context") val summaryContext: String? = null,
+    @SerializedName("phone_number") val phoneNumber: String? = null,
+    @SerializedName("contact_name") val contactName: String? = null
 )
 
 data class SummaryEditRequest(
@@ -80,7 +83,9 @@ data class CallHistoryItemDto(
     @SerializedName("status") val status: String,
     @SerializedName("started_at") val startedAt: String?,
     @SerializedName("ended_at") val endedAt: String?,
-    @SerializedName("contact_name") val contactName: String? = null
+    @SerializedName("contact_name") val contactName: String? = null,
+    @SerializedName("phone_number") val phoneNumber: String? = null,
+    @SerializedName("summary_preview") val summaryPreview: String? = null
 )
 
 data class ReminderDto(

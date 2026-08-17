@@ -575,6 +575,32 @@ fun SummaryScreen(
                                             fontWeight = FontWeight.Medium
                                         )
 
+                                        if (!appointment.contactName.isNullOrBlank() || !appointment.phoneNumber.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "👤 Avec : ${appointment.contactName ?: ""} ${if (!appointment.phoneNumber.isNullOrBlank()) "(${appointment.phoneNumber})" else ""}".trim(),
+                                                color = Color.LightGray,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+
+                                        if (!appointment.summaryContext.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Card(
+                                                shape = RoundedCornerShape(6.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color(0x1A000000)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = "💡 Extrait : ${appointment.summaryContext}",
+                                                    color = Color(0xFFE2E8F0),
+                                                    fontSize = 12.sp,
+                                                    maxLines = 3,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                                )
+                                            }
+                                        }
+
                                         if (appointment.status == "PROPOSED" || appointment.status == "MODIFIED") {
                                             Spacer(modifier = Modifier.height(14.dp))
                                             Row(

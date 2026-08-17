@@ -48,15 +48,14 @@ data class CallSummary(
     val appointment: Appointment? = null
 )
 
-/**
- * Note: title is nullable and treated as a stub until the appointments.title migration
- * (Agent.md §3.2) is confirmed applied on the backend. Do not render title in UI yet.
- */
 data class Appointment(
     val id: String,
     val contactId: String,
     val scheduledAt: String,
     val status: String,
-    val title: String? = null  // stub — not yet stored in DB; do not display in appointment card
+    val title: String? = null,
+    val summaryContext: String? = null,
+    val phoneNumber: String? = null,
+    val contactName: String? = null
 )
 

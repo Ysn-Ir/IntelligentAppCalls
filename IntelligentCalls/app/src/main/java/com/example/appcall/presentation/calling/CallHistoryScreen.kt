@@ -66,85 +66,125 @@ fun CallHistoryRow(
             containerColor = Color(0x1F293754)
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(14.dp)
+                .fillMaxWidth()
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar with initials
-                val initials = item.contactName?.split(" ")?.mapNotNull { it.firstOrNull() }?.joinToString("") ?: "C"
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(ElectricViolet.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = initials.uppercase(),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        text = item.contactName ?: "Unknown Contact",
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Call direction & status icon
-                        val iconColor = when (item.status) {
-                            "COMPLETED" -> NeonTeal
-                            "MISSED" -> Color(0xFFF59E0B)
-                            else -> Color.Red
-                        }
-                        val statusIcon = when (item.status) {
-                            "COMPLETED" -> Icons.Default.Call
-                            "MISSED" -> Icons.Default.Close
-                            else -> Icons.Default.Warning
-                        }
-
-                        Icon(
-                            imageVector = statusIcon,
-                            contentDescription = item.status,
-                            tint = iconColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    // Avatar with initials
+                    val displayName = item.contactName ?: item.phoneNumber ?: "Appel"
+                    val initials = displayName.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("")
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(ElectricViolet.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = "${item.direction} • ${item.status.lowercase()}",
-                            color = Color.Gray,
-                            fontSize = 12.sp
+                            text = if (initials.isNotBlank()) initials.uppercase() else "📞",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = displayName,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 15.sp
+                        )
+                        if (!item.phoneNumber.isNullOrBlank() && item.phoneNumber != item.contactName) {
+                            Text(
+                                text = item.phoneNumber,
+                                color = Color(0xFF93C5FD),
+                                fontSize = 12.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val isCompleted = item.status == "COMPLETED"
+                            val iconColor = if (isCompleted) NeonTeal else Color(0xFFF59E0B)
+                            val statusIcon = if (isCompleted) Icons.Default.Call else Icons.Default.Close
+
+                            Icon(
+                                imageVector = statusIcon,
+                                contentDescription = item.status,
+                                tint = iconColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val dirLabel = if (item.direction.contains("OUT", ignoreCase = true)) "Sortant" else "Entrant"
+                            Text(
+                                text = "$dirLabel • ${if (isCompleted) "Terminé" else "Manqué"}",
+                                color = Color.Gray,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+
+                // Date / Time text
+                Column(horizontalAlignment = Alignment.End) {
+                    val timeText = try {
+                        if (item.startedAt?.contains("T") == true) {
+                            item.startedAt.substringAfter("T").replace("Z", "").take(5)
+                        } else ""
+                    } catch (e: Exception) { "" }
+
+                    val dateText = try {
+                        if (item.startedAt?.contains("T") == true) {
+                            item.startedAt.substringBefore("T")
+                        } else item.startedAt ?: ""
+                    } catch (e: Exception) { "" }
+
+                    if (timeText.isNotBlank()) {
+                        Text(
+                            text = timeText,
+                            color = NeonTeal,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Text(
+                        text = dateText,
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
                 }
             }
 
-            // Date / Time text
-            Column(horizontalAlignment = Alignment.End) {
-                val timeText = item.startedAt?.substringAfter("T")?.substringBefore("Z")?.substring(0, 5) ?: ""
-                val dateText = item.startedAt?.substringBefore("T") ?: ""
-                Text(
-                    text = timeText,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-                Text(
-                    text = dateText,
-                    color = Color.Gray,
-                    fontSize = 11.sp
-                )
+            // Summary snippet preview if available
+            if (!item.summaryPreview.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0x14FFFFFF)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "📝 ${item.summaryPreview}",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 12.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
             }
         }
     }

@@ -60,13 +60,48 @@ class CallingManager @Inject constructor(
 
     private var activeCallId: String? = null
     val currentActiveCallId: String? get() = activeCallId
-    private var activeContactName: String = "Unknown"
+    private var activeContactName: String = "Appel Téléphonique"
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private var collectionJob: kotlinx.coroutines.Job? = null
 
     // Track OFFHOOK so we correctly fire onCallEnded only after an active call
     private var wasOffhook = false
+
+    companion object {
+        const val PREF_NAME = "call_recording_prefs"
+        const val KEY_ACTIVE_CALL_ID = "active_call_id"
+
+        fun getContactNameFromNumber(context: Context, number: String?): String {
+            if (number.isNullOrBlank()) return "Appel Téléphonique"
+            try {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.READ_CONTACTS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    val uri = android.net.Uri.withAppendedPath(
+                        android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                        android.net.Uri.encode(number)
+                    )
+                    val cursor = context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME),
+                        null, null, null
+                    )
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val name = it.getString(0)
+                            if (!name.isNullOrBlank()) return name
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("CallingManager", "Error resolving contact name: ${e.message}")
+            }
+            return number
+        }
+    }
 
     init {
         registerPhoneStateListener()
@@ -112,11 +147,13 @@ class CallingManager @Inject constructor(
             // Call detected that wasn't initiated through this app (e.g. native dialer)
             val id = "native-${System.currentTimeMillis()}"
             activeCallId = id
-            // Store for BroadcastReceiver fallback
-            context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-                .edit().putString(KEY_ACTIVE_CALL_ID, id).apply()
+            val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_ACTIVE_CALL_ID, id).apply()
+            val phone = prefs.getString("active_phone_number", null)
+            val name = prefs.getString("active_contact_name", null) ?: getContactNameFromNumber(context, phone)
+            activeContactName = name
             coroutineScope.launch {
-                voipRepository.addCallToHistory(id, "1", activeContactName, "OUTBOUND", "ONGOING")
+                voipRepository.addCallToHistory(id, "dev-$id", activeContactName, "OUTBOUND", "ONGOING")
             }
             id
         }
@@ -149,7 +186,7 @@ class CallingManager @Inject constructor(
 
         _callState.value = CallState.Disconnected
         activeCallId = null
-        activeContactName = "Unknown"
+        activeContactName = "Appel Téléphonique"
     }
 
     /**
@@ -165,7 +202,7 @@ class CallingManager @Inject constructor(
         }
 
         _callState.value = CallState.Connecting
-        activeContactName = contact.fullName
+        activeContactName = contact.fullName.ifBlank { contact.phoneNumber }
         _transcript.value = ""
 
         coroutineScope.launch {
@@ -179,9 +216,13 @@ class CallingManager @Inject constructor(
             activeCallId = callId
             Log.d(TAG, "Created call row $callId for ${contact.fullName} (${contact.phoneNumber})")
 
-            // Persist callId so the manifest BroadcastReceiver can read it when OFFHOOK fires
+            // Persist callId & caller info for BroadcastReceiver and summary screens
             context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-                .edit().putString(KEY_ACTIVE_CALL_ID, callId).apply()
+                .edit()
+                .putString(KEY_ACTIVE_CALL_ID, callId)
+                .putString("active_contact_name", activeContactName)
+                .putString("active_phone_number", contact.phoneNumber)
+                .apply()
 
             // Determine dial target: if Bridge Mode is active and gateway set, dial gateway number
             val dialNumber = if (useBridgeMode && gatewayNumber.isNotBlank()) gatewayNumber else contact.phoneNumber

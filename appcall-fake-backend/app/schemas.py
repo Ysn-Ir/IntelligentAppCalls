@@ -50,6 +50,9 @@ class AppointmentDto(BaseModel):
     scheduled_at: str
     status: str
     title: Optional[str] = None
+    summary_context: Optional[str] = None
+    phone_number: Optional[str] = None
+    contact_name: Optional[str] = None
 
 class CallSummaryDto(BaseModel):
     id: str
@@ -72,6 +75,8 @@ class CallHistoryItemDto(BaseModel):
     started_at: Optional[str] = None
     ended_at: Optional[str] = None
     contact_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    summary_preview: Optional[str] = None
 
 class ReminderDto(BaseModel):
     id: str
