@@ -30,7 +30,8 @@ sealed interface SummaryScreenState {
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
     private val voipRepository: VoipRepository,
-    private val reminderManager: ReminderManager
+    private val reminderManager: ReminderManager,
+    private val localDatabase: com.example.appcall.data.local.AppLocalDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SummaryScreenState>(SummaryScreenState.Idle)
@@ -200,7 +201,18 @@ class SummaryViewModel @Inject constructor(
         val currentSummaryState = _uiState.value as? SummaryScreenState.Success ?: return
         val appointment = currentSummaryState.summary.appointment ?: return
 
+        val title = appointment.title ?: "Rendez-vous détecté"
+        val scheduledAt = appointment.scheduledAt
+        localDatabase.addAgendaAppointment(
+            com.example.appcall.data.local.LocalAgendaItem(
+                id = appointment.id,
+                title = title,
+                scheduledAt = scheduledAt
+            )
+        )
+
         viewModelScope.launch {
+            voipRepository.createAgenda(appointment.id, title, scheduledAt)
             voipRepository.validateAppointment(callId)
                 .onSuccess {
                     reminderManager.scheduleReminder(
@@ -212,7 +224,7 @@ class SummaryViewModel @Inject constructor(
                 }
                 .onFailure {
                     reminderManager.scheduleReminder(
-                        title = "Rappel (Offline): Rendez-vous",
+                        title = "Rappel: Rendez-vous",
                         message = "Votre rendez-vous du ${appointment.scheduledAt.substringBefore("T")} est confirmé.",
                         delaySeconds = 10
                     )

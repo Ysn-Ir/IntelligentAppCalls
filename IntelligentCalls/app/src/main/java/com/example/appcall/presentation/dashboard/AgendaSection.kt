@@ -1,5 +1,7 @@
 package com.example.appcall.presentation.dashboard
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -23,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +41,7 @@ import java.util.Locale
 
 @Composable
 fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var appointments by remember { mutableStateOf(localDatabase.getAgendaAppointments()) }
     var newTitle by remember { mutableStateOf("") }
@@ -49,21 +53,56 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
     // Dynamic date and time selectors
     var selectedDayOffset by remember { mutableStateOf(1) } // 0 = Today, 1 = Tomorrow, 2 = +2 days, etc.
+    var customSelectedDateStr by remember { mutableStateOf<String?>(null) }
     var selectedTime by remember { mutableStateOf("14:00") }
 
-    fun calculateScheduledDate(offsetDays: Int, timeStr: String): String {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, offsetDays)
-        val dayPart = SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH).format(cal.time)
-        return "$dayPart à $timeStr"
+    fun calculateScheduledDate(): String {
+        val dayPart = if (customSelectedDateStr != null) {
+            customSelectedDateStr!!
+        } else {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.DAY_OF_YEAR, selectedDayOffset)
+            SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH).format(cal.time)
+        }
+        return "$dayPart à $selectedTime"
     }
 
     var dynamicScheduledAt by remember {
-        mutableStateOf(calculateScheduledDate(selectedDayOffset, selectedTime))
+        mutableStateOf(calculateScheduledDate())
     }
 
-    LaunchedEffect(selectedDayOffset, selectedTime) {
-        dynamicScheduledAt = calculateScheduledDate(selectedDayOffset, selectedTime)
+    LaunchedEffect(selectedDayOffset, selectedTime, customSelectedDateStr) {
+        dynamicScheduledAt = calculateScheduledDate()
+    }
+
+    fun openClockPicker() {
+        val currentHour = selectedTime.substringBefore(":").toIntOrNull() ?: 14
+        val currentMinute = selectedTime.substringAfter(":").toIntOrNull() ?: 0
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                selectedTime = String.format(Locale.US, "%02d:%02d", hourOfDay, minute)
+            },
+            currentHour,
+            currentMinute,
+            true
+        ).show()
+    }
+
+    fun openCalendarPicker() {
+        val cal = Calendar.getInstance()
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val pickedCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                customSelectedDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH).format(pickedCal.time)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
     LaunchedEffect(Unit) {
@@ -199,7 +238,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Day Selection Chips
+                    // Day Selection Chips with dynamic calendar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -215,8 +254,11 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                             7 to "+1 sem."
                         ).forEach { (offset, label) ->
                             FilterChip(
-                                selected = selectedDayOffset == offset,
-                                onClick = { selectedDayOffset = offset },
+                                selected = customSelectedDateStr == null && selectedDayOffset == offset,
+                                onClick = {
+                                    customSelectedDateStr = null
+                                    selectedDayOffset = offset
+                                },
                                 label = { Text(label, fontSize = 9.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = NeonTeal,
@@ -226,11 +268,23 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                 )
                             )
                         }
+                        // Custom Calendar Picker Chip
+                        FilterChip(
+                            selected = customSelectedDateStr != null,
+                            onClick = { openCalendarPicker() },
+                            label = { Text(customSelectedDateStr?.let { "📅 $it" } ?: "📅 Autre date...", fontSize = 9.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NeonTeal,
+                                selectedLabelColor = Color(0xFF0F172A),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = NeonTeal
+                            )
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Time Selection Chips
+                    // Time Selection Chips with dynamic Clock Picker
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -252,7 +306,27 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                 )
                             )
                         }
+                        // Custom Dynamic Clock Picker Chip
+                        FilterChip(
+                            selected = true,
+                            onClick = { openClockPicker() },
+                            label = { Text("⏰ $selectedTime (Modifier)", fontSize = 9.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF3B82F6),
+                                selectedLabelColor = Color.White,
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = Color.White
+                            )
+                        )
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "📅 RDV prévu : $dynamicScheduledAt",
+                        color = NeonTeal,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

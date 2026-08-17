@@ -147,23 +147,23 @@ class VoipRepositoryImpl @Inject constructor(
     override suspend fun endCall(callId: String): Result<CallSession> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
         val currentTime = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
+        
+        val existing = localDatabase.getCallHistory().firstOrNull { it.id == callId }
+        val contactName = existing?.contactName ?: "Appel"
+        val contactId = existing?.contactId ?: "unknown"
+        val startedAt = existing?.startedAt ?: currentTime
+        localDatabase.saveCallHistoryItem(callId, contactId, contactName, "OUTBOUND", "COMPLETED", startedAt, currentTime)
+
         return try {
             val response = apiService.endCall(auth, callId)
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
-                localDatabase.getCallHistory().firstOrNull { it.id == callId }?.let { item ->
-                    localDatabase.saveCallHistoryItem(item.id, item.contactId, item.contactName, item.direction, "COMPLETED", item.startedAt, currentTime)
-                }
                 Result.success(CallSession(body.id, body.contactId, body.direction, body.status))
             } else {
                 Result.failure(Exception("Failed to end call: ${response.code()}"))
             }
         } catch (e: Exception) {
-            // Update local DB call status to complete and end time offline
-            localDatabase.getCallHistory().firstOrNull { it.id == callId }?.let { item ->
-                localDatabase.saveCallHistoryItem(item.id, item.contactId, item.contactName, item.direction, "COMPLETED", item.startedAt, currentTime)
-            }
-            Result.success(CallSession(callId, "1", "OUTBOUND", "COMPLETED"))
+            Result.success(CallSession(callId, contactId, "OUTBOUND", "COMPLETED"))
         }
     }
 

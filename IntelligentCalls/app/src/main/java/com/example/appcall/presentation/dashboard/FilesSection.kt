@@ -35,22 +35,34 @@ import java.util.Locale
 @Composable
 fun FilesSection(localDatabase: AppLocalDatabase) {
     val context = LocalContext.current
-    val recordingsDir = remember { File(context.filesDir, "recordings") }
 
     fun getRecordingsList(): List<File> {
-        return if (recordingsDir.exists() && recordingsDir.isDirectory) {
-            recordingsDir.listFiles()
-                ?.filter { it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 512 }
-                ?.sortedByDescending { it.lastModified() } ?: emptyList()
-        } else {
-            emptyList()
+        val targetDirs = listOf(
+            File(context.filesDir, "recordings"),
+            File(context.filesDir, "recordings_native"),
+            context.getExternalFilesDir(null)?.let { File(it, "recordings") },
+            context.cacheDir
+        ).filterNotNull()
+
+        val allFiles = mutableListOf<File>()
+        targetDirs.forEach { dir ->
+            if (dir.exists() && dir.isDirectory) {
+                dir.listFiles()?.filter {
+                    it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 0
+                }?.let { allFiles.addAll(it) }
+            }
         }
+        return allFiles.distinctBy { it.name }.sortedByDescending { it.lastModified() }
     }
 
     var recordingFiles by remember { mutableStateOf(getRecordingsList()) }
     var currentlyPlayingPath by remember { mutableStateOf<String?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        recordingFiles = getRecordingsList()
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -71,9 +83,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                         mediaPlayer = null
                         currentlyPlayingPath = null
 
-                        if (recordingsDir.exists() && recordingsDir.isDirectory) {
-                            recordingsDir.listFiles()?.forEach { it.delete() }
-                        }
+                        getRecordingsList().forEach { it.delete() }
                         recordingFiles = getRecordingsList()
                         showDeleteAllDialog = false
                         Toast.makeText(context, "Tous les enregistrements locaux ont été supprimés", Toast.LENGTH_SHORT).show()

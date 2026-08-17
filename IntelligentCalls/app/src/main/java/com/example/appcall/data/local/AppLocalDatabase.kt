@@ -388,6 +388,10 @@ class AppLocalDatabase @Inject constructor(
         db.insertWithOnConflict(TABLE_AGENDA, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
+    fun addAgendaAppointment(item: LocalAgendaItem) {
+        saveAgendaAppointment(item.id, item.title, item.scheduledAt)
+    }
+
     fun getAgendaAppointments(): List<LocalAgendaItem> {
         val list = mutableListOf<LocalAgendaItem>()
         val db = readableDatabase
