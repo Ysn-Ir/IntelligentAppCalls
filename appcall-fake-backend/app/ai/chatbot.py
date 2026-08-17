@@ -47,10 +47,11 @@ Format de réponse :
 def _get_openai():
     try:
         from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
         if not api_key:
             return None
-        return OpenAI(api_key=api_key)
+        base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
+        return OpenAI(api_key=api_key, base_url=base_url)
     except ImportError:
         return None
 
@@ -142,19 +143,21 @@ def chat(
         {"role": "user", "content": message}
     ]
 
-    # 5. Call GPT
+    # 5. Call LLM
     client = _get_openai()
     if client:
         try:
+            active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+            model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
             response = client.chat.completions.create(
-                model=OPENAI_MODEL,
+                model=model,
                 messages=messages,
                 temperature=0.3,
                 max_tokens=500,
             )
             reply = response.choices[0].message.content.strip()
         except Exception as e:
-            logger.error(f"Chatbot GPT error: {e}")
+            logger.error(f"Chatbot LLM error: {e}")
             reply = _offline_reply(chunks, message)
     else:
         logger.warning("No OpenAI client — using offline chatbot reply.")

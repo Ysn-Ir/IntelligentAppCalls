@@ -121,7 +121,7 @@ def index_transcript(transcript_id: str, contact_id: str, raw_text: str, db) -> 
             transcript_id=transcript_id,
             contact_id=contact_id,
             chunk_text=chunk_text,
-            embedding=vector,
+            embedding=json.dumps(vector),
         )
         db.add(embedding_row)
 
@@ -222,5 +222,21 @@ def search_similar_chunks(
             "call_id": call_id,
             "call_date": call_date,
         })
+
+    # If no vector chunks found, fallback to direct search on Transcript table
+    if not output:
+        q = db.query(Transcript).join(Call, Transcript.call_id == Call.id)
+        if contact_id:
+            q = q.filter(Call.contact_id == contact_id)
+        all_transcripts = q.order_by(Call.started_at.desc()).all()
+        for t in all_transcripts[:top_k]:
+            call = db.query(Call).filter(Call.id == t.call_id).first()
+            output.append({
+                "chunk_text": t.raw_text,
+                "transcript_id": t.id,
+                "contact_id": call.contact_id if call else contact_id,
+                "call_id": t.call_id,
+                "call_date": call.started_at.isoformat() if call and call.started_at else None,
+            })
 
     return output

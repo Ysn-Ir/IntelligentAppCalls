@@ -157,8 +157,37 @@ class ChatbotSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+def _ensure_schema(eng):
+    """Automatically adds new columns to existing tables if missing."""
+    from sqlalchemy import text
+    columns_to_ensure = [
+        ("calls", "audio_url", "VARCHAR(500) NULL"),
+        ("calls", "ai_status", "VARCHAR(20) DEFAULT 'PENDING'"),
+        ("transcripts", "speaker_segments", "TEXT NULL"),
+        ("appointments", "title", "VARCHAR(255) NULL"),
+    ]
+    with eng.connect() as conn:
+        for table, col, col_type in columns_to_ensure:
+            try:
+                if eng.dialect.name == "mysql":
+                    res = conn.execute(text(f"SHOW COLUMNS FROM `{table}` LIKE '{col}'")).fetchall()
+                    if not res:
+                        conn.execute(text(f"ALTER TABLE `{table}` ADD COLUMN `{col}` {col_type}"))
+                        conn.commit()
+                elif eng.dialect.name == "sqlite":
+                    cols = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()]
+                    if col not in cols:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                        conn.commit()
+                elif eng.dialect.name == "postgresql":
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+                    conn.commit()
+            except Exception as ex:
+                pass
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _ensure_schema(engine)
     
     db = SessionLocal()
     try:

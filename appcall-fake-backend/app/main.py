@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 import uuid
 import random
 import json
@@ -301,63 +304,43 @@ def end_call(id: str, token: str = Depends(verify_token), db: Session = Depends(
     
     call.status = "COMPLETED"
     call.ended_at = datetime.utcnow()
+    call.ai_status = "PROCESSING"
     db.commit()
-    
-    # Trigger Fake AI Pipeline
-    # 1. Transcript Row
-    transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
-    if not transcript:
-        confidence = random.uniform(20.0, 99.0) if random.random() < 0.2 else random.uniform(75.0, 99.0)
-        canned_texts = [
-            "Bonjour Jean, c'est Marc. Je t'appelle pour confirmer notre rendez-vous. Je te propose mardi prochain à 14h dans vos bureaux. Parfait, c'est noté. Bonne journée !",
-            "Allo Ahmed, réunion d'équipe prévue pour jeudi à 10 heures s'il te plaît. Oui, je serai là. Merci !",
-            "Bonjour, j'aimerais prendre rendez-vous pour vendredi après-midi vers 16h. D'accord, c'est réservé."
-        ]
-        transcript = Transcript(
-            id=str(uuid.uuid4()),
-            call_id=id,
-            raw_text=random.choice(canned_texts),
-            language="fr",
-            confidence_score=confidence
-        )
-        db.add(transcript)
-        db.commit()
 
-    # 2. Appointment Detection (~70% of the time)
-    appointment_id = None
-    if random.random() < 0.7:
-        title_pool = ["Rendez-vous de suivi", "Point commercial", "Réunion projet", "Validation dossier"]
-        scheduled_date = datetime.utcnow() + timedelta(days=random.randint(1, 7), hours=random.randint(0, 4))
-        appt = Appointment(
-            id=str(uuid.uuid4()),
-            contact_id=call.contact_id,
-            user_id=call.user_id,
-            scheduled_at=scheduled_date,
-            status="PROPOSED",
-            title=random.choice(title_pool)
-        )
-        db.add(appt)
-        db.commit()
-        appointment_id = appt.id
+    # Check if audio file was uploaded and trigger AI pipeline
+    local_path = None
+    for ext in ["mp4", "m4a", "wav"]:
+        candidate = os.path.join(UPLOAD_DIR, f"{id}.{ext}")
+        if os.path.exists(candidate):
+            local_path = candidate
+            break
 
-    # 3. Call Summary Row
-    summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
-    if not summary:
-        canned_summaries = [
-            "Marc a proposé un rendez-vous mardi prochain à 14h dans les bureaux. Jean a accepté et a noté la date.",
-            "L'appel concerne la confirmation de la réunion d'équipe de ce jeudi à 10h. Ahmed a validé sa présence.",
-            "Le client a fixé un rendez-vous vendredi à 16h pour un entretien de suivi."
-        ]
-        summary = CallSummary(
-            id=str(uuid.uuid4()),
-            call_id=id,
-            summary_text=random.choice(canned_summaries),
-            detected_appointment_id=appointment_id,
-            status="PROPOSED",
-            modified_count=0
-        )
-        db.add(summary)
-        db.commit()
+    if local_path:
+        from .ai.transcriber import transcribe_call
+        from .ai.summarizer import summarize_call
+        from .ai.embeddings import index_transcript
+        import threading
+
+        def _run_pipeline():
+            from .database import SessionLocal
+            import logging
+            _db = SessionLocal()
+            try:
+                t = transcribe_call(id, local_path, _db)
+                summarize_call(id, _db)
+                call_row = _db.query(Call).filter(Call.id == id).first()
+                if call_row and call_row.contact_id and t:
+                    index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+                if call_row:
+                    call_row.ai_status = "DONE"
+                    _db.commit()
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).error(f"End call pipeline error: {ex}")
+            finally:
+                _db.close()
+
+        threading.Thread(target=_run_pipeline, daemon=True).start()
         
     return schemas.CallResponse(
         id=call.id,
@@ -456,39 +439,21 @@ def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
         db.add(call)
         db.commit()
 
-    # 2. Create Transcript row if missing
+    # 2. Check if Transcript exists
     transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
-    if not transcript:
-        transcript = Transcript(
-            id=str(uuid.uuid4()),
-            call_id=call_id,
-            raw_text="[Simulation d'appel intercepté] Bonjour, nous confirmons le rendez-vous commercial pour mardi à 14h. Parfait, c'est noté.",
-            language="fr",
-            confidence_score=90.0
-        )
-        db.add(transcript)
-        db.commit()
+    if transcript and transcript.raw_text:
+        from .ai.summarizer import summarize_call
+        real_summary = summarize_call(call_id, db)
+        if real_summary:
+            return real_summary
 
-    # 3. Create Appointment row if missing
-    title_pool = ["Rendez-vous commercial", "Point d'avancement", "Validation contrat"]
-    appt = Appointment(
-        id=str(uuid.uuid4()),
-        contact_id=call.contact_id,
-        user_id=call.user_id,
-        scheduled_at=datetime.utcnow() + timedelta(days=3),
-        status="PROPOSED",
-        title=random.choice(title_pool)
-    )
-    db.add(appt)
-    db.commit()
-
-    # 4. Create CallSummary row
+    # 3. Create pending placeholder while awaiting audio/transcription
     summary = CallSummary(
         id=str(uuid.uuid4()),
         call_id=call_id,
-        summary_text="Rendez-vous commercial fixé suite à l'appel intercepté pour mardi prochain à 14h.",
-        detected_appointment_id=appt.id,
-        status="PROPOSED",
+        summary_text="Traitement IA en cours. Le résumé sera généré dès la fin de la transcription audio.",
+        detected_appointment_id=None,
+        status="PROCESSING",
         modified_count=0
     )
     db.add(summary)
@@ -749,38 +714,41 @@ async def upload_audio(
         with open(local_path, "wb") as f:
             f.write(file_bytes)
 
-    # Queue AI processing pipeline (Celery)
-    try:
-        from .worker import process_call_audio
-        process_call_audio.delay(id, local_path)
-    except Exception as e:
-        # If Celery/Redis not running, run synchronously as a background task
-        import asyncio
-        from fastapi import BackgroundTasks
-        from .ai.transcriber import transcribe_call
-        from .ai.summarizer import summarize_call
-        from .ai.embeddings import index_transcript
-        import threading
+    # Execute AI processing pipeline in background thread
+    from .ai.transcriber import transcribe_call
+    from .ai.summarizer import summarize_call
+    from .ai.embeddings import index_transcript
+    import threading
 
-        def _run_pipeline():
-            from .database import SessionLocal
-            _db = SessionLocal()
+    def _run_pipeline():
+        from .database import SessionLocal
+        import logging
+        _db = SessionLocal()
+        try:
+            logging.info(f"Starting AI pipeline for call_id={id}, path={local_path}")
+            t = transcribe_call(id, local_path, _db)
+            summarize_call(id, _db)
+            call_row = _db.query(Call).filter(Call.id == id).first()
+            if call_row and call_row.contact_id and t:
+                index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+            if call_row:
+                call_row.ai_status = "DONE"
+                _db.commit()
+            logging.info(f"AI pipeline completed successfully for call_id={id}")
+        except Exception as ex:
+            import logging
+            logging.getLogger(__name__).error(f"Pipeline processing error: {ex}", exc_info=True)
             try:
-                t = transcribe_call(id, local_path, _db)
-                summarize_call(id, _db)
-                if call.contact_id:
-                    index_transcript(t.id, call.contact_id, t.raw_text, _db)
                 c = _db.query(Call).filter(Call.id == id).first()
                 if c:
-                    c.ai_status = "DONE"
+                    c.ai_status = "FAILED"
                     _db.commit()
-            except Exception as ex:
-                import logging
-                logging.getLogger(__name__).error(f"Inline pipeline error: {ex}")
-            finally:
-                _db.close()
+            except Exception:
+                pass
+        finally:
+            _db.close()
 
-        threading.Thread(target=_run_pipeline, daemon=True).start()
+    threading.Thread(target=_run_pipeline, daemon=True).start()
 
     return {
         "status": "ok",
@@ -966,9 +934,12 @@ def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Dep
         raise HTTPException(status_code=404, detail="Appel introuvable")
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
     summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
+    status_str = getattr(call, "ai_status", "PROCESSING")
+    if transcript is not None and summary is not None:
+        status_str = "DONE"
     return {
         "call_id": id,
-        "ai_status": getattr(call, "ai_status", "UNKNOWN"),
+        "ai_status": status_str,
         "has_transcript": transcript is not None,
         "has_summary": summary is not None,
         "transcript_confidence": transcript.confidence_score if transcript else None,

@@ -93,12 +93,15 @@ def summarize_transcript(raw_text: str, speaker_segments: list) -> dict:
         logger.error("openai package not installed. Run: pip install openai")
         return _fallback_summary(raw_text)
 
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        logger.warning("OPENAI_API_KEY not set — using offline fallback summary.")
+        logger.warning("No API key set — using offline fallback summary.")
         return _fallback_summary(raw_text)
 
-    client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT)
+    base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
+    model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if api_key.startswith("gsk_") else OPENAI_MODEL
+
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=OPENAI_TIMEOUT)
 
     # Format transcript for the model
     transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
@@ -113,7 +116,7 @@ Analyse cet appel et retourne le JSON demandé."""
 
     try:
         response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=model,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -124,14 +127,14 @@ Analyse cet appel et retourne le JSON demandé."""
         )
         content = response.choices[0].message.content
         result = json.loads(content)
-        logger.info(f"GPT summary generated: sentiment={result.get('sentiment')}, "
+        logger.info(f"AI summary generated with {model}: sentiment={result.get('sentiment')}, "
                     f"rendez_vous={len(result.get('rendez_vous', []))}")
         return result
     except json.JSONDecodeError as e:
-        logger.error(f"GPT returned invalid JSON: {e}")
+        logger.error(f"AI returned invalid JSON: {e}")
         return _fallback_summary(raw_text)
     except Exception as e:
-        logger.error(f"GPT summarization error: {e}")
+        logger.error(f"AI summarization error: {e}")
         return _fallback_summary(raw_text)
 
 
