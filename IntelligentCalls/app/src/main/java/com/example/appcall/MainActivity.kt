@@ -462,14 +462,7 @@ fun AiAssistantSection(
 ) {
     var promptText by remember { mutableStateOf("") }
     var chatMessages by remember {
-        mutableStateOf(
-            listOf(
-                ChatDisplayItem(
-                    isUser = false,
-                    text = "Bonjour ! Je suis votre assistant IA. Vous pouvez me poser des questions sur l'ensemble de vos appels ou cibler un contact spécifique."
-                )
-            )
-        )
+        mutableStateOf<List<ChatDisplayItem>>(emptyList())
     }
     var contacts by remember { mutableStateOf<List<Contact>>(emptyList()) }
     var selectedContactId by remember { mutableStateOf<String?>(null) }
@@ -477,8 +470,33 @@ fun AiAssistantSection(
     var isLoading by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
+    fun loadChatHistory(contactId: String?) {
+        val history = localDatabase.getChatHistory(contactId)
+        if (history.isNotEmpty()) {
+            chatMessages = history.map { item ->
+                ChatDisplayItem(
+                    isUser = item.isUser,
+                    text = item.text
+                )
+            }
+            currentSessionId = history.lastOrNull()?.sessionId
+        } else {
+            chatMessages = listOf(
+                ChatDisplayItem(
+                    isUser = false,
+                    text = "Bonjour ! Je suis votre assistant IA. Vous pouvez me poser des questions sur l'ensemble de vos appels ou cibler un contact spécifique."
+                )
+            )
+            currentSessionId = null
+        }
+    }
+
     LaunchedEffect(Unit) {
         voipRepository.getContacts().onSuccess { contacts = it }
+    }
+
+    LaunchedEffect(selectedContactId) {
+        loadChatHistory(selectedContactId)
     }
 
     Column(
@@ -511,6 +529,7 @@ fun AiAssistantSection(
             if (chatMessages.size > 1) {
                 TextButton(
                     onClick = {
+                        localDatabase.clearChatHistory(selectedContactId)
                         chatMessages = listOf(
                             ChatDisplayItem(
                                 isUser = false,
@@ -681,6 +700,14 @@ fun AiAssistantSection(
                         chatMessages = newMessages
                         isLoading = true
 
+                        // Save user message to persistent local history
+                        localDatabase.saveChatMessage(
+                            contactId = selectedContactId,
+                            isUser = true,
+                            text = userText,
+                            sessionId = currentSessionId
+                        )
+
                         coroutineScope.launch {
                             // First check if it's an offline local command
                             val lower = userText.lowercase()
@@ -689,6 +716,12 @@ fun AiAssistantSection(
                                 if (taskTitle.isNotBlank()) {
                                     localDatabase.saveTask("task-${System.currentTimeMillis()}", taskTitle, false)
                                     val reply = "J'ai ajouté la tâche : '$taskTitle'"
+                                    localDatabase.saveChatMessage(
+                                        contactId = selectedContactId,
+                                        isUser = false,
+                                        text = reply,
+                                        sessionId = currentSessionId
+                                    )
                                     chatMessages = chatMessages + ChatDisplayItem(isUser = false, text = reply)
                                     isLoading = false
                                     return@launch
@@ -705,15 +738,28 @@ fun AiAssistantSection(
 
                             result.onSuccess { res ->
                                 currentSessionId = res.sessionId
+                                localDatabase.saveChatMessage(
+                                    contactId = selectedContactId,
+                                    isUser = false,
+                                    text = res.reply,
+                                    sessionId = res.sessionId
+                                )
                                 chatMessages = chatMessages + ChatDisplayItem(
                                     isUser = false,
                                     text = res.reply,
                                     sources = res.sources
                                 )
                             }.onFailure { err ->
+                                val errReply = "Erreur: ${err.message}"
+                                localDatabase.saveChatMessage(
+                                    contactId = selectedContactId,
+                                    isUser = false,
+                                    text = errReply,
+                                    sessionId = currentSessionId
+                                )
                                 chatMessages = chatMessages + ChatDisplayItem(
                                     isUser = false,
-                                    text = "Erreur: ${err.message}"
+                                    text = errReply
                                 )
                             }
                             isLoading = false

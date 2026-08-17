@@ -65,6 +65,12 @@ export const api = {
   chatHistory: (contactId: string) =>
     request<{ session_id: string | null; messages: ChatMessage[] }>(`/api/v1/contacts/${contactId}/chat/history`),
 
+  globalChatHistory: () =>
+    request<{ session_id: string | null; messages: ChatMessage[] }>("/api/v1/chat/history"),
+
+  clearGlobalChat: () =>
+    request<{ status: string }>("/api/v1/chat/history", { method: "DELETE" }),
+
   // ── GDPR ──────────────────────────────────────────────────────────
   exportData: () => request<object>("/api/v1/me/export"),
 

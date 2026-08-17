@@ -66,6 +66,16 @@ class AppLocalDatabase @Inject constructor(
         private const val KEY_HIST_STATUS = "status"
         private const val KEY_HIST_STARTED_AT = "started_at"
         private const val KEY_HIST_ENDED_AT = "ended_at"
+
+        // Table Chat History
+        private const val TABLE_CHAT = "chat_history"
+        private const val KEY_CHAT_ID = "chat_id"
+        private const val KEY_CHAT_SESSION_ID = "session_id"
+        private const val KEY_CHAT_CONTACT_ID = "contact_id"
+        private const val KEY_CHAT_IS_USER = "is_user"
+        private const val KEY_CHAT_TEXT = "text"
+        private const val KEY_CHAT_SOURCES = "sources_json"
+        private const val KEY_CHAT_CREATED_AT = "created_at"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -128,12 +138,25 @@ class AppLocalDatabase @Inject constructor(
             )
         """.trimIndent()
 
+        val createChatTable = """
+            CREATE TABLE IF NOT EXISTS $TABLE_CHAT (
+                $KEY_CHAT_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $KEY_CHAT_SESSION_ID TEXT,
+                $KEY_CHAT_CONTACT_ID TEXT,
+                $KEY_CHAT_IS_USER INTEGER,
+                $KEY_CHAT_TEXT TEXT,
+                $KEY_CHAT_SOURCES TEXT,
+                $KEY_CHAT_CREATED_AT INTEGER
+            )
+        """.trimIndent()
+
         db.execSQL(createCallsTable)
         db.execSQL(createSyncQueueTable)
         db.execSQL(createTasksTable)
         db.execSQL(createAgendaTable)
         db.execSQL(createFilesTable)
         db.execSQL(createCallHistoryTable)
+        db.execSQL(createChatTable)
 
         // Seed with initial mock data
         seedMockData(db)
@@ -156,11 +179,70 @@ class AppLocalDatabase @Inject constructor(
         db.execSQL("DROP TABLE IF EXISTS $TABLE_AGENDA")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_FILES")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_CALL_HISTORY")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_CHAT")
         onCreate(db)
     }
 
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         onUpgrade(db, oldVersion, newVersion)
+    }
+
+    // --- Chat History Operations ---
+
+    fun saveChatMessage(contactId: String?, isUser: Boolean, text: String, sourcesJson: String? = null, sessionId: String? = null) {
+        try {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put(KEY_CHAT_SESSION_ID, sessionId)
+                put(KEY_CHAT_CONTACT_ID, contactId)
+                put(KEY_CHAT_IS_USER, if (isUser) 1 else 0)
+                put(KEY_CHAT_TEXT, text)
+                put(KEY_CHAT_SOURCES, sourcesJson)
+                put(KEY_CHAT_CREATED_AT, System.currentTimeMillis())
+            }
+            db.insert(TABLE_CHAT, null, values)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save chat message: ${e.message}")
+        }
+    }
+
+    fun getChatHistory(contactId: String?): List<LocalChatMessage> {
+        val list = mutableListOf<LocalChatMessage>()
+        try {
+            val db = readableDatabase
+            val selection = if (contactId == null) "$KEY_CHAT_CONTACT_ID IS NULL" else "$KEY_CHAT_CONTACT_ID = ?"
+            val selectionArgs = if (contactId == null) null else arrayOf(contactId)
+            val cursor = db.query(TABLE_CHAT, null, selection, selectionArgs, null, null, "$KEY_CHAT_ID ASC")
+            cursor.use {
+                while (it.moveToNext()) {
+                    list.add(
+                        LocalChatMessage(
+                            id = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID)),
+                            sessionId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)),
+                            contactId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_CONTACT_ID)),
+                            isUser = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_IS_USER)) == 1,
+                            text = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_TEXT)),
+                            sourcesJson = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SOURCES)),
+                            createdAt = it.getLong(it.getColumnIndexOrThrow(KEY_CHAT_CREATED_AT))
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get chat history: ${e.message}")
+        }
+        return list
+    }
+
+    fun clearChatHistory(contactId: String?) {
+        try {
+            val db = writableDatabase
+            val selection = if (contactId == null) "$KEY_CHAT_CONTACT_ID IS NULL" else "$KEY_CHAT_CONTACT_ID = ?"
+            val selectionArgs = if (contactId == null) null else arrayOf(contactId)
+            db.delete(TABLE_CHAT, selection, selectionArgs)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear chat history: ${e.message}")
+        }
     }
 
     // --- Calls Table Operations ---
@@ -399,4 +481,5 @@ data class LocalCallHistoryItem(val id: String, val contactId: String, val conta
 data class LocalTask(val id: String, val title: String, val completed: Boolean)
 data class LocalAgendaItem(val id: String, val title: String, val scheduledAt: String)
 data class LocalFileItem(val id: String, val name: String, val path: String, val size: String)
+data class LocalChatMessage(val id: Int, val sessionId: String?, val contactId: String?, val isUser: Boolean, val text: String, val sourcesJson: String?, val createdAt: Long)
 data class SyncItem(val id: Int, val callId: String, val actionType: String, val filePath: String?, val payload: String?)

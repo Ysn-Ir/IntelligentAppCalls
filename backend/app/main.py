@@ -161,26 +161,28 @@ def get_voip_token(token: str = Depends(verify_token)):
     return {"token": f"fake_twilio_token_{uuid.uuid4().hex}"}
 
 @app.get("/api/v1/users/me")
-def get_me(token: str = Depends(verify_token), db: Session = Depends(get_db)):
-    user = db.query(User).first()
+def get_me(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = db.query(User).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
     return {
         "id": user.id,
         "first_name": user.first_name,
         "last_name": user.last_name,
         "email": user.email,
         "number": user.number,
-        "created_at": user.created_at.isoformat() + "Z"
+        "created_at": user.created_at.isoformat() + "Z" if user.created_at else datetime.utcnow().isoformat() + "Z"
     }
 
 @app.get("/api/v1/contacts", response_model=List[schemas.ContactDto])
-def get_contacts(token: str = Depends(verify_token), db: Session = Depends(get_db)):
+def get_contacts(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     contacts = db.query(Contact).all()
     return contacts
 
 @app.post("/api/v1/contacts", response_model=schemas.ContactDto)
-def create_contact(contact: schemas.ContactDto, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+def create_contact(contact: schemas.ContactDto, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     existing = db.query(Contact).filter(Contact.phone_number == contact.phone_number).first()
     if existing:
         raise HTTPException(status_code=400, detail="Phone number already exists")
@@ -199,7 +201,7 @@ def create_contact(contact: schemas.ContactDto, token: str = Depends(verify_toke
     return new_c
 
 @app.patch("/api/v1/contacts/{id}/gdpr-consent")
-def patch_contact_consent(id: str, payload: schemas.ConsentRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+def patch_contact_consent(id: str, payload: schemas.ConsentRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     contact = db.query(Contact).filter(Contact.id == id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
@@ -208,31 +210,33 @@ def patch_contact_consent(id: str, payload: schemas.ConsentRequest, token: str =
     return {"status": "ok"}
 
 @app.post("/api/v1/calls", response_model=schemas.CallResponse)
-def create_call(request: schemas.CallRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+def create_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
     if not contact:
-        # Self-healing: fallback to first available contact so native calls don't 404
         contact = db.query(Contact).first()
         if not contact:
-            raise HTTPException(status_code=404, detail="No contacts seeded in database")
-    
-    user = db.query(User).first()
-    user_id = user.id if user else "system"
+            raise HTTPException(status_code=404, detail="No contacts available")
     
     new_call = Call(
         id=str(uuid.uuid4()),
-        contact_id=contact.id,  # Use resolved contact.id to satisfy FK constraint
+        contact_id=contact.id,
         user_id=user_id,
         direction=request.direction,
         status="ONGOING",
         consent_given=True,
-        twilio_params=json.dumps({"caller_id": "+331234567", "room_name": f"call_{uuid.uuid4().hex}"})
+        twilio_params=json.dumps({"caller_id": contact.phone_number or "+331234567", "room_name": f"call_{uuid.uuid4().hex}"})
     )
     db.add(new_call)
     db.commit()
     db.refresh(new_call)
     
     return schemas.CallResponse(
+        id=new_call.id,
+        contact_id=new_call.contact_id,
+        direction=new_call.direction,
+        status=new_call.status,
+        twilio_params=json.loads(new_call.twilio_params) if new_call.twilio_params else None
+    )
         id=new_call.id,
         contact_id=new_call.contact_id,
         direction=new_call.direction,
@@ -368,10 +372,10 @@ def get_calls(
     contact_id: Optional[str] = None,
     status: Optional[str] = None,
     page: Optional[int] = 1,
-    token: str = Depends(verify_token),
+    user_id: str = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Call)
+    query = db.query(Call).filter((Call.user_id == user_id) | (Call.user_id == "system") | (Call.user_id.is_(None)))
     if contact_id:
         query = query.filter(Call.contact_id == contact_id)
     if status:
@@ -1132,6 +1136,41 @@ def clear_contact_chat(
     session = db.query(ChatbotSession).filter(
         ChatbotSession.user_id == user_id,
         ChatbotSession.contact_id == contact_id,
+    ).first()
+    if session:
+        clear_session(session.id, db)
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/chat/history")
+def get_global_chat_history(
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Returns the global chatbot conversation history for the current user."""
+    session = db.query(ChatbotSession).filter(
+        ChatbotSession.user_id == user_id,
+        ChatbotSession.contact_id.is_(None),
+    ).order_by(ChatbotSession.updated_at.desc()).first()
+    if not session:
+        return {"session_id": None, "messages": []}
+    import json as _json
+    return {
+        "session_id": session.id,
+        "messages": _json.loads(session.messages) if session.messages else [],
+    }
+
+
+@app.delete("/api/v1/chat/history")
+def clear_global_chat(
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Clears the global chatbot conversation history for the current user."""
+    from .ai.chatbot import clear_session
+    session = db.query(ChatbotSession).filter(
+        ChatbotSession.user_id == user_id,
+        ChatbotSession.contact_id.is_(None),
     ).first()
     if session:
         clear_session(session.id, db)

@@ -320,6 +320,50 @@ function ChatPage({ contactId, contactName }: { contactId?: string; contactName?
     api.contacts().then(setContacts).catch(console.error);
   }, []);
 
+  // Load persistent conversation history for the selected scope
+  useEffect(() => {
+    setLoading(true);
+    const fetchHistory = selectedContact
+      ? api.chatHistory(selectedContact)
+      : api.globalChatHistory();
+
+    fetchHistory
+      .then((data) => {
+        if (data && data.messages && data.messages.length > 0) {
+          setSessionId(data.session_id || undefined);
+          setMessages(
+            data.messages.map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }))
+          );
+        } else {
+          setMessages([]);
+          setSessionId(undefined);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load chat history:", err);
+        setMessages([]);
+      })
+      .finally(() => setLoading(false));
+  }, [selectedContact]);
+
+  async function clearHistory() {
+    if (!confirm("Effacer tout l'historique de cette conversation ?")) return;
+    try {
+      if (selectedContact) {
+        await api.clearContactChat?.(selectedContact);
+      } else {
+        await api.clearGlobalChat();
+      }
+      setMessages([]);
+      setSessionId(undefined);
+    } catch (err) {
+      console.error("Failed to clear chat history:", err);
+    }
+  }
+
   async function send() {
     if (!input.trim()) return;
     const msg = input.trim();
@@ -344,9 +388,16 @@ function ChatPage({ contactId, contactName }: { contactId?: string; contactName?
 
   return (
     <div className="fade-in" style={{ height: "calc(100vh - 64px)", display: "flex", flexDirection: "column" }}>
-      <div className="page-header">
-        <h1>Assistant IA</h1>
-        <p>Posez des questions sur vos appels avec {displayName}</p>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1>Assistant IA</h1>
+          <p>Posez des questions sur vos appels avec {displayName}</p>
+        </div>
+        {messages.length > 0 && (
+          <button className="btn btn-secondary" onClick={clearHistory} style={{ fontSize: 12, padding: "6px 12px" }}>
+            🗑️ Effacer l'historique
+          </button>
+        )}
       </div>
 
       {/* Contact selector */}
@@ -355,7 +406,7 @@ function ChatPage({ contactId, contactName }: { contactId?: string; contactName?
           className="input"
           style={{ maxWidth: 300 }}
           value={selectedContact || ""}
-          onChange={(e) => { setSelectedContact(e.target.value || undefined); setMessages([]); setSessionId(undefined); }}
+          onChange={(e) => setSelectedContact(e.target.value || undefined)}
         >
           <option value="">🌍 Tous les contacts (chatbot global)</option>
           {contacts.map((c) => (
