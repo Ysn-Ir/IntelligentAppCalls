@@ -430,11 +430,20 @@ def get_transcript(id: str, token: str = Depends(verify_token), db: Session = De
         "speaker_segments": segments
     }
 
-# Helper to auto-create mock summaries, call records, and appointments for unknown/intercepted call IDs.
-# This prevents 404s and makes testing offline-to-online sync or intercepted calls seamless.
+# Helper to auto-create or update summaries, call records, and appointments for call IDs.
 def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
     summary = db.query(CallSummary).filter(CallSummary.call_id == call_id).first()
-    if summary:
+    transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
+
+    # If transcript is available and summary is missing or pending/placeholder, generate real summary!
+    if transcript and transcript.raw_text:
+        if not summary or summary.status == "PROCESSING" or "Traitement IA" in (summary.summary_text or ""):
+            from .ai.summarizer import summarize_call
+            real_summary = summarize_call(call_id, db)
+            if real_summary:
+                return real_summary
+
+    if summary and summary.status != "PROCESSING":
         return summary
 
     # 1. Create Call row if missing
@@ -458,15 +467,10 @@ def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
         db.add(call)
         db.commit()
 
-    # 2. Check if Transcript exists
-    transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
-    if transcript and transcript.raw_text:
-        from .ai.summarizer import summarize_call
-        real_summary = summarize_call(call_id, db)
-        if real_summary:
-            return real_summary
+    if summary:
+        return summary
 
-    # 3. Create pending placeholder while awaiting audio/transcription
+    # 2. Create pending placeholder while awaiting audio/transcription
     summary = CallSummary(
         id=str(uuid.uuid4()),
         call_id=call_id,
@@ -761,7 +765,10 @@ async def upload_audio(
             summarize_call(id, _db)
             call_row = _db.query(Call).filter(Call.id == id).first()
             if call_row and call_row.contact_id and t:
-                index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+                try:
+                    index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+                except Exception as e_idx:
+                    logging.warning(f"Embedding index error (ignored): {e_idx}")
             if call_row:
                 call_row.ai_status = "DONE"
                 _db.commit()

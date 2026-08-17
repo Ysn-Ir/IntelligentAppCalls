@@ -279,13 +279,31 @@ fun SummaryScreen(
                                         }
                                     }
                                 } else {
-                                    val raw = transcript?.rawText ?: summary.summaryText
-                                    Text(
-                                        text = raw,
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        lineHeight = 22.sp
-                                    )
+                                    val raw = transcript?.rawText
+                                    if (!raw.isNullOrBlank()) {
+                                        Text(
+                                            text = raw,
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            lineHeight = 22.sp
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                CircularProgressIndicator(color = NeonTeal, modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                    text = "Transcription en cours par l'IA (Whisper + Groq)...\nAppuyez sur 'Actualiser' dès la fin de l'appel.",
+                                                    color = Color.LightGray,
+                                                    fontSize = 12.sp,
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

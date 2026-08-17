@@ -153,36 +153,25 @@ class VoipRepositoryImpl @Inject constructor(
                     detectedAppointmentId = dto.detectedAppointmentId,
                     appointment = appointment
                 )
-                // Cache locally
-                localDatabase.saveCallSummary(summary)
+                // Cache locally only if real summary
+                if (dto.status != "PROCESSING" && !dto.summaryText.startsWith("Traitement IA")) {
+                    localDatabase.saveCallSummary(summary)
+                }
                 Result.success(summary)
             } else {
-                Result.failure(Exception("Failed to get call summary: ${response.code()}"))
+                val cached = localDatabase.getCallSummary(callId)
+                if (cached != null && !cached.summaryText.startsWith("Rendez-vous fixé avec Marc")) {
+                    Result.success(cached)
+                } else {
+                    Result.failure(Exception("Résumé indisponible (${response.code()})"))
+                }
             }
         } catch (e: Exception) {
-            // Check local SQLite cache first
             val cached = localDatabase.getCallSummary(callId)
-            if (cached != null) {
-                Log.d("VoipRepositoryImpl", "Returning locally cached summary for call $callId")
+            if (cached != null && !cached.summaryText.startsWith("Rendez-vous fixé avec Marc")) {
                 Result.success(cached)
             } else {
-                // Fallback mock (then save it locally so the user can interact offline)
-                val mockSummary = CallSummary(
-                    id = "local-sum-$callId",
-                    callId = callId,
-                    summaryText = "Rendez-vous fixé avec Marc mardi prochain à 14h dans vos bureaux.",
-                    status = "PROPOSED",
-                    confidenceScore = 95.0,
-                    detectedAppointmentId = "mock-appointment-id",
-                    appointment = com.example.appcall.domain.model.Appointment(
-                        id = "mock-appointment-id",
-                        contactId = "1",
-                        scheduledAt = "2026-07-21T14:00:00Z",
-                        status = "PROPOSED"
-                    )
-                )
-                localDatabase.saveCallSummary(mockSummary)
-                Result.success(mockSummary)
+                Result.failure(e)
             }
         }
     }
