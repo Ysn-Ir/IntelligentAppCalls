@@ -96,7 +96,7 @@ def chat(
 
     if not session:
         session = ChatbotSession(
-            id=str(uuid.uuid4()),
+            id=session_id if session_id else str(uuid.uuid4()),
             user_id=user_id,
             contact_id=contact_id,
             messages=json.dumps([]),

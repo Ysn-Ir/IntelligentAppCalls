@@ -502,13 +502,13 @@ fun AiAssistantSection(
             }
             currentSessionId = latestSessionId
         } else {
+            currentSessionId = "session-${System.currentTimeMillis()}"
             chatMessages = listOf(
                 ChatDisplayItem(
                     isUser = false,
                     text = "Bonjour ! Je suis votre assistant IA. Vous pouvez me poser des questions sur l'ensemble de vos appels ou cibler un contact spécifique."
                 )
             )
-            currentSessionId = null
         }
     }
 
@@ -895,10 +895,10 @@ fun AiAssistantSection(
                         val userText = promptText.trim()
                         promptText = ""
 
-                        if (currentSessionId == null) {
+                        if (currentSessionId.isNullOrBlank()) {
                             currentSessionId = "session-${System.currentTimeMillis()}"
                         }
-                        val activeSessionId = currentSessionId
+                        val activeSessionId = currentSessionId!!
 
                         val newMessages = chatMessages.toMutableList()
                         newMessages.add(ChatDisplayItem(isUser = true, text = userText))
@@ -942,12 +942,13 @@ fun AiAssistantSection(
                             }
 
                             result.onSuccess { res ->
-                                currentSessionId = res.sessionId
+                                val finalSessionId = if (!res.sessionId.isNullOrBlank()) res.sessionId else activeSessionId
+                                currentSessionId = finalSessionId
                                 localDatabase.saveChatMessage(
                                     contactId = selectedContactId,
                                     isUser = false,
                                     text = res.reply,
-                                    sessionId = res.sessionId
+                                    sessionId = finalSessionId
                                 )
                                 chatMessages = chatMessages + ChatDisplayItem(
                                     isUser = false,

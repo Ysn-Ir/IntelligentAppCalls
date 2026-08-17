@@ -263,7 +263,8 @@ class AppLocalDatabase @Inject constructor(
             val sessionMap = linkedMapOf<String, MutableList<LocalChatMessage>>()
             cursor.use {
                 while (it.moveToNext()) {
-                    val sId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)) ?: "session-${it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID))}"
+                    val rawSid = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID))
+                    val sId = if (!rawSid.isNullOrBlank()) rawSid else "session-principal"
                     val msg = LocalChatMessage(
                         id = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID)),
                         sessionId = sId,
@@ -299,13 +300,18 @@ class AppLocalDatabase @Inject constructor(
         val list = mutableListOf<LocalChatMessage>()
         try {
             val db = readableDatabase
-            val cursor = db.query(TABLE_CHAT, null, "$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId), null, null, "$KEY_CHAT_ID ASC")
+            val (selection, selectionArgs) = if (sessionId == "session-principal") {
+                Pair("$KEY_CHAT_SESSION_ID = ? OR $KEY_CHAT_SESSION_ID IS NULL", arrayOf("session-principal"))
+            } else {
+                Pair("$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId))
+            }
+            val cursor = db.query(TABLE_CHAT, null, selection, selectionArgs, null, null, "$KEY_CHAT_ID ASC")
             cursor.use {
                 while (it.moveToNext()) {
                     list.add(
                         LocalChatMessage(
                             id = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_ID)),
-                            sessionId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)),
+                            sessionId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_SESSION_ID)) ?: "session-principal",
                             contactId = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_CONTACT_ID)),
                             isUser = it.getInt(it.getColumnIndexOrThrow(KEY_CHAT_IS_USER)) == 1,
                             text = it.getString(it.getColumnIndexOrThrow(KEY_CHAT_TEXT)),
@@ -324,7 +330,11 @@ class AppLocalDatabase @Inject constructor(
     fun deleteSession(sessionId: String) {
         try {
             val db = writableDatabase
-            db.delete(TABLE_CHAT, "$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId))
+            if (sessionId == "session-principal") {
+                db.delete(TABLE_CHAT, "$KEY_CHAT_SESSION_ID = ? OR $KEY_CHAT_SESSION_ID IS NULL", arrayOf(sessionId))
+            } else {
+                db.delete(TABLE_CHAT, "$KEY_CHAT_SESSION_ID = ?", arrayOf(sessionId))
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to delete session: ${e.message}")
         }
