@@ -536,7 +536,15 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val dtos = response.body()!!
                 dtos.forEach { dto: com.example.appcall.data.model.AgendaDto ->
-                    localDatabase.saveAgendaAppointment(dto.id, dto.title, dto.scheduledAt)
+                    localDatabase.saveAgendaAppointment(
+                        id = dto.id,
+                        title = dto.title,
+                        scheduledAt = dto.scheduledAt,
+                        contactName = dto.contactName,
+                        phoneNumber = dto.phoneNumber,
+                        callId = dto.callId,
+                        status = dto.status ?: "CONFIRMED"
+                    )
                 }
                 Result.success(localDatabase.getAgendaAppointments())
             } else {

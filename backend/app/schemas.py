@@ -94,6 +94,10 @@ class AgendaDto(BaseModel):
     id: str
     title: str
     scheduled_at: str
+    contact_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    call_id: Optional[str] = None
+    status: Optional[str] = "SCHEDULED"
 
 class FileDto(BaseModel):
     id: str

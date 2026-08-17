@@ -203,11 +203,17 @@ class SummaryViewModel @Inject constructor(
 
         val title = appointment.title ?: "Rendez-vous détecté"
         val scheduledAt = appointment.scheduledAt
+        val contactName = appointment.contactName ?: "Contact"
+        val phoneNumber = appointment.phoneNumber
         localDatabase.addAgendaAppointment(
             com.example.appcall.data.local.LocalAgendaItem(
                 id = appointment.id,
                 title = title,
-                scheduledAt = scheduledAt
+                scheduledAt = scheduledAt,
+                contactName = contactName,
+                phoneNumber = phoneNumber,
+                callId = callId,
+                status = "CONFIRMED"
             )
         )
 

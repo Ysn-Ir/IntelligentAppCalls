@@ -601,46 +601,77 @@ fun SummaryScreen(
                                             }
                                         }
 
-                                        if (appointment.status == "PROPOSED" || appointment.status == "MODIFIED") {
-                                            Spacer(modifier = Modifier.height(14.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = { viewModel.dismissAppointment() },
+                                                modifier = Modifier.weight(1f),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = Color(0xFFEF4444)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
                                             ) {
-                                                OutlinedButton(
-                                                    onClick = { viewModel.dismissAppointment() },
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = ButtonDefaults.outlinedButtonColors(
-                                                        contentColor = Color(0xFFEF4444)
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                ) {
-                                                    Text("Ignorer", fontSize = 12.sp)
-                                                }
+                                                Text("Ignorer", fontSize = 12.sp)
+                                            }
 
-                                                Button(
-                                                    onClick = { showVoiceDialog = true },
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = ElectricViolet
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                ) {
-                                                    Text("Modifier", color = Color.White, fontSize = 12.sp)
-                                                }
+                                            Button(
+                                                onClick = { showVoiceDialog = true },
+                                                modifier = Modifier.weight(1f),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = ElectricViolet
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Modifier", color = Color.White, fontSize = 12.sp)
+                                            }
 
-                                                Button(
-                                                    onClick = { viewModel.validateAppointment() },
-                                                    modifier = Modifier.weight(1.2f),
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = NeonTeal
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                ) {
-                                                    Text("✅ Confirmer", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                }
+                                            Button(
+                                                onClick = { viewModel.validateAppointment() },
+                                                modifier = Modifier.weight(1.3f),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = NeonTeal
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (appointment.status == "VALIDATED" || appointment.status == "CONFIRMED") "✅ Validé (Sync)" else "✅ Confirmer",
+                                                    color = Color.Black,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
                                             }
                                         }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (summary.appointment == null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("📅 Rendez-vous", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text("Créer ou ajuster un rendez-vous par commande", color = Color.Gray, fontSize = 11.sp)
+                                    }
+                                    Button(
+                                        onClick = { showVoiceDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("+ Ajouter RDV", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

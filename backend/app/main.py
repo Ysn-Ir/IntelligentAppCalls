@@ -511,6 +511,7 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
     if not appt and summary.detected_appointment_id:
         appt = db.query(Appointment).filter(Appointment.id == summary.detected_appointment_id).first()
     
+    call_row = db.query(Call).filter(Call.id == id).first()
     appt_dto = None
     if appt:
         contact_name = None
@@ -518,6 +519,13 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
         if appt.contact:
             contact_name = f"{appt.contact.first_name} {appt.contact.last_name}".strip()
             phone_num = appt.contact.phone_number
+        if (not contact_name or not phone_num) and call_row and call_row.twilio_params:
+            try:
+                tp = json.loads(call_row.twilio_params)
+                contact_name = contact_name or tp.get("contact_name")
+                phone_num = phone_num or tp.get("caller_id")
+            except Exception:
+                pass
 
         appt_dto = schemas.AppointmentDto(
             id=appt.id,
@@ -953,8 +961,49 @@ def update_task(id: str, task: schemas.TaskDto, user_id: str = Depends(verify_to
 
 @app.get("/api/v1/agenda", response_model=List[schemas.AgendaDto])
 def get_agenda(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    results = []
+    seen_ids = set()
+
+    # 1. Appointments detected from calls
+    appts = db.query(Appointment).all()
+    for a in appts:
+        c_name = None
+        p_num = None
+        if a.contact:
+            c_name = f"{a.contact.first_name} {a.contact.last_name}".strip()
+            p_num = a.contact.phone_number
+        elif a.call and a.call.twilio_params:
+            try:
+                tp = json.loads(a.call.twilio_params)
+                c_name = tp.get("contact_name")
+                p_num = tp.get("caller_id")
+            except Exception:
+                pass
+
+        results.append(schemas.AgendaDto(
+            id=a.id,
+            title=a.title or f"Rendez-vous avec {c_name or 'Contact'}",
+            scheduled_at=a.scheduled_at.isoformat() + "Z" if a.scheduled_at else datetime.utcnow().isoformat() + "Z",
+            contact_name=c_name,
+            phone_number=p_num,
+            call_id=a.call_id,
+            status=a.status or "SCHEDULED"
+        ))
+        seen_ids.add(a.id)
+
+    # 2. Agenda backend items
     items = db.query(AgendaModel).filter((AgendaModel.user_id == user_id) | (AgendaModel.user_id.is_(None))).all()
-    return [schemas.AgendaDto(id=i.id, title=i.title, scheduled_at=i.scheduled_at.isoformat() + "Z") for i in items]
+    for i in items:
+        if i.id not in seen_ids:
+            results.append(schemas.AgendaDto(
+                id=i.id,
+                title=i.title,
+                scheduled_at=i.scheduled_at.isoformat() + "Z" if i.scheduled_at else datetime.utcnow().isoformat() + "Z",
+                status="SCHEDULED"
+            ))
+            seen_ids.add(i.id)
+
+    return results
 
 @app.post("/api/v1/agenda", response_model=schemas.AgendaDto)
 def create_agenda_item(item: schemas.AgendaDto, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):

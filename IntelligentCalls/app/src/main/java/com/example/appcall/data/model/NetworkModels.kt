@@ -105,7 +105,11 @@ data class TaskDto(
 data class AgendaDto(
     @SerializedName("id") val id: String,
     @SerializedName("title") val title: String,
-    @SerializedName("scheduled_at") val scheduledAt: String
+    @SerializedName("scheduled_at") val scheduledAt: String,
+    @SerializedName("contact_name") val contactName: String? = null,
+    @SerializedName("phone_number") val phoneNumber: String? = null,
+    @SerializedName("call_id") val callId: String? = null,
+    @SerializedName("status") val status: String? = "SCHEDULED"
 )
 
 data class FileDto(

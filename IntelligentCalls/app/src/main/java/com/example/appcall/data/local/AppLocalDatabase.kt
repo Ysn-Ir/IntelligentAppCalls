@@ -19,7 +19,7 @@ class AppLocalDatabase @Inject constructor(
     companion object {
         private const val TAG = "AppLocalDatabase"
         private const val DATABASE_NAME = "appcall_local.db"
-        private const val DATABASE_VERSION = 6
+        private const val DATABASE_VERSION = 8
 
         // Table Calls (Summaries cache)
         private const val TABLE_CALLS = "calls"
@@ -49,6 +49,10 @@ class AppLocalDatabase @Inject constructor(
         private const val KEY_AGENDA_ID = "agenda_id"
         private const val KEY_AGENDA_TITLE = "title"
         private const val KEY_AGENDA_DATE = "scheduled_at"
+        private const val KEY_AGENDA_CONTACT_NAME = "contact_name"
+        private const val KEY_AGENDA_PHONE = "phone_number"
+        private const val KEY_AGENDA_CALL_ID = "call_id"
+        private const val KEY_AGENDA_STATUS = "status"
 
         // Table Files (Fichiers)
         private const val TABLE_FILES = "files"
@@ -110,10 +114,14 @@ class AppLocalDatabase @Inject constructor(
         """.trimIndent()
 
         val createAgendaTable = """
-            CREATE TABLE $TABLE_AGENDA (
+            CREATE TABLE IF NOT EXISTS $TABLE_AGENDA (
                 $KEY_AGENDA_ID TEXT PRIMARY KEY,
                 $KEY_AGENDA_TITLE TEXT,
-                $KEY_AGENDA_DATE TEXT
+                $KEY_AGENDA_DATE TEXT,
+                $KEY_AGENDA_CONTACT_NAME TEXT,
+                $KEY_AGENDA_PHONE TEXT,
+                $KEY_AGENDA_CALL_ID TEXT,
+                $KEY_AGENDA_STATUS TEXT
             )
         """.trimIndent()
 
@@ -455,18 +463,38 @@ class AppLocalDatabase @Inject constructor(
 
     // --- Agenda Operations ---
 
-    fun saveAgendaAppointment(id: String, title: String, scheduledAt: String) {
+    fun saveAgendaAppointment(
+        id: String,
+        title: String,
+        scheduledAt: String,
+        contactName: String? = null,
+        phoneNumber: String? = null,
+        callId: String? = null,
+        status: String? = "CONFIRMED"
+    ) {
         val db = writableDatabase
         val values = ContentValues().apply {
             put(KEY_AGENDA_ID, id)
             put(KEY_AGENDA_TITLE, title)
             put(KEY_AGENDA_DATE, scheduledAt)
+            put(KEY_AGENDA_CONTACT_NAME, contactName)
+            put(KEY_AGENDA_PHONE, phoneNumber)
+            put(KEY_AGENDA_CALL_ID, callId)
+            put(KEY_AGENDA_STATUS, status ?: "CONFIRMED")
         }
         db.insertWithOnConflict(TABLE_AGENDA, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     fun addAgendaAppointment(item: LocalAgendaItem) {
-        saveAgendaAppointment(item.id, item.title, item.scheduledAt)
+        saveAgendaAppointment(
+            id = item.id,
+            title = item.title,
+            scheduledAt = item.scheduledAt,
+            contactName = item.contactName,
+            phoneNumber = item.phoneNumber,
+            callId = item.callId,
+            status = item.status
+        )
     }
 
     fun getAgendaAppointments(): List<LocalAgendaItem> {
@@ -475,11 +503,20 @@ class AppLocalDatabase @Inject constructor(
         val cursor = db.query(TABLE_AGENDA, null, null, null, null, null, "$KEY_AGENDA_DATE ASC")
         cursor.use {
             while (it.moveToNext()) {
+                val contactNameIdx = it.getColumnIndex(KEY_AGENDA_CONTACT_NAME)
+                val phoneIdx = it.getColumnIndex(KEY_AGENDA_PHONE)
+                val callIdIdx = it.getColumnIndex(KEY_AGENDA_CALL_ID)
+                val statusIdx = it.getColumnIndex(KEY_AGENDA_STATUS)
+
                 list.add(
                     LocalAgendaItem(
                         id = it.getString(it.getColumnIndexOrThrow(KEY_AGENDA_ID)),
                         title = it.getString(it.getColumnIndexOrThrow(KEY_AGENDA_TITLE)),
-                        scheduledAt = it.getString(it.getColumnIndexOrThrow(KEY_AGENDA_DATE))
+                        scheduledAt = it.getString(it.getColumnIndexOrThrow(KEY_AGENDA_DATE)),
+                        contactName = if (contactNameIdx != -1 && !it.isNull(contactNameIdx)) it.getString(contactNameIdx) else null,
+                        phoneNumber = if (phoneIdx != -1 && !it.isNull(phoneIdx)) it.getString(phoneIdx) else null,
+                        callId = if (callIdIdx != -1 && !it.isNull(callIdIdx)) it.getString(callIdIdx) else null,
+                        status = if (statusIdx != -1 && !it.isNull(statusIdx)) it.getString(statusIdx) else "CONFIRMED"
                     )
                 )
             }
@@ -560,7 +597,15 @@ class AppLocalDatabase @Inject constructor(
 
 data class LocalCallHistoryItem(val id: String, val contactId: String, val contactName: String, val direction: String, val status: String, val startedAt: String, val endedAt: String?)
 data class LocalTask(val id: String, val title: String, val completed: Boolean)
-data class LocalAgendaItem(val id: String, val title: String, val scheduledAt: String)
+data class LocalAgendaItem(
+    val id: String,
+    val title: String,
+    val scheduledAt: String,
+    val contactName: String? = null,
+    val phoneNumber: String? = null,
+    val callId: String? = null,
+    val status: String? = "CONFIRMED"
+)
 data class LocalFileItem(val id: String, val name: String, val path: String, val size: String)
 data class LocalChatMessage(val id: Int, val sessionId: String?, val contactId: String?, val isUser: Boolean, val text: String, val sourcesJson: String?, val createdAt: Long)
 data class ChatSessionSummary(val sessionId: String, val contactId: String?, val previewText: String, val messageCount: Int, val lastTimestamp: Long)

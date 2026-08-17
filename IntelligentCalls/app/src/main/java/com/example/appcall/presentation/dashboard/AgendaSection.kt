@@ -348,7 +348,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun rendez-vous planifié.\nLes rendez-vous détectés lors de vos appels apparaîtront ici automatiquement.",
+                    text = "Aucun rendez-vous planifié.\nLes rendez-vous détectés lors de vos appels apparaîtront ici automatiquement avec les coordonnées de l'interlocuteur.",
                     color = Color.Gray,
                     fontSize = 12.sp,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -357,70 +357,151 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(appointments, key = { it.id }) { app ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(NeonTeal.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = null,
-                                    tint = NeonTeal,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(NeonTeal.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = null,
+                                            tint = NeonTeal,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = app.title,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+
+                                // Status badge
+                                val statusLabel = when (app.status) {
+                                    "VALIDATED" -> "VALIDÉ"
+                                    "CONFIRMED" -> "CONFIRMÉ"
+                                    "PROPOSED" -> "PROPOSÉ"
+                                    else -> app.status ?: "CONFIRMÉ"
+                                }
+                                Card(
+                                    shape = RoundedCornerShape(4.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (app.status == "PROPOSED") Color(0x337C3AED) else Color(0x3300F2FE)
+                                    )
+                                ) {
+                                    Text(
+                                        text = statusLabel,
+                                        color = if (app.status == "PROPOSED") ElectricViolet else NeonTeal,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Date & Time display
+                            val dateClean = try {
+                                if (app.scheduledAt.contains("T")) {
+                                    val d = app.scheduledAt.substringBefore("T")
+                                    val t = app.scheduledAt.substringAfter("T").replace("Z", "").take(5)
+                                    "$d à $t"
+                                } else app.scheduledAt
+                            } catch (e: Exception) { app.scheduledAt }
+
+                            Text(
+                                text = "📅 Prévu le : $dateClean",
+                                color = Color(0xFF93C5FD),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            // Caller / Contact Name & Number
+                            if (!app.contactName.isNullOrBlank() || !app.phoneNumber.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = app.title,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                                val dateClean = try {
-                                    if (app.scheduledAt.contains("T")) {
-                                        val d = app.scheduledAt.substringBefore("T")
-                                        val t = app.scheduledAt.substringAfter("T").replace("Z", "").take(5)
-                                        "$d à $t"
-                                    } else app.scheduledAt
-                                } catch (e: Exception) { app.scheduledAt }
-                                Text(
-                                    text = "📅 $dateClean",
-                                    color = Color(0xFF93C5FD),
-                                    fontSize = 11.sp,
+                                    text = "👤 Interlocuteur : ${app.contactName ?: "Contact"} ${if (!app.phoneNumber.isNullOrBlank()) "(${app.phoneNumber})" else ""}".trim(),
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
-                            IconButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        localDatabase.deleteAgendaAppointment(app.id)
-                                        appointments = localDatabase.getAgendaAppointments()
-                                    }
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Supprimer",
-                                    tint = Color(0xFF64748B),
-                                    modifier = Modifier.size(15.dp)
+
+                            // Call Reference ID
+                            if (!app.callId.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "🆔 Réf. Appel : ${app.callId.take(16)}...",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 10.sp
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Bottom Actions: Quick Call & Delete
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!app.phoneNumber.isNullOrBlank()) {
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                val dialIntent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${app.phoneNumber}"))
+                                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                context.startActivity(dialIntent)
+                                            } catch (e: Exception) {}
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0x3300F2FE)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("📞 Rappeler (${app.phoneNumber})", color = NeonTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.width(1.dp))
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            localDatabase.deleteAgendaAppointment(app.id)
+                                            appointments = localDatabase.getAgendaAppointments()
+                                        }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Supprimer",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
