@@ -1,6 +1,7 @@
 # Build & Temporary Files
 *.b64
 *.mp4
+*.m4a
 *.wav
 *.ab
 .idea/
@@ -15,5 +16,6 @@ env/
 venv/
 *.log
 
-appcall-fake-backend/uploads/*
-!appcall-fake-backend/uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+uploads/*
