@@ -516,9 +516,10 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
     if appt:
         contact_name = None
         phone_num = None
-        if appt.contact:
-            contact_name = f"{appt.contact.first_name} {appt.contact.last_name}".strip()
-            phone_num = appt.contact.phone_number
+        contact_obj = db.query(Contact).filter(Contact.id == appt.contact_id).first() if appt.contact_id else None
+        if contact_obj:
+            contact_name = f"{contact_obj.first_name} {contact_obj.last_name}".strip()
+            phone_num = contact_obj.phone_number
         if (not contact_name or not phone_num) and call_row and call_row.twilio_params:
             try:
                 tp = json.loads(call_row.twilio_params)
@@ -969,9 +970,10 @@ def get_agenda(user_id: str = Depends(verify_token), db: Session = Depends(get_d
     for a in appts:
         c_name = None
         p_num = None
-        if a.contact:
-            c_name = f"{a.contact.first_name} {a.contact.last_name}".strip()
-            p_num = a.contact.phone_number
+        contact_obj = db.query(Contact).filter(Contact.id == a.contact_id).first() if a.contact_id else None
+        if contact_obj:
+            c_name = f"{contact_obj.first_name} {contact_obj.last_name}".strip()
+            p_num = contact_obj.phone_number
         elif a.call and a.call.twilio_params:
             try:
                 tp = json.loads(a.call.twilio_params)

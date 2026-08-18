@@ -35,7 +35,8 @@ def _get_openai():
     try:
         from openai import OpenAI
         api_key = os.getenv("OPENAI_API_KEY", "")
-        if not api_key:
+        # Groq keys do not support OpenAI embedding endpoint
+        if not api_key or api_key.startswith("gsk_"):
             return None
         _openai_client = OpenAI(api_key=api_key)
         return _openai_client

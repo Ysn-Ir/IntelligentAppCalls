@@ -3,6 +3,9 @@ package com.example.appcall.data.calling
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.CallLog
+import android.provider.ContactsContract
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.example.appcall.data.local.AppLocalDatabase
@@ -39,6 +42,10 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
 
         if (!incomingNumber.isNullOrBlank()) {
             prefs.edit().putString("active_phone_number", incomingNumber).apply()
+            val resolvedName = resolveContactNameFromNumber(context, incomingNumber)
+            if (!resolvedName.isNullOrBlank()) {
+                prefs.edit().putString("active_contact_name", resolvedName).apply()
+            }
         }
 
         val nowIso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).format(Date())
@@ -50,15 +57,28 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                     ?: "native-${System.currentTimeMillis()}"
                 prefs.edit().putString(KEY_ACTIVE_CALL_ID, callId).apply()
 
-                val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
-                val phoneNumber = prefs.getString("active_phone_number", null) ?: incomingNumber
+                var (resolvedNum, resolvedName) = resolveLatestCallInfo(context)
+                if (resolvedNum.isNullOrBlank()) {
+                    resolvedNum = prefs.getString("active_phone_number", null) ?: incomingNumber
+                }
+                if (resolvedName.isNullOrBlank() && !resolvedNum.isNullOrBlank()) {
+                    resolvedName = resolveContactNameFromNumber(context, resolvedNum)
+                }
+
+                val finalContactName = resolvedName ?: prefs.getString("active_contact_name", null) ?: resolvedNum ?: "Appel Téléphonique"
+                val finalPhoneNumber = resolvedNum ?: prefs.getString("active_phone_number", null)
+
+                prefs.edit()
+                    .putString("active_contact_name", finalContactName)
+                    .putString("active_phone_number", finalPhoneNumber)
+                    .apply()
 
                 try {
                     val db = AppLocalDatabase(context)
                     db.saveCallHistoryItem(
                         id = callId,
-                        contactId = phoneNumber ?: "native",
-                        contactName = contactName,
+                        contactId = finalPhoneNumber ?: "native",
+                        contactName = finalContactName,
                         direction = "OUTBOUND",
                         status = "IN_PROGRESS",
                         startedAt = nowIso,
@@ -68,7 +88,7 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                     Log.w(TAG, "Could not log call start in history: ${e.message}")
                 }
 
-                Log.d(TAG, "OFFHOOK → starting recorder for callId=$callId")
+                Log.d(TAG, "OFFHOOK → starting recorder for callId=$callId (Contact: $finalContactName, Phone: $finalPhoneNumber)")
                 PhoneCallRecorderService.start(context, callId)
             }
 
@@ -76,8 +96,17 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                 // Call ended. Stop recording.
                 Log.d(TAG, "IDLE → stopping recorder")
                 val callId = prefs.getString(KEY_ACTIVE_CALL_ID, null)
-                val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
-                val phoneNumber = prefs.getString("active_phone_number", null) ?: incomingNumber
+
+                var (resolvedNum, resolvedName) = resolveLatestCallInfo(context)
+                if (resolvedNum.isNullOrBlank()) {
+                    resolvedNum = prefs.getString("active_phone_number", null) ?: incomingNumber
+                }
+                if (resolvedName.isNullOrBlank() && !resolvedNum.isNullOrBlank()) {
+                    resolvedName = resolveContactNameFromNumber(context, resolvedNum)
+                }
+
+                val finalContactName = resolvedName ?: prefs.getString("active_contact_name", null) ?: resolvedNum ?: "Appel Téléphonique"
+                val finalPhoneNumber = resolvedNum ?: prefs.getString("active_phone_number", null)
 
                 if (callId != null) {
                     try {
@@ -86,8 +115,8 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                         val startedAt = existing?.startedAt ?: nowIso
                         db.saveCallHistoryItem(
                             id = callId,
-                            contactId = phoneNumber ?: existing?.contactId ?: "native",
-                            contactName = contactName,
+                            contactId = finalPhoneNumber ?: existing?.contactId ?: "native",
+                            contactName = finalContactName,
                             direction = existing?.direction ?: "OUTBOUND",
                             status = "COMPLETED",
                             startedAt = startedAt,
@@ -107,5 +136,58 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                 Log.d(TAG, "RINGING — waiting for answer")
             }
         }
+    }
+
+    private fun resolveLatestCallInfo(context: Context): Pair<String?, String?> {
+        try {
+            val cursor = context.contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                arrayOf(
+                    CallLog.Calls.NUMBER,
+                    CallLog.Calls.CACHED_NAME
+                ),
+                null,
+                null,
+                "${CallLog.Calls.DATE} DESC LIMIT 1"
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val numIndex = it.getColumnIndex(CallLog.Calls.NUMBER)
+                    val nameIndex = it.getColumnIndex(CallLog.Calls.CACHED_NAME)
+                    val number = if (numIndex >= 0) it.getString(numIndex) else null
+                    val name = if (nameIndex >= 0) it.getString(nameIndex) else null
+                    return Pair(number, name)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not query CallLog: ${e.message}")
+        }
+        return Pair(null, null)
+    }
+
+    private fun resolveContactNameFromNumber(context: Context, number: String?): String? {
+        if (number.isNullOrBlank()) return null
+        try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(number)
+            )
+            val cursor = context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (index >= 0) return it.getString(index)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not resolve contact name: ${e.message}")
+        }
+        return null
     }
 }
