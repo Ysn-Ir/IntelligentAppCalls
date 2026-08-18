@@ -386,20 +386,24 @@ def get_calls(
     result = []
     for c in calls:
         phone = None
-        if c.contact and c.contact.phone_number:
-            phone = c.contact.phone_number
-        elif c.twilio_params:
+        name = None
+        if c.twilio_params:
             try:
                 p = json.loads(c.twilio_params)
                 phone = p.get("caller_id") or p.get("phone_number")
+                name = p.get("contact_name")
             except Exception:
                 pass
-        
-        name = "Appel"
+
         if c.contact:
-            name = f"{c.contact.first_name} {c.contact.last_name}".strip()
-        elif phone:
-            name = phone
+            contact_full = f"{c.contact.first_name} {c.contact.last_name}".strip()
+            if contact_full and contact_full not in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+                name = contact_full
+            if not phone and c.contact.phone_number:
+                phone = c.contact.phone_number
+
+        if not name or name in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+            name = phone or "Appel Téléphonique"
 
         summary_row = db.query(CallSummary).filter(CallSummary.call_id == c.id).first()
         summary_prev = summary_row.summary_text if summary_row and not summary_row.summary_text.startswith("Traitement IA") else None
@@ -468,14 +472,12 @@ def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
     # 1. Create Call row if missing
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
-        contact = db.query(Contact).first()
-        contact_id = contact.id if contact else "contact-1111"
         user = db.query(User).first()
         user_id = user.id if user else "system"
         
         call = Call(
             id=call_id,
-            contact_id=contact_id,
+            contact_id=None,
             user_id=user_id,
             direction="OUTBOUND",
             status="COMPLETED",
