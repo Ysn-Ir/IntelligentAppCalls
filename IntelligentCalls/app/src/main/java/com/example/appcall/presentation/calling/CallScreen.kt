@@ -39,6 +39,8 @@ fun CallScreen(
     val transcript by viewModel.transcript.collectAsState()
     val callHistory by viewModel.callHistory.collectAsState()
 
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Historique Appels, 1 = Contacts
+    var contactSearchQuery by remember { mutableStateOf("") }
     var showContactDialer by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -56,17 +58,179 @@ fun CallScreen(
     val context = LocalContext.current
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
+    val filteredContacts = remember(contacts, contactSearchQuery) {
+        if (contactSearchQuery.isBlank()) contacts
+        else contacts.filter {
+            it.fullName.contains(contactSearchQuery, ignoreCase = true) ||
+            it.phoneNumber.contains(contactSearchQuery, ignoreCase = true)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
     ) {
-        // Screen 1: Call History Screen
-        CallHistoryScreen(
-            callHistory = callHistory,
-            onCallClick = onNavigateToSummary,
-            onFabClick = { showContactDialer = true }
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ── TOP TAB SWITCHER (Appels vs Contacts) ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(BgColor)
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selectedTab == 0) Text1 else Surface1)
+                        .border(1.dp, if (selectedTab == 0) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                        .clickable { selectedTab = 0 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "📞 Historique (${callHistory.size})",
+                        color = if (selectedTab == 0) BgColor else Text2,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selectedTab == 1) Text1 else Surface1)
+                        .border(1.dp, if (selectedTab == 1) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                        .clickable { selectedTab = 1 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "👥 Contacts (${contacts.size})",
+                        color = if (selectedTab == 1) BgColor else Text2,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (selectedTab == 0) {
+                // Screen 1: Call History Screen
+                CallHistoryScreen(
+                    callHistory = callHistory,
+                    onCallClick = onNavigateToSummary,
+                    onFabClick = { showContactDialer = true }
+                )
+            } else {
+                // Contacts List View
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 18.dp),
+                    contentPadding = PaddingValues(vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Consent Toggle Card
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Surface1)
+                                .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Transcription & Analyse IA",
+                                        color = Text1,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (consentGiven) "Actif: Les appels seront transcrits & résumés"
+                                               else "Désactivé: Appel audio classique",
+                                        color = if (consentGiven) SuccessColor else Text3,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                                Switch(
+                                    checked = consentGiven,
+                                    onCheckedChange = { viewModel.setConsentGiven(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = BgColor,
+                                        checkedTrackColor = Text1
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Search Contacts Box
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Surface1)
+                                .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = contactSearchQuery,
+                                onValueChange = { contactSearchQuery = it },
+                                textStyle = androidx.compose.ui.text.TextStyle(color = Text1, fontSize = 13.sp),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                decorationBox = { innerTextField ->
+                                    if (contactSearchQuery.isEmpty()) {
+                                        Text("Rechercher un contact...", color = Text3, fontSize = 13.sp)
+                                    }
+                                    innerTextField()
+                                }
+                            )
+                        }
+                    }
+
+                    if (filteredContacts.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Aucun contact trouvé", color = Text3, fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        items(filteredContacts) { contact ->
+                            ContactRow(
+                                contact = contact,
+                                onCallClick = { viewModel.startCall(contact) },
+                                onDirectDial = {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                                        data = android.net.Uri.parse("tel:${contact.phoneNumber}")
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            )
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(80.dp))
+                    }
+                }
+            }
+        }
 
         // Contact Dialer Dialog
         if (showContactDialer) {
@@ -179,48 +343,86 @@ fun CallScreen(
     }
 }
 
-
 @Composable
 fun ContactRow(
     contact: Contact,
-    onCallClick: () -> Unit
+    onCallClick: () -> Unit,
+    onDirectDial: () -> Unit = {}
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0x1F293754)
-        )
+    val initial = contact.fullName.trim().take(1).uppercase().ifEmpty { "C" }
+    val avatarBg = remember(contact.fullName) {
+        val colors = listOf(AvatarBgA, AvatarBgB, AvatarBgC, AvatarBgD, AvatarBgE)
+        colors[kotlin.math.abs(contact.fullName.hashCode()) % colors.size]
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface1)
+            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+            .padding(12.dp)
     ) {
         Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(avatarBg),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = contact.fullName,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = contact.phoneNumber,
-                    color = Color.Gray,
-                    fontSize = 14.sp
+                    text = initial,
+                    color = Text1,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
-            Button(
-                onClick = onCallClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ElectricViolet
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("CALL", color = Color.White, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = contact.fullName,
+                    color = Text1,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = contact.phoneNumber,
+                    color = Text3,
+                    fontSize = 11.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Direct SIM call
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(Surface2)
+                        .clickable { onDirectDial() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("📱", fontSize = 12.sp)
+                }
+
+                // VoIP Call
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(Text1)
+                        .clickable { onCallClick() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Appeler", color = BgColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

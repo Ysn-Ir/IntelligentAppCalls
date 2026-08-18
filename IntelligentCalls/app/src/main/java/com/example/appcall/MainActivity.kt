@@ -342,20 +342,22 @@ class MainActivity : ComponentActivity() {
                                         "Appels" to "📞",
                                         "Assistant IA" to "🤖",
                                         "Agenda" to "📅",
-                                        "Tâches" to "📋"
+                                        "Tâches" to "📋",
+                                        "Paramètres" to "⚙️"
                                     )
                                     sections.forEachIndexed { index, (title, iconEmoji) ->
                                         val isSelected = selectedSection == index
                                         NavigationBarItem(
                                             selected = isSelected,
                                             onClick = { selectedSection = index },
-                                            icon = { Text(text = iconEmoji, fontSize = 16.sp) },
+                                            icon = { Text(text = iconEmoji, fontSize = 15.sp) },
                                             label = {
                                                 Text(
                                                     text = title,
-                                                    fontSize = 9.5.sp,
+                                                    fontSize = 8.5.sp,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (isSelected) Text1 else Text3
+                                                    color = if (isSelected) Text1 else Text3,
+                                                    maxLines = 1
                                                 )
                                             },
                                             colors = NavigationBarItemDefaults.colors(
@@ -399,6 +401,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                     3 -> {
                                         TasksSection(localDatabase, voipRepository)
+                                    }
+                                    4 -> {
+                                        SettingsSection(
+                                            voipRepository = voipRepository,
+                                            shizukuManager = shizukuManager,
+                                            onLogout = {
+                                                tokenStorage.clear()
+                                                loginViewModel.resetState()
+                                                selectedSection = 0
+                                                currentScreen = AppScreen.LOGIN
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -1021,12 +1035,14 @@ fun SettingsSection(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF111B21))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(BgColor)
+            .padding(horizontal = 18.dp),
+        contentPadding = PaddingValues(vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Paramètres", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Paramètres", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Text1)
+            Text("Configuration, enregistrement & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
         }
 
         // ── SHIZUKU STATUS CARD ─────────────────────────────────────────────────
@@ -1034,19 +1050,22 @@ fun SettingsSection(
             val isShizukuAvailable = remember { shizukuManager?.isShizukuAvailable() == true }
             val hasShizukuPerm = remember { shizukuManager?.hasShizukuPermission() == true }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("SHIZUKU API — PERMISSIONS ÉLEVÉES ADB", color = NeonTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column {
+                    Text("SHIZUKU API — PERMISSIONS ÉLEVÉES ADB", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
-                                .background(if (isShizukuAvailable && hasShizukuPerm) Color.Green else Color.Red, CircleShape)
+                                .size(8.dp)
+                                .background(if (isShizukuAvailable && hasShizukuPerm) SuccessColor else DangerColor, CircleShape)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -1055,18 +1074,19 @@ fun SettingsSection(
                                 isShizukuAvailable -> "Shizuku Détecté (Permission requise)"
                                 else -> "Shizuku Non Détecté / Service arrêté"
                             },
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            color = Text1,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                     if (isShizukuAvailable && !hasShizukuPerm) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = { shizukuManager?.requestShizukuPermission() },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonTeal)
+                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Autoriser Shizuku", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                            Text("Autoriser Shizuku", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
@@ -1075,14 +1095,17 @@ fun SettingsSection(
 
         // ── SERVER CONFIG CARD ─────────────────────────────────────────────────
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("CONFIGURATION SERVEUR & IA", color = NeonTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column {
+                    Text("CONFIGURATION SERVEUR & IA", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
                     var customUrlText by remember { 
                         mutableStateOf(
                             context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
@@ -1092,16 +1115,16 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = customUrlText,
                         onValueChange = { customUrlText = it },
-                        label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Color.Gray) },
+                        label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Text3, fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonTeal,
-                            unfocusedBorderColor = Color.Gray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
                         )
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1116,10 +1139,10 @@ fun SettingsSection(
                                 Toast.makeText(context, "Mode USB sélectionné (127.0.0.1:8000)", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("🔌 Mode USB", color = NeonTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("🔌 Mode USB", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                         Button(
                             onClick = {
@@ -1131,10 +1154,10 @@ fun SettingsSection(
                                 Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.177:8000)", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("📶 Mode Wi-Fi", color = Color(0xFF60A5FA), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("📶 Mode Wi-Fi", color = AccentText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1152,10 +1175,10 @@ fun SettingsSection(
                                 Toast.makeText(context, "URL enregistrée", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Enregistrer", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                            Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                         Button(
                             onClick = {
@@ -1187,10 +1210,10 @@ fun SettingsSection(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("🔄 Tester", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("🔄 Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
@@ -1199,14 +1222,17 @@ fun SettingsSection(
 
         // ── CALL RECORDING SETTINGS CARD ───────────────────────────────────────
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("MODE D'ENREGISTREMENT APPEL SIM", color = NeonTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column {
+                    Text("MODE D'ENREGISTREMENT APPEL SIM", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val callPrefs = remember { context.getSharedPreferences("call_settings", android.content.Context.MODE_PRIVATE) }
                     var useBtSco by remember { mutableStateOf(callPrefs.getBoolean("use_bt_sco", true)) }
@@ -1218,14 +1244,14 @@ fun SettingsSection(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Micro Casque Bluetooth (SCO)", color = Color.White, fontSize = 13.sp)
+                        Text("Micro Casque Bluetooth (SCO)", color = Text1, fontSize = 13.sp)
                         Switch(
                             checked = useBtSco,
                             onCheckedChange = {
                                 useBtSco = it
                                 callPrefs.edit().putBoolean("use_bt_sco", it).apply()
                             },
-                            colors = SwitchDefaults.colors(checkedThumbColor = NeonTeal)
+                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1234,14 +1260,14 @@ fun SettingsSection(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Pont d'Appel PBX (2-Way Server)", color = Color.White, fontSize = 13.sp)
+                        Text("Pont d'Appel PBX (2-Way Server)", color = Text1, fontSize = 13.sp)
                         Switch(
                             checked = useBridgeMode,
                             onCheckedChange = {
                                 useBridgeMode = it
                                 callPrefs.edit().putBoolean("use_pbx_bridge", it).apply()
                             },
-                            colors = SwitchDefaults.colors(checkedThumbColor = NeonTeal)
+                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
                         )
                     }
                     if (useBridgeMode) {
@@ -1252,13 +1278,13 @@ fun SettingsSection(
                                 gatewayNum = it
                                 callPrefs.edit().putString("pbx_gateway_number", it.trim()).apply()
                             },
-                            label = { Text("Numéro Passerelle PBX (ex: +33180000000)", color = Color.Gray) },
+                            label = { Text("Numéro Passerelle PBX (ex: +33180000000)", color = Text3) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NeonTeal,
-                                unfocusedBorderColor = Color.Gray,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
                             )
                         )
                     }
@@ -1268,19 +1294,22 @@ fun SettingsSection(
 
         // ── RGPD & GESTION DES DONNÉES ──────────────────────────────────────────
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("RGPD & PROTECTION DES DONNÉES", color = NeonTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Column {
+                    Text("RGPD & PROTECTION DES DONNÉES", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Conformément au RGPD (Règlement Général sur la Protection des Données), vous disposez d'un droit d'accès, d'export et d'effacement complet de vos données.",
-                        color = Color.LightGray, fontSize = 12.sp, lineHeight = 18.sp
+                        color = Text2, fontSize = 11.5.sp, lineHeight = 17.sp
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Button 1: Export all data (Art. 15 / 20)
                     Button(
@@ -1314,9 +1343,10 @@ fun SettingsSection(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = ElectricViolet)
+                        colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("📥 Exporter toutes mes données (Art. 15 RGPD)", color = Color.White, fontSize = 13.sp)
+                        Text("📥 Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.5.sp)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1325,9 +1355,10 @@ fun SettingsSection(
                     OutlinedButton(
                         onClick = { showDeleteVoiceDialog = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF59E0B))
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WarnColor),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Effacer uniquement les enregistrements", color = Color(0xFFF59E0B), fontSize = 13.sp)
+                        Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.5.sp)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1336,9 +1367,10 @@ fun SettingsSection(
                     Button(
                         onClick = { showDeleteAccountDialog = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                        colors = ButtonDefaults.buttonColors(containerColor = DangerColor),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("🗑️ Supprimer mon compte & mes données (Art. 17)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("🗑️ Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                     }
                 }
             }
@@ -1348,11 +1380,13 @@ fun SettingsSection(
         item {
             Button(
                 onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155))
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Text("DÉCONNEXION (LOGOUT)", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("DÉCONNEXION", color = DangerColor, fontWeight = FontWeight.Bold)
             }
+            Spacer(modifier = Modifier.height(60.dp))
         }
     }
 
@@ -1360,13 +1394,12 @@ fun SettingsSection(
     if (showDeleteVoiceDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteVoiceDialog = false },
-            title = { Text("Supprimer les enregistrements vocaux", color = Color.White) },
-            text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fichiers locaux et distants seront effacés.", color = Color.LightGray) },
+            title = { Text("Supprimer les enregistrements vocaux", color = Text1, fontWeight = FontWeight.Bold) },
+            text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fichiers locaux et distants seront effacés.", color = Text2) },
             confirmButton = {
                 Button(
                     onClick = {
                         coroutineScope.launch {
-                            // Purge local recording files on device
                             val recDir = java.io.File(context.filesDir, "recordings")
                             if (recDir.exists() && recDir.isDirectory) {
                                 recDir.listFiles()?.forEach { it.delete() }
@@ -1377,13 +1410,13 @@ fun SettingsSection(
                         }
                         showDeleteVoiceDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
-                ) { Text("Confirmer", color = Color.Black) }
+                    colors = ButtonDefaults.buttonColors(containerColor = WarnColor)
+                ) { Text("Confirmer", color = BgColor, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteVoiceDialog = false }) { Text("Annuler", color = Color.Gray) }
+                TextButton(onClick = { showDeleteVoiceDialog = false }) { Text("Annuler", color = Text3) }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = Surface1
         )
     }
 
@@ -1391,11 +1424,11 @@ fun SettingsSection(
     if (showDeleteAccountDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
-            title = { Text("⚠️ Suppression définitive du compte", color = Color.White) },
+            title = { Text("⚠️ Suppression définitive du compte", color = DangerColor, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     "Conformément à l'Art. 17 du RGPD (Droit à l'oubli), votre compte, tous vos contacts, appels, enregistrements et résumés seront définitivement effacés. Cette action est irréversible.",
-                    color = Color.LightGray
+                    color = Text2
                 )
             },
             confirmButton = {
@@ -1414,13 +1447,13 @@ fun SettingsSection(
                         }
                         showDeleteAccountDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) { Text("Supprimer Définitivement", color = Color.White, fontWeight = FontWeight.Bold) }
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
+                ) { Text("Supprimer Définitivement", color = Text1, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler", color = Color.Gray) }
+                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler", color = Text3) }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = Surface1
         )
     }
 }
