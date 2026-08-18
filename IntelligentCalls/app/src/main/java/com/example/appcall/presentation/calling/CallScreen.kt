@@ -4,20 +4,20 @@ import android.content.Context
 import android.media.AudioManager
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,9 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.calling.CallState
 import com.example.appcall.domain.model.Contact
-import com.example.appcall.presentation.theme.DarkIndigo
-import com.example.appcall.presentation.theme.ElectricViolet
-import com.example.appcall.presentation.theme.NeonTeal
+import com.example.appcall.presentation.theme.*
 
 @Composable
 fun CallScreen(
@@ -41,12 +39,10 @@ fun CallScreen(
     val transcript by viewModel.transcript.collectAsState()
     val callHistory by viewModel.callHistory.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Contacts, 1 = History
+    var showContactDialer by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 1) {
-            viewModel.loadCallHistory()
-        }
+    LaunchedEffect(Unit) {
+        viewModel.loadCallHistory()
     }
 
     var lastActiveCallId by remember { mutableStateOf<String?>(null) }
@@ -63,143 +59,98 @@ fun CallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(DarkIndigo, Color(0xFF0A0F24))
-                )
-            )
+            .background(BgColor)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Dashboard",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Intelligent Calls Module",
-                        fontSize = 14.sp,
-                        color = NeonTeal
-                    )
-                }
-                TextButton(onClick = onLogout) {
-                    Text("Logout", color = Color.LightGray)
-                }
-            }
+        // Screen 1: Call History Screen
+        CallHistoryScreen(
+            callHistory = callHistory,
+            onCallClick = onNavigateToSummary,
+            onFabClick = { showContactDialer = true }
+        )
 
-            // Tab Selector Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { selectedTab = 0 },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedTab == 0) ElectricViolet else Color(0x1FFFFFFF)
-                    ),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Contacts", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = { selectedTab = 1 },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedTab == 1) ElectricViolet else Color(0x1FFFFFFF)
-                    ),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Call History", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            if (selectedTab == 0) {
-                // Consent Configuration Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0x14FFFFFF)
+        // Contact Dialer Dialog
+        if (showContactDialer) {
+            AlertDialog(
+                onDismissRequest = { showContactDialer = false },
+                containerColor = Surface1,
+                title = {
+                    Text(
+                        text = "Composer un appel",
+                        color = Text1,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                ) {
-                    Row(
+                },
+                text = {
+                    Column(
                         modifier = Modifier
-                            .padding(16.dp)
-                            .fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .heightIn(max = 350.dp)
                     ) {
-                        Checkbox(
-                            checked = consentGiven,
-                            onCheckedChange = { viewModel.setConsentGiven(it) },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = NeonTeal,
-                                uncheckedColor = Color.Gray
-                            )
+                        Text(
+                            text = "Sélectionnez un contact pour lancer l'appel :",
+                            color = Text3,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 10.dp)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+
+                        if (contacts.isEmpty()) {
                             Text(
-                                text = "AI Transcription Consent",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 15.sp
+                                text = "Aucun contact enregistré",
+                                color = Text3,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(vertical = 16.dp)
                             )
-                            Text(
-                                text = if (consentGiven) "Enabled: Call will be transcribed & summarized by Claude"
-                                       else "Disabled: Call will connect as plain audio only",
-                                color = if (consentGiven) NeonTeal else Color.Gray,
-                                fontSize = 12.sp
-                            )
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(contacts) { contact ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Surface2)
+                                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                showContactDialer = false
+                                                viewModel.startCall(contact)
+                                            }
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = contact.fullName,
+                                                    color = Text1,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 14.sp
+                                                )
+                                                Text(
+                                                    text = contact.phoneNumber,
+                                                    color = Text3,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                            Text(text = "📞", fontSize = 14.sp)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                }
-
-                Text(
-                    text = "My Contacts",
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                // Contact List
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(contacts) { contact ->
-                        ContactRow(
-                            contact = contact,
-                            onCallClick = { viewModel.startCall(contact) }
-                        )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showContactDialer = false }) {
+                        Text("Fermer", color = Text2, fontWeight = FontWeight.SemiBold)
                     }
                 }
-            } else {
-                Box(modifier = Modifier.weight(1f)) {
-                    CallHistoryScreen(
-                        callHistory = callHistory,
-                        onCallClick = onNavigateToSummary
-                    )
-                }
-            }
+            )
         }
 
         // Active Call Overlay Screen
@@ -227,6 +178,7 @@ fun CallScreen(
         }
     }
 }
+
 
 @Composable
 fun ContactRow(

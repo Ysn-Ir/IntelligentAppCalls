@@ -43,10 +43,17 @@ import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
-import com.example.appcall.presentation.theme.NeonTeal
-import com.example.appcall.presentation.theme.ElectricViolet
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Divider
+import androidx.compose.material3.CircularProgressIndicator
+import com.example.appcall.presentation.theme.*
 import com.example.appcall.domain.repository.VoipRepository
 import javax.inject.Inject
 import android.widget.Toast
@@ -122,7 +129,7 @@ class MainActivity : ComponentActivity() {
         mutableStateOf(if (tokenStorage.token != null) AppScreen.DASHBOARD else AppScreen.LOGIN)
     }
     private val activeCallIdForSummaryState = mutableStateOf("")
-    private val selectedSectionState = mutableStateOf(4)
+    private val selectedSectionState = mutableStateOf(0)
     private val showInterceptConsentState = mutableStateOf(false)
     private val interceptedNumberState = mutableStateOf("")
 
@@ -231,7 +238,7 @@ class MainActivity : ComponentActivity() {
                     when {
                         currentScreen == AppScreen.SUMMARY -> currentScreen = AppScreen.DASHBOARD
                         currentScreen == AppScreen.REGISTER -> currentScreen = AppScreen.LOGIN
-                        currentScreen == AppScreen.DASHBOARD && selectedSection != 4 -> selectedSection = 4
+                        currentScreen == AppScreen.DASHBOARD && selectedSection != 0 -> selectedSection = 0
                         currentScreen == AppScreen.DASHBOARD -> moveTaskToBack(true)
                     }
                 }
@@ -327,33 +334,36 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             bottomBar = {
                                 NavigationBar(
-                                    containerColor = Color(0xFF111B21),
-                                    contentColor = Color.White
+                                    containerColor = BgColor,
+                                    contentColor = Text1,
+                                    tonalElevation = 0.dp
                                 ) {
                                     val sections = listOf(
-                                        "To-do list", "Agenda", "Assistant IA",
-                                        "Fichiers", "Appels", "Paramètres"
+                                        "Appels" to "📞",
+                                        "Assistant IA" to "🤖",
+                                        "Agenda" to "📅",
+                                        "Tâches" to "📋"
                                     )
-                                    val icons = listOf(
-                                        Icons.Default.Check,
-                                        Icons.Default.Home,
-                                        Icons.Default.Face,
-                                        Icons.Default.Menu,
-                                        Icons.Default.Call,
-                                        Icons.Default.Settings
-                                    )
-                                    sections.forEachIndexed { index, title ->
+                                    sections.forEachIndexed { index, (title, iconEmoji) ->
+                                        val isSelected = selectedSection == index
                                         NavigationBarItem(
-                                            selected = selectedSection == index,
+                                            selected = isSelected,
                                             onClick = { selectedSection = index },
-                                            icon = { Icon(icons[index], contentDescription = title) },
-                                            label = { Text(title, fontSize = 9.sp) },
+                                            icon = { Text(text = iconEmoji, fontSize = 16.sp) },
+                                            label = {
+                                                Text(
+                                                    text = title,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) Text1 else Text3
+                                                )
+                                            },
                                             colors = NavigationBarItemDefaults.colors(
-                                                selectedIconColor = NeonTeal,
-                                                unselectedIconColor = Color.Gray,
-                                                selectedTextColor = NeonTeal,
-                                                unselectedTextColor = Color.Gray,
-                                                indicatorColor = Color(0x3300F2FE)
+                                                selectedIconColor = Text1,
+                                                unselectedIconColor = Text3,
+                                                selectedTextColor = Text1,
+                                                unselectedTextColor = Text3,
+                                                indicatorColor = Surface2
                                             )
                                         )
                                     }
@@ -367,24 +377,12 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 when (selectedSection) {
                                     0 -> {
-                                        TasksSection(localDatabase, voipRepository)
-                                    }
-                                    1 -> {
-                                        AgendaSection(localDatabase, voipRepository)
-                                    }
-                                    2 -> {
-                                        AiAssistantSection(localDatabase, voipRepository)
-                                    }
-                                    3 -> {
-                                        FilesSection(localDatabase)
-                                    }
-                                    4 -> {
                                         CallScreen(
                                             viewModel = callViewModel,
                                             onLogout = {
                                                 tokenStorage.clear()
                                                 loginViewModel.resetState()
-                                                selectedSection = 4
+                                                selectedSection = 0
                                                 currentScreen = AppScreen.LOGIN
                                             },
                                             onNavigateToSummary = { callId ->
@@ -393,17 +391,14 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                     }
-                                    5 -> {
-                                        SettingsSection(
-                                            voipRepository = voipRepository,
-                                            shizukuManager = shizukuManager,
-                                            onLogout = {
-                                                tokenStorage.clear()
-                                                loginViewModel.resetState()
-                                                selectedSection = 4
-                                                currentScreen = AppScreen.LOGIN
-                                            }
-                                        )
+                                    1 -> {
+                                        AiAssistantSection(localDatabase, voipRepository)
+                                    }
+                                    2 -> {
+                                        AgendaSection(localDatabase, voipRepository)
+                                    }
+                                    3 -> {
+                                        TasksSection(localDatabase, voipRepository)
                                     }
                                 }
                             }
@@ -685,156 +680,159 @@ fun AiAssistantSection(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A))
-            .padding(16.dp)
+            .background(BgColor)
     ) {
-        // ── TOP HEADER WITH ACTIONS ──
-        Row(
+        // ── TOP HEADER (Screen 3) ──
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .background(BgColor)
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-            Column {
-                Text(
-                    text = "Assistant IA (RAG)",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Recherche & conversations intelligentes",
-                    color = Color.Gray,
-                    fontSize = 11.sp
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                // + New Chat Button
-                Button(
-                    onClick = { startNewConversation() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x3300F2FE)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = NeonTeal,
-                        modifier = Modifier.size(14.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Assistant Intelligent Calls",
+                        color = Text1,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Nouveau", color = NeonTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "gpt-4o · groq-llama",
+                        color = Text3,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
 
-                // History Button
-                Button(
-                    onClick = {
-                        sessionList = localDatabase.getChatSessions(selectedContactId)
-                        showHistoryDialog = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0x1F293754)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("📜 Historique", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Surface1)
+                            .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                            .clickable {
+                                sessionList = localDatabase.getChatSessions(selectedContactId)
+                                showHistoryDialog = true
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("Historique", color = Text2, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Surface1)
+                            .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                            .clickable { startNewConversation() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("＋ Nouveau", color = Text2, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
-        }
 
-        // Contact Filter Dropdown / Row
-        if (contacts.isNotEmpty()) {
-            var showContactMenu by remember { mutableStateOf(false) }
-            val selectedName = contacts.firstOrNull { it.id == selectedContactId }?.let { "${it.firstName} ${it.lastName}" } ?: "🌍 Tous les contacts (Chatbot Global)"
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                OutlinedButton(
-                    onClick = { showContactMenu = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonTeal),
-                    shape = RoundedCornerShape(10.dp)
+            // ── CONTEXT CHIPS (Horizontal Scroll) ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val isGlobal = selectedContactId == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(if (isGlobal) Surface2 else Surface1)
+                        .border(1.dp, if (isGlobal) BorderStrong else BorderColor, RoundedCornerShape(7.dp))
+                        .clickable { selectedContactId = null }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Contexte : $selectedName",
-                        color = NeonTeal,
-                        fontSize = 13.sp,
+                        text = "Tous les appels",
+                        color = if (isGlobal) Text1 else Text2,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                androidx.compose.material3.DropdownMenu(
-                    expanded = showContactMenu,
-                    onDismissRequest = { showContactMenu = false },
-                    modifier = Modifier.background(Color(0xFF1E293B))
-                ) {
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("🌍 Tous les contacts (Chatbot Global)", color = Color.White) },
-                        onClick = {
-                            selectedContactId = null
-                            showContactMenu = false
-                        }
-                    )
-                    contacts.forEach { c ->
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("👤 ${c.firstName} ${c.lastName}", color = Color.White) },
-                            onClick = {
-                                selectedContactId = c.id
-                                showContactMenu = false
-                            }
+                contacts.forEach { c ->
+                    val isSelected = selectedContactId == c.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (isSelected) Surface2 else Surface1)
+                            .border(1.dp, if (isSelected) BorderStrong else BorderColor, RoundedCornerShape(7.dp))
+                            .clickable { selectedContactId = c.id }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${c.firstName} ${c.lastName}".trim(),
+                            color = if (isSelected) Text1 else Text2,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
         }
 
-        // Chat Message List
+        // ── CHAT MESSAGE LIST ──
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(chatMessages) { item ->
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = if (item.isUser) Alignment.CenterEnd else Alignment.CenterStart
                 ) {
-                    Column(
-                        horizontalAlignment = if (item.isUser) Alignment.End else Alignment.Start
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (item.isUser) ElectricViolet else Color(0xFF1E293B)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.widthIn(max = 300.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = item.text,
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 290.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    topStart = 12.dp,
+                                    topEnd = 12.dp,
+                                    bottomStart = if (item.isUser) 12.dp else 3.dp,
+                                    bottomEnd = if (item.isUser) 3.dp else 12.dp
                                 )
-                            }
-                        }
+                            )
+                            .background(if (item.isUser) Surface2 else Surface1)
+                            .border(1.dp, if (item.isUser) BorderStrong else BorderColor, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 13.dp, vertical = 10.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = item.text,
+                                color = Text1,
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp
+                            )
 
-                        // Display RAG sources citation chips
-                        if (!item.isUser && item.sources.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            item.sources.forEach { src ->
-                                val dateStr = src.callDate?.substringBefore("T") ?: ""
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color(0x3300F2FE)),
-                                    shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.padding(top = 2.dp).widthIn(max = 280.dp)
-                                ) {
+                            if (!item.isUser && item.sources.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(9.dp))
+                                Divider(color = BorderColor, thickness = 1.dp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                item.sources.forEach { src ->
+                                    val dateStr = src.callDate?.substringBefore("T") ?: ""
                                     Text(
-                                        text = "📞 Appel ${if (dateStr.isNotBlank()) "du $dateStr" else ""} : \"${src.excerpt ?: ""}\"",
-                                        color = NeonTeal,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(6.dp)
+                                        text = "Source — Appel ${if (dateStr.isNotBlank()) "du $dateStr" else ""} : \"${src.excerpt ?: ""}\"",
+                                        color = Text3,
+                                        fontSize = 10.5.sp,
+                                        lineHeight = 14.sp
                                     )
                                 }
                             }
@@ -846,21 +844,17 @@ fun AiAssistantSection(
             if (isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                            shape = RoundedCornerShape(12.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Surface1)
+                                .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                                .padding(10.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    color = NeonTeal,
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(color = AccentColor, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("L'assistant analyse vos appels...", color = Color.Gray, fontSize = 12.sp)
+                                Text("L'assistant analyse vos appels...", color = Text3, fontSize = 12.sp)
                             }
                         }
                     }
@@ -868,41 +862,75 @@ fun AiAssistantSection(
             }
         }
 
-        // Input Field + Send Button
+        // ── CHAT INPUT BAR ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(BgColor)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            OutlinedTextField(
-                value = promptText,
-                onValueChange = { promptText = it },
-                placeholder = { Text("Posez une question sur vos appels...", color = Color.Gray, fontSize = 13.sp) },
-                modifier = Modifier.weight(1f),
-                enabled = !isLoading,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NeonTeal,
-                    unfocusedBorderColor = Color.Gray,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "📎", fontSize = 13.sp)
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(9.dp))
+                    .padding(horizontal = 12.dp, vertical = 9.dp)
+            ) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = promptText,
+                    onValueChange = { promptText = it },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Text1, fontSize = 13.sp),
+                    singleLine = true,
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    decorationBox = { innerTextField ->
+                        if (promptText.isEmpty()) {
+                            Text("Posez une question sur vos appels...", color = Text3, fontSize = 13.sp)
+                        }
+                        innerTextField()
+                    }
                 )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = {
-                    if (promptText.isNotBlank() && !isLoading) {
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "🎙", fontSize = 13.sp)
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (promptText.isNotBlank()) Text1 else Surface2)
+                    .clickable(enabled = promptText.isNotBlank() && !isLoading) {
                         val userText = promptText.trim()
                         promptText = ""
-
                         if (currentSessionId.isNullOrBlank()) {
                             currentSessionId = "session-${System.currentTimeMillis()}"
                         }
                         val activeSessionId = currentSessionId!!
 
-                        val newMessages = chatMessages.toMutableList()
-                        newMessages.add(ChatDisplayItem(isUser = true, text = userText))
-                        chatMessages = newMessages
+                        chatMessages = chatMessages + ChatDisplayItem(isUser = true, text = userText)
                         isLoading = true
 
                         // Save user message to persistent local history
@@ -914,7 +942,7 @@ fun AiAssistantSection(
                         )
 
                         coroutineScope.launch {
-                            // First check if it's an offline local command
+                            // Check offline local command
                             val lower = userText.lowercase()
                             if (lower.startsWith("tâche") || lower.startsWith("todo") || lower.startsWith("créer tâche")) {
                                 val taskTitle = userText.substringAfter("tâche").substringAfter("todo").trim()
@@ -933,7 +961,7 @@ fun AiAssistantSection(
                                 }
                             }
 
-                            // Otherwise execute RAG Chatbot query
+                            // RAG Chatbot query
                             val contactId = selectedContactId
                             val result = if (contactId != null) {
                                 voipRepository.chatWithContact(contactId, userText, activeSessionId)
@@ -970,12 +998,10 @@ fun AiAssistantSection(
                             }
                             isLoading = false
                         }
-                    }
-                },
-                enabled = !isLoading && promptText.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonTeal)
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Text("Envoyer", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                Text(text = "↑", color = if (promptText.isNotBlank()) BgColor else Text3, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
