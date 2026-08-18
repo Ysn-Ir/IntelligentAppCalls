@@ -216,10 +216,34 @@ class PhoneCallRecorderService : Service() {
             mediaRecorder = null
         }
 
-        if (callId != null && file != null && file.exists() && file.length() > 1024) {
-            Log.d(TAG, "Uploading ${file.length()} bytes for call $callId")
+        if (callId != null && file != null && file.exists() && file.length() > 128) {
+            Log.d(TAG, "Recording finished: ${file.length()} bytes for call $callId (${file.name})")
+
+            val sizeKb = "${(file.length() + 1023) / 1024} KB"
+            val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
+
+            try {
+                val db = com.example.appcall.data.local.AppLocalDatabase(this)
+                val prefs = getSharedPreferences("call_recording_prefs", Context.MODE_PRIVATE)
+                val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
+                val phoneNumber = prefs.getString("active_phone_number", null)
+
+                db.saveFile(id = callId, name = file.name, path = file.absolutePath, size = sizeKb)
+                val existing = db.getCallHistory().firstOrNull { it.id == callId }
+                db.saveCallHistoryItem(
+                    id = callId,
+                    contactId = phoneNumber ?: existing?.contactId ?: "native",
+                    contactName = contactName,
+                    direction = existing?.direction ?: "OUTBOUND",
+                    status = "COMPLETED",
+                    startedAt = existing?.startedAt ?: nowIso,
+                    endedAt = nowIso
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not persist call details locally: ${e.message}")
+            }
+
             // Use a fresh independent scope — the service scope is cancelled in onDestroy()
-            // before the upload coroutine can run if we use scope.launch here.
             CoroutineScope(Dispatchers.IO).launch {
                 voipRepository.uploadCallAudio(callId, file)
                     .onSuccess { Log.d(TAG, "Upload successful for call $callId") }

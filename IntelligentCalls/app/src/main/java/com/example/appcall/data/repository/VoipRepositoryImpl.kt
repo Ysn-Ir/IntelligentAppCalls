@@ -430,8 +430,24 @@ class VoipRepositoryImpl @Inject constructor(
     override suspend fun uploadCallAudio(callId: String, audioFile: java.io.File): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
         val prefs = context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE)
-        val contactName = prefs.getString("active_contact_name", null)
+        val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
         val phoneNumber = prefs.getString("active_phone_number", null)
+
+        val sizeKb = "${(audioFile.length() + 1023) / 1024} KB"
+        val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
+
+        localDatabase.saveFile(id = callId, name = audioFile.name, path = audioFile.absolutePath, size = sizeKb)
+        val existing = localDatabase.getCallHistory().firstOrNull { it.id == callId }
+        localDatabase.saveCallHistoryItem(
+            id = callId,
+            contactId = phoneNumber ?: existing?.contactId ?: "native",
+            contactName = contactName,
+            direction = existing?.direction ?: "OUTBOUND",
+            status = "COMPLETED",
+            startedAt = existing?.startedAt ?: nowIso,
+            endedAt = nowIso
+        )
+
         return try {
             val requestBody = requestBodyOf(audioFile)
             val multipartBody = MultipartBody.Part.createFormData("file", audioFile.name, requestBody)

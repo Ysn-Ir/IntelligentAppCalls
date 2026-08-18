@@ -84,7 +84,7 @@ class AppLocalDatabase @Inject constructor(
 
     override fun onCreate(db: SQLiteDatabase) {
         val createCallsTable = """
-            CREATE TABLE $TABLE_CALLS (
+            CREATE TABLE IF NOT EXISTS $TABLE_CALLS (
                 $KEY_CALL_ID TEXT PRIMARY KEY,
                 $KEY_SUMMARY_TEXT TEXT,
                 $KEY_CONFIDENCE_SCORE REAL,
@@ -96,7 +96,7 @@ class AppLocalDatabase @Inject constructor(
         """.trimIndent()
 
         val createSyncQueueTable = """
-            CREATE TABLE $TABLE_SYNC_QUEUE (
+            CREATE TABLE IF NOT EXISTS $TABLE_SYNC_QUEUE (
                 $KEY_SYNC_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $KEY_CALL_ID TEXT,
                 $KEY_ACTION_TYPE TEXT,
@@ -106,7 +106,7 @@ class AppLocalDatabase @Inject constructor(
         """.trimIndent()
 
         val createTasksTable = """
-            CREATE TABLE $TABLE_TASKS (
+            CREATE TABLE IF NOT EXISTS $TABLE_TASKS (
                 $KEY_TASK_ID TEXT PRIMARY KEY,
                 $KEY_TASK_TITLE TEXT,
                 $KEY_TASK_COMPLETED INTEGER DEFAULT 0
@@ -126,7 +126,7 @@ class AppLocalDatabase @Inject constructor(
         """.trimIndent()
 
         val createFilesTable = """
-            CREATE TABLE $TABLE_FILES (
+            CREATE TABLE IF NOT EXISTS $TABLE_FILES (
                 $KEY_FILE_ID TEXT PRIMARY KEY,
                 $KEY_FILE_NAME TEXT,
                 $KEY_FILE_PATH_STORED TEXT,
@@ -135,7 +135,7 @@ class AppLocalDatabase @Inject constructor(
         """.trimIndent()
 
         val createCallHistoryTable = """
-            CREATE TABLE $TABLE_CALL_HISTORY (
+            CREATE TABLE IF NOT EXISTS $TABLE_CALL_HISTORY (
                 $KEY_HIST_ID TEXT PRIMARY KEY,
                 $KEY_HIST_CONTACT_ID TEXT,
                 $KEY_HIST_CONTACT_NAME TEXT,
@@ -166,29 +166,39 @@ class AppLocalDatabase @Inject constructor(
         db.execSQL(createCallHistoryTable)
         db.execSQL(createChatTable)
 
-        // Seed with initial mock data
+        // Seed with initial mock data if empty
         seedMockData(db)
-        Log.d(TAG, "Local database tables created and seeded successfully")
+        Log.d(TAG, "Local database tables created/verified successfully")
     }
 
     private fun seedMockData(db: SQLiteDatabase) {
-        // Mock Tasks
-        db.execSQL("INSERT INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-1', 'Appeler le client pour validation', 0)")
-        db.execSQL("INSERT INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-2', 'Préparer la présentation commerciale', 1)")
+        try {
+            // Mock Tasks
+            db.execSQL("INSERT OR IGNORE INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-1', 'Appeler le client pour validation', 0)")
+            db.execSQL("INSERT OR IGNORE INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-2', 'Préparer la présentation commerciale', 1)")
 
-        // Mock Agenda
-        db.execSQL("INSERT INTO $TABLE_AGENDA ($KEY_AGENDA_ID, $KEY_AGENDA_TITLE, $KEY_AGENDA_DATE) VALUES ('agenda-1', 'Réunion d''équipe hebdomadaire', '2026-07-17T10:00:00Z')")
+            // Mock Agenda
+            db.execSQL("INSERT OR IGNORE INTO $TABLE_AGENDA ($KEY_AGENDA_ID, $KEY_AGENDA_TITLE, $KEY_AGENDA_DATE) VALUES ('agenda-1', 'Réunion d''équipe hebdomadaire', '2026-07-17T10:00:00Z')")
+        } catch (e: Exception) {
+            Log.w(TAG, "Mock data seeding skipped: ${e.message}")
+        }
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CALLS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_SYNC_QUEUE")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_TASKS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_AGENDA")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_FILES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CALL_HISTORY")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CHAT")
+        // Safe migration: never drop user tables!
         onCreate(db)
+        try {
+            db.execSQL("ALTER TABLE $TABLE_AGENDA ADD COLUMN $KEY_AGENDA_CONTACT_NAME TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_AGENDA ADD COLUMN $KEY_AGENDA_PHONE TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_AGENDA ADD COLUMN $KEY_AGENDA_CALL_ID TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_AGENDA ADD COLUMN $KEY_AGENDA_STATUS TEXT")
+        } catch (e: Exception) {}
     }
 
     override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
