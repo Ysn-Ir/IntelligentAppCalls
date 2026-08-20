@@ -86,15 +86,45 @@ def chat(
         session = db.query(ChatbotSession).filter(ChatbotSession.id == session_id).first()
 
     if not session:
+        valid_contact_id = None
+        if contact_id:
+            c_exists = db.query(Contact).filter(Contact.id == contact_id).first()
+            if c_exists:
+                valid_contact_id = contact_id
+            else:
+                # Auto-create the contact or leave valid_contact_id as None to avoid FK violation
+                try:
+                    new_c = Contact(
+                        id=contact_id,
+                        user_id=user_id,
+                        first_name="Contact",
+                        last_name=contact_id,
+                        phone_number=contact_id if (contact_id.startswith("+") or contact_id.isdigit()) else "+33000000000",
+                        global_gdpr_consent=True
+                    )
+                    db.add(new_c)
+                    db.commit()
+                    valid_contact_id = contact_id
+                except Exception:
+                    db.rollback()
+                    valid_contact_id = None
+
         session = ChatbotSession(
             id=session_id if session_id else str(uuid.uuid4()),
             user_id=user_id,
-            contact_id=contact_id,
+            contact_id=valid_contact_id,
             messages=json.dumps([]),
         )
         db.add(session)
-        db.commit()
-        db.refresh(session)
+        try:
+            db.commit()
+            db.refresh(session)
+        except Exception:
+            db.rollback()
+            session.contact_id = None
+            db.add(session)
+            db.commit()
+            db.refresh(session)
 
     history = json.loads(session.messages) if session.messages else []
 

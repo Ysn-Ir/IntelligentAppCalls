@@ -47,11 +47,11 @@ class ConsentRequest(BaseModel):
 
 class ContactDto(BaseModel):
     id: str
-    first_name: str
-    last_name: str
-    phone_number: str
-    email: str
-    global_gdpr_consent: bool
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    phone_number: Optional[str] = ""
+    email: Optional[str] = None
+    global_gdpr_consent: Optional[bool] = False
 
     class Config:
         from_attributes = True

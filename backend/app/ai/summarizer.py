@@ -156,6 +156,7 @@ Analyze this call transcript carefully. Detect the true sentiment, intent, key a
             )
             content = response.choices[0].message.content
             result = json.loads(content)
+            result = _refine_sentiment_and_intent(transcript_text, result, target_lang)
             logger.info(f"AI summary generated with {model} (lang={target_lang}): sentiment={result.get('sentiment')}, "
                         f"intent={result.get('intent')}, tags={result.get('tags')}, rendez_vous={len(result.get('rendez_vous', []))}")
             return result
@@ -167,38 +168,100 @@ Analyze this call transcript carefully. Detect the true sentiment, intent, key a
             continue
 
     logger.error("All candidate LLM models failed — using fallback summary.")
-    return _fallback_summary(raw_text)
+    return _refine_sentiment_and_intent(transcript_text, _fallback_summary(raw_text), target_lang)
+
+
+def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "en") -> dict:
+    """Enforces strict multi-lingual sentiment & intent rules across English, French, and Arabic."""
+    text_lower = (raw_text or "").lower()
+    
+    # 1. Hostility, violence, threats, extreme aggression in EN, FR, AR (Standard & Dialects)
+    hostile_patterns = [
+        "kill", "beat", "murder", "threat", "die", "destroy", "attack", "assault", "punch", 
+        "choke", "stab", "shoot", "hate", "sue", "lawyer", "police", "court", "scam", "fraud",
+        "thief", "bastard", "fuck", "bitch", "shut up", "cut your throat",
+        "tuer", "frapper", "battre", "menace", "crever", "mort", "meurtre", "attaquer", 
+        "agresser", "plainte", "avocat", "tribunal", "escroc", "arnaque", "voleur", "connard", 
+        "salaud", "ferme ta gueule", "nique",
+        "قتل", "نقتلك", "ضرب", "نضربك", "ذبح", "نذبحك", "تهديد", "شرطة", "بوليس", 
+        "محكمة", "محامي", "موت", "طحن", "حساب", "حمار", "كلب", "قحب", "تبا", "سرقة", "نصاب", 
+        "شفار", "غدار", "قضية", "نربيك", "ندفنك"
+    ]
+    
+    # 2. Complaints, dissatisfaction, dispute
+    negative_patterns = [
+        "angry", "furious", "annoyed", "problem", "cancel", "bad", "worst", "disappointed", 
+        "refund", "broken", "failed", "scam", "waste of time",
+        "colère", "furieux", "énervé", "problème", "annuler", "mauvais", "pire", "déçu", 
+        "remboursement", "cassé", "échoué", "incompétent", "perte de temps",
+        "مشكل", "غاضب", "عصبني", "إلغاء", "سيء", "خايب", "كارثة", "استرجاع", "تعويض", "ضياع وقت"
+    ]
+    
+    # 3. Satisfied, collaboration, positive agreement
+    positive_patterns = [
+        "thank", "thanks", "great", "excellent", "perfect", "super", "agree", "deal", "awesome", "pleasure",
+        "merci", "parfait", "excellent", "super", "d'accord", "accord", "génial", "formidable", "validé",
+        "شكرا", "ممتاز", "رائع", "موافق", "اتفاق", "مبروك", "بكل سرور", "صافي", "تمام"
+    ]
+
+    is_hostile = any(pat in text_lower for pat in hostile_patterns)
+    is_negative = any(pat in text_lower for pat in negative_patterns)
+    is_positive = any(pat in text_lower for pat in positive_patterns)
+
+    curr_sentiment = str(result.get("sentiment", "NEUTRAL")).upper()
+
+    if is_hostile:
+        result["sentiment"] = "HOSTILE"
+        if language == "ar":
+            result["intent"] = "تهديد / نزاع خطير ومحاولة اعتداء"
+            result["tags"] = ["#تهديد_أمني", "#نزاع_خطير", "#إنذار_عاجل"]
+        elif language == "fr":
+            result["intent"] = "Menace / Conflit Urgent & Agressivité"
+            result["tags"] = ["#AlerteSecurite", "#Menace", "#ConflitUrgent"]
+        else:
+            result["intent"] = "Threat / Violent Conflict & Hostility"
+            result["tags"] = ["#Threat", "#SecurityAlert", "#UrgentEscalation"]
+    elif is_negative and curr_sentiment not in ["HOSTILE"]:
+        result["sentiment"] = "NEGATIVE"
+        if result.get("intent") in [None, "", "General Call", "General Follow-up"]:
+            if language == "ar":
+                result["intent"] = "شكوى / عدم رضا العميل"
+                result["tags"] = ["#شكوى", "#نزاع_عميل"]
+            elif language == "fr":
+                result["intent"] = "Réclamation / Insatisfaction Client"
+                result["tags"] = ["#Reclamation", "#LitigeClient"]
+            else:
+                result["intent"] = "Customer Complaint / Dissatisfaction"
+                result["tags"] = ["#Complaint", "#CustomerIssue"]
+    elif is_positive and curr_sentiment not in ["HOSTILE", "NEGATIVE"]:
+        result["sentiment"] = "POSITIVE"
+        if result.get("intent") in [None, "", "General Call", "General Follow-up"]:
+            if language == "ar":
+                result["intent"] = "اتفاق وتعاون إيجابي"
+                result["tags"] = ["#اتفاق", "#عميل_راضٍ"]
+            elif language == "fr":
+                result["intent"] = "Accord & Collaboration Positive"
+                result["tags"] = ["#Accord", "#ClientSatisfait"]
+            else:
+                result["intent"] = "Positive Agreement & Collaboration"
+                result["tags"] = ["#Agreement", "#SatisfiedClient"]
+
+    # Ensure tags are formatted with '#'
+    tags = result.get("tags") or []
+    result["tags"] = [t if t.startswith("#") else f"#{t}" for t in tags if t]
+    if not result["tags"]:
+        result["tags"] = ["#Threat"] if result["sentiment"] == "HOSTILE" else (["#Positive"] if result["sentiment"] == "POSITIVE" else ["#GeneralCall"])
+
+    return result
 
 
 def _fallback_summary(raw_text: str) -> dict:
     """Returns an intelligent offline fallback analyzing key sentiment tokens when LLM is offline."""
-    lower = raw_text.lower()
-    hostile_tokens = ["kill", "beat", "tuer", "frapper", "menace", "threat", "police", "die", "meurtre", "attack", "agression"]
-    negative_tokens = ["angry", "problem", "cancel", "mauvais", "nul", "déçu", "horrible", "remboursement", "issue", "scam"]
-    positive_tokens = ["merci", "thank", "great", "excellent", "parfait", "super", "agree", "d'accord", "oui", "awesome"]
-
-    if any(tok in lower for tok in hostile_tokens):
-        sentiment = "HOSTILE"
-        intent = "Threat / Urgent Conflict"
-        tags = ["#Threat", "#SecurityAlert", "#UrgentEscalation"]
-    elif any(tok in lower for tok in negative_tokens):
-        sentiment = "NEGATIVE"
-        intent = "Complaint / Conflict"
-        tags = ["#Complaint", "#IssueReport"]
-    elif any(tok in lower for tok in positive_tokens):
-        sentiment = "POSITIVE"
-        intent = "Positive Agreement / Collaboration"
-        tags = ["#Positive", "#Collaboration"]
-    else:
-        sentiment = "NEUTRAL"
-        intent = "General Call"
-        tags = ["#GeneralCall"]
-
     return {
         "resume": raw_text[:300] + "..." if len(raw_text) > 300 else (raw_text or "Call summary not available."),
-        "sentiment": sentiment,
-        "intent": intent,
-        "tags": tags,
+        "sentiment": "NEUTRAL",
+        "intent": "General Call",
+        "tags": ["#GeneralCall"],
         "confidence_score": 85.0,
         "rendez_vous": [],
         "actions": [],
