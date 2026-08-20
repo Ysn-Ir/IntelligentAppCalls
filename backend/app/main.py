@@ -1211,6 +1211,17 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
             db.add(call)
             db.commit()
 
+        # Determine target to dial:
+        # If incoming call from customer -> forward to agent's real mobile phone
+        twilio_virtual_number = os.getenv("TWILIO_PHONE_NUMBER", "")
+        agent_forward_number = os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
+        if not agent_forward_number:
+            user = db.query(User).first()
+            agent_forward_number = user.number if user and user.number else "+33100000000"
+
+        is_inbound = (to_number == twilio_virtual_number) or ("inbound" in direction.lower())
+        target_dial = agent_forward_number if is_inbound else to_number
+
         # Build TwiML Response with absolute callback URL for Twilio
         base_url = str(request.base_url).rstrip('/')
         callback_url = f"{base_url}/webhooks/twilio/recording-complete"
@@ -1223,10 +1234,10 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
                 recording_status_callback=callback_url,
                 recording_status_callback_method="POST"
             )
-            if to_number.startswith("client:"):
-                dial.client(to_number.replace("client:", ""))
+            if target_dial.startswith("client:"):
+                dial.client(target_dial.replace("client:", ""))
             else:
-                dial.number(to_number)
+                dial.number(target_dial)
             vr.append(dial)
             twiml_xml = str(vr)
         except Exception:
@@ -1234,7 +1245,7 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
             twiml_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Dial record="record-from-answer-dual" recordingStatusCallback="{callback_url}" recordingStatusCallbackMethod="POST">
-        <Number>{to_number}</Number>
+        <Number>{target_dial}</Number>
     </Dial>
 </Response>"""
 
