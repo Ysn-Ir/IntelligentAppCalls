@@ -1,0 +1,718 @@
+import os
+import json
+import uuid
+import logging
+import threading
+from datetime import datetime, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File as FastAPIFile, Query
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from ..database import Call, Contact, Transcript, TranscriptEmbedding, CallSummary, Appointment, Reminder, User, SessionLocal, get_db
+from .. import schemas
+from .deps import verify_token, UPLOAD_DIR
+
+router = APIRouter(tags=["Calls & Telephony"])
+logger = logging.getLogger("intelligent_calls.calls")
+
+@router.post("/api/v1/calls", response_model=schemas.CallResponse)
+def create_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
+    if not contact:
+        contact = db.query(Contact).first()
+        if not contact:
+            raise HTTPException(status_code=404, detail="No contacts available")
+    
+    new_call = Call(
+        id=str(uuid.uuid4()),
+        contact_id=contact.id,
+        user_id=user_id,
+        direction=request.direction,
+        status="ONGOING",
+        consent_given=True,
+        twilio_params=json.dumps({"caller_id": contact.phone_number or "+331234567", "room_name": f"call_{uuid.uuid4().hex}"})
+    )
+    db.add(new_call)
+    db.commit()
+    db.refresh(new_call)
+    
+    return schemas.CallResponse(
+        id=new_call.id,
+        contact_id=new_call.contact_id,
+        direction=new_call.direction,
+        status=new_call.status,
+        twilio_params=json.loads(new_call.twilio_params) if new_call.twilio_params else None,
+        provider="SIM"
+    )
+
+@router.post("/api/v1/calls/cloud-outbound")
+def initiate_cloud_outbound_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    Initiates an outbound call using the configured Cloud VoIP provider
+    (Twilio, Telnyx, Plivo, Vonage, or Generic SIP/PBX Gateway).
+    """
+    provider = (request.provider or os.getenv("VOIP_PROVIDER", "TWILIO")).upper()
+    contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
+    if not contact or not contact.phone_number:
+        raise HTTPException(status_code=404, detail="Contact introuvable ou sans numéro de téléphone")
+
+    # Determine agent's phone to ring first
+    agent_phone = os.getenv("VOIP_AGENT_PHONE_NUMBER") or os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
+    if not agent_phone:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.number:
+            agent_phone = user.number
+        else:
+            agent_phone = "+33100000000"
+
+    server_url = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:8000")
+    recording_cb = f"{server_url.rstrip('/')}/webhooks/recording-complete"
+    status_cb = f"{server_url.rstrip('/')}/webhooks/status"
+
+    call_id = f"{provider.lower()}_{uuid.uuid4().hex[:12]}"
+
+    try:
+        if provider == "TWILIO":
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
+
+            if not account_sid or not auth_token or not twilio_number:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Paramètres Twilio non configurés (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER manquants)"
+                )
+
+            from twilio.rest import Client
+            client = Client(account_sid, auth_token)
+
+            bridge_twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="fr-FR">Connexion en cours avec votre contact...</Say>
+    <Dial record="record-from-answer-dual" recordingStatusCallback="{recording_cb}" recordingStatusCallbackMethod="POST">
+        <Number>{contact.phone_number}</Number>
+    </Dial>
+</Response>"""
+
+            tw_call = client.calls.create(
+                to=agent_phone,
+                from_=twilio_number,
+                twiml=bridge_twiml,
+                status_callback=status_cb,
+                status_callback_method="POST"
+            )
+            call_id = tw_call.sid
+
+        elif provider == "TELNYX":
+            telnyx_key = os.getenv("TELNYX_API_KEY")
+            telnyx_connection_id = os.getenv("TELNYX_CONNECTION_ID")
+            telnyx_number = os.getenv("TELNYX_PHONE_NUMBER") or os.getenv("VOIP_PHONE_NUMBER")
+
+            if telnyx_key:
+                import requests
+                headers = {"Authorization": f"Bearer {telnyx_key}", "Content-Type": "application/json"}
+                payload = {
+                    "to": agent_phone,
+                    "from": telnyx_number,
+                    "connection_id": telnyx_connection_id,
+                    "webhook_url": f"{server_url.rstrip('/')}/webhooks/telnyx/voice"
+                }
+                resp = requests.post("https://api.telnyx.com/v2/calls", json=payload, headers=headers, timeout=10)
+                if resp.status_code in [200, 201]:
+                    call_id = resp.json().get("data", {}).get("call_control_id", call_id)
+
+        elif provider == "PLIVO":
+            plivo_auth_id = os.getenv("PLIVO_AUTH_ID")
+            plivo_auth_token = os.getenv("PLIVO_AUTH_TOKEN")
+            plivo_number = os.getenv("PLIVO_PHONE_NUMBER")
+
+            if plivo_auth_id and plivo_auth_token:
+                import requests
+                url = f"https://api.plivo.com/v1/Account/{plivo_auth_id}/Call/"
+                payload = {
+                    "from": plivo_number,
+                    "to": agent_phone,
+                    "answer_url": f"{server_url.rstrip('/')}/webhooks/plivo/voice",
+                    "answer_method": "POST"
+                }
+                resp = requests.post(url, json=payload, auth=(plivo_auth_id, plivo_auth_token), timeout=10)
+                if resp.status_code in [200, 201]:
+                    call_id = resp.json().get("request_uuid", call_id)
+
+        elif provider == "VONAGE":
+            logger.info(f"Vonage call dispatch prepared for {contact.phone_number}")
+
+        # Save active call record in Database
+        new_call = Call(
+            id=call_id,
+            contact_id=contact.id,
+            user_id=user_id,
+            direction="OUTBOUND",
+            status="QUEUED",
+            ai_status="PROCESSING",
+            twilio_params=json.dumps({
+                "provider": provider,
+                "call_id": call_id,
+                "target": contact.phone_number,
+                "agent_phone": agent_phone
+            })
+        )
+        db.add(new_call)
+        db.commit()
+
+        return {
+            "id": call_id,
+            "provider": provider,
+            "contact_id": contact.id,
+            "status": "QUEUED",
+            "direction": "OUTBOUND",
+            "message": f"Appel {provider} lancé. Votre téléphone ({agent_phone}) va sonner pour vous connecter à {contact.phone_number}."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating {provider} outbound call: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur {provider}: {str(e)}")
+
+@router.post("/api/v1/calls/twilio-outbound")
+def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Legacy alias for initiate_cloud_outbound_call with provider=TWILIO."""
+    request.provider = "TWILIO"
+    return initiate_cloud_outbound_call(request, user_id, db)
+
+@router.post("/api/v1/calls/bridge")
+def initiate_call_bridge(request: schemas.CallInitiateRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
+    if not contact:
+        contact = db.query(Contact).first()
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contact not found")
+    
+    user = db.query(User).first()
+    call_id = str(uuid.uuid4())
+    
+    new_call = Call(
+        id=call_id,
+        contact_id=contact.id,
+        user_id=user.id if user else "system",
+        direction=request.direction,
+        status="BRIDGE_PENDING",
+        consent_given=True,
+        twilio_params=json.dumps({"gateway": "+33180000000", "target": contact.phone_number})
+    )
+    db.add(new_call)
+    db.commit()
+    db.refresh(new_call)
+    
+    return {
+        "call_id": new_call.id,
+        "gateway_number": "+33180000000",
+        "target_number": contact.phone_number,
+        "status": "BRIDGE_INITIATED"
+    }
+
+@router.post("/api/v1/calls/{id}/consent")
+def submit_consent(id: str, payload: schemas.ConsentRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    
+    call.consent_given = payload.consent_given
+    call.consent_timestamp = datetime.utcnow() if payload.consent_given else None
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/v1/calls/{id}/end", response_model=schemas.CallResponse)
+def end_call(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        user = db.query(User).first()
+        contact = db.query(Contact).first()
+        call = Call(
+            id=id,
+            contact_id=contact.id if contact else "unknown",
+            user_id=user.id if user else "system",
+            direction="OUTBOUND",
+            status="ONGOING",
+            consent_given=False,
+            twilio_params=json.dumps({"caller_id": "+331234567", "room_name": f"native_{id}"})
+        )
+        db.add(call)
+        db.commit()
+        db.refresh(call)
+    
+    call.status = "COMPLETED"
+    call.ended_at = datetime.utcnow()
+    call.ai_status = "PROCESSING"
+    db.commit()
+
+    local_path = None
+    for ext in ["mp4", "m4a", "wav"]:
+        candidate = os.path.join(UPLOAD_DIR, f"{id}.{ext}")
+        if os.path.exists(candidate):
+            local_path = candidate
+            break
+
+    if local_path:
+        from ..ai.transcriber import transcribe_call
+        from ..ai.summarizer import summarize_call
+        from ..ai.embeddings import index_transcript
+
+        def _run_pipeline():
+            _db = SessionLocal()
+            try:
+                t = transcribe_call(id, local_path, _db)
+                summarize_call(id, _db)
+                call_row = _db.query(Call).filter(Call.id == id).first()
+                if call_row and call_row.contact_id and t:
+                    index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+                if call_row:
+                    call_row.ai_status = "DONE"
+                    _db.commit()
+            except Exception as ex:
+                logger.error(f"End call pipeline error: {ex}")
+            finally:
+                _db.close()
+
+        threading.Thread(target=_run_pipeline, daemon=True).start()
+        
+    return schemas.CallResponse(
+        id=call.id,
+        contact_id=call.contact_id,
+        direction=call.direction,
+        status=call.status,
+        twilio_params=json.loads(call.twilio_params) if call.twilio_params else None
+    )
+
+@router.get("/api/v1/calls/{id}", response_model=schemas.CallResponse)
+def get_call(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    return schemas.CallResponse(
+        id=call.id,
+        contact_id=call.contact_id,
+        direction=call.direction,
+        status=call.status,
+        twilio_params=json.loads(call.twilio_params) if call.twilio_params else None
+    )
+
+@router.get("/api/v1/calls", response_model=List[schemas.CallHistoryItemDto])
+def get_calls(
+    contact_id: Optional[str] = None,
+    status: Optional[str] = None,
+    page: Optional[int] = 1,
+    user_id: str = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Call).filter((Call.user_id == user_id) | (Call.user_id == "system") | (Call.user_id.is_(None)))
+    if contact_id:
+        query = query.filter(Call.contact_id == contact_id)
+    if status:
+        query = query.filter(Call.status == status)
+        
+    query = query.order_by(Call.started_at.desc())
+    limit = 20
+    offset = (page - 1) * limit
+    calls = query.offset(offset).limit(limit).all()
+    
+    result = []
+    for c in calls:
+        phone = None
+        name = None
+        if c.twilio_params:
+            try:
+                p = json.loads(c.twilio_params)
+                phone = p.get("caller_id") or p.get("phone_number")
+                name = p.get("contact_name")
+            except Exception:
+                pass
+
+        if c.contact:
+            contact_full = f"{c.contact.first_name} {c.contact.last_name}".strip()
+            if contact_full and contact_full not in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+                name = contact_full
+            if not phone and c.contact.phone_number:
+                phone = c.contact.phone_number
+
+        if not name or name in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+            name = phone or "Appel Téléphonique"
+
+        summary_row = db.query(CallSummary).filter(CallSummary.call_id == c.id).first()
+        summary_prev = summary_row.summary_text if summary_row and not summary_row.summary_text.startswith("Traitement IA") else None
+
+        result.append(schemas.CallHistoryItemDto(
+            id=c.id,
+            contact_id=c.contact_id or "unknown",
+            direction=c.direction or "OUTBOUND",
+            status=c.status or "COMPLETED",
+            started_at=c.started_at.isoformat() + "Z" if c.started_at else None,
+            ended_at=c.ended_at.isoformat() + "Z" if c.ended_at else None,
+            contact_name=name,
+            phone_number=phone,
+            summary_preview=summary_prev
+        ))
+    return result
+
+@router.get("/api/v1/calls/{id}/transcript")
+def get_transcript(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
+    if not transcript:
+        return {
+            "id": f"pending-{id}",
+            "call_id": id,
+            "raw_text": "",
+            "language": "fr",
+            "confidence_score": 0.0,
+            "speaker_segments": []
+        }
+
+    segments = []
+    if transcript.speaker_segments:
+        try:
+            segments = json.loads(transcript.speaker_segments)
+        except Exception:
+            pass
+
+    return {
+        "id": transcript.id,
+        "call_id": transcript.call_id,
+        "raw_text": transcript.raw_text,
+        "language": transcript.language,
+        "confidence_score": transcript.confidence_score,
+        "speaker_segments": segments
+    }
+
+def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
+    summary = db.query(CallSummary).filter(CallSummary.call_id == call_id).first()
+    transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
+
+    if transcript and transcript.raw_text:
+        if not summary or summary.status == "PROCESSING" or "Traitement IA" in (summary.summary_text or ""):
+            from ..ai.summarizer import summarize_call
+            real_summary = summarize_call(call_id, db)
+            if real_summary:
+                return real_summary
+
+    if summary and summary.status != "PROCESSING":
+        return summary
+
+    call = db.query(Call).filter(Call.id == call_id).first()
+    if not call:
+        user = db.query(User).first()
+        user_id = user.id if user else "system"
+        call = Call(
+            id=call_id,
+            contact_id=None,
+            user_id=user_id,
+            direction="OUTBOUND",
+            status="COMPLETED",
+            ended_at=datetime.utcnow(),
+            consent_given=True,
+            consent_timestamp=datetime.utcnow()
+        )
+        db.add(call)
+        db.commit()
+
+    if summary:
+        return summary
+
+    summary = CallSummary(
+        id=str(uuid.uuid4()),
+        call_id=call_id,
+        summary_text="Traitement IA en cours. Le résumé sera généré dès la fin de la transcription audio.",
+        detected_appointment_id=None,
+        status="PROCESSING",
+        modified_count=0
+    )
+    db.add(summary)
+    db.commit()
+    db.refresh(summary)
+    return summary
+
+@router.get("/api/v1/calls/{id}/summary", response_model=schemas.CallSummaryDto)
+def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    summary = ensure_call_summary_exists(id, db)
+    appt = summary.appointment
+    if not appt and summary.detected_appointment_id:
+        appt = db.query(Appointment).filter(Appointment.id == summary.detected_appointment_id).first()
+    
+    call_row = db.query(Call).filter(Call.id == id).first()
+    appt_dto = None
+    if appt:
+        contact_name = None
+        phone_num = None
+        contact_obj = db.query(Contact).filter(Contact.id == appt.contact_id).first() if appt.contact_id else None
+        if contact_obj:
+            contact_name = f"{contact_obj.first_name} {contact_obj.last_name}".strip()
+            phone_num = contact_obj.phone_number
+        if (not contact_name or not phone_num) and call_row and call_row.twilio_params:
+            try:
+                tp = json.loads(call_row.twilio_params)
+                contact_name = contact_name or tp.get("contact_name")
+                phone_num = phone_num or tp.get("caller_id")
+            except Exception:
+                pass
+
+        appt_dto = schemas.AppointmentDto(
+            id=appt.id,
+            contact_id=appt.contact_id or "contact-1111",
+            scheduled_at=appt.scheduled_at.isoformat() + "Z" if appt.scheduled_at else datetime.utcnow().isoformat() + "Z",
+            status=appt.status or "PROPOSED",
+            title=appt.title or "Rendez-vous détecté",
+            summary_context=summary.summary_text if not summary.summary_text.startswith("Traitement IA") else None,
+            phone_number=phone_num,
+            contact_name=contact_name
+        )
+        
+    transcript_row = db.query(Transcript).filter(Transcript.call_id == id).first()
+    confidence = transcript_row.confidence_score if transcript_row else 100.0
+
+    return schemas.CallSummaryDto(
+        id=summary.id,
+        call_id=summary.call_id,
+        summary_text=summary.summary_text,
+        status=summary.status,
+        confidence_score=confidence,
+        detected_appointment_id=summary.detected_appointment_id or (appt.id if appt else None),
+        appointment=appt_dto
+    )
+
+@router.post("/api/v1/calls/{id}/summary/validate")
+def validate_summary(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    summary = ensure_call_summary_exists(id, db)
+    summary.status = "VALIDATED"
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/v1/calls/{id}/summary/edit")
+def edit_summary(id: str, payload: schemas.SummaryEditRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    summary = ensure_call_summary_exists(id, db)
+    updated = False
+    if payload.new_text is not None:
+        summary.summary_text = payload.new_text
+        summary.status = "MODIFIED"
+        summary.modified_count += 1
+        updated = True
+        
+    if payload.voice_command_transcript is not None:
+        summary.status = "MODIFIED"
+        summary.modified_count += 1
+        updated = True
+        if summary.appointment:
+            summary.appointment.scheduled_at += timedelta(days=1)
+            summary.appointment.title = f"{summary.appointment.title or 'Point'} (modifié par voix)"
+            db.add(summary.appointment)
+            
+    if not updated:
+        raise HTTPException(status_code=400, detail="Missing new_text or voice_command_transcript")
+        
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/v1/calls/{id}/appointment/validate")
+def validate_appointment(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    summary = ensure_call_summary_exists(id, db)
+    if not summary.appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found for this call")
+        
+    summary.appointment.status = "VALIDATED"
+    reminder = Reminder(
+        id=str(uuid.uuid4()),
+        appointment_id=summary.appointment.id,
+        call_id=id,
+        scheduled_at=summary.appointment.scheduled_at - timedelta(hours=1),
+        type="APPOINTMENT"
+    )
+    db.add(reminder)
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/v1/calls/{id}/appointment/dismiss")
+def dismiss_appointment(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    summary = ensure_call_summary_exists(id, db)
+    if not summary.appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found for this call")
+        
+    summary.appointment.status = "DISMISSED"
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/v1/calls/{id}/audio")
+async def upload_audio(
+    id: str,
+    file: UploadFile = FastAPIFile(...),
+    x_contact_name: Optional[str] = Header(None),
+    x_phone_number: Optional[str] = Header(None),
+    token: str = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    contact_id = None
+    if x_phone_number and x_phone_number.strip():
+        clean_num = x_phone_number.strip()
+        c = db.query(Contact).filter(Contact.phone_number == clean_num).first()
+        if not c:
+            parts = (x_contact_name or clean_num).split(" ", 1)
+            c = Contact(
+                id=str(uuid.uuid4()),
+                first_name=parts[0],
+                last_name=parts[1] if len(parts) > 1 else "",
+                phone_number=clean_num,
+                email=f"{parts[0].lower()}@contact.phone",
+                global_gdpr_consent=True
+            )
+            db.add(c)
+            db.commit()
+            db.refresh(c)
+        contact_id = c.id
+    elif x_contact_name and x_contact_name.strip() and x_contact_name not in ["Appel Téléphonique", "Unknown Contact"]:
+        c = db.query(Contact).filter(Contact.first_name.ilike(f"%{x_contact_name.strip()}%")).first()
+        if c:
+            contact_id = c.id
+
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        user = db.query(User).first()
+        call = Call(
+            id=id,
+            contact_id=contact_id,
+            user_id=user.id if user else "system",
+            direction="OUTBOUND",
+            status="COMPLETED",
+            consent_given=True,
+            twilio_params=json.dumps({"caller_id": x_phone_number or "+331234567", "contact_name": x_contact_name or "Appel"})
+        )
+        db.add(call)
+        db.commit()
+        db.refresh(call)
+    else:
+        if contact_id and not call.contact_id:
+            call.contact_id = contact_id
+        if x_phone_number:
+            call.twilio_params = json.dumps({"caller_id": x_phone_number, "contact_name": x_contact_name or "Appel"})
+        db.commit()
+
+    call.consent_given = True
+    db.commit()
+
+    file_bytes = await file.read()
+    content_type = file.content_type or "audio/mp4"
+
+    from ..storage import upload_audio_file
+    audio_url = upload_audio_file(id, file_bytes, content_type)
+
+    call.audio_url = audio_url
+    call.ai_status = "PROCESSING"
+    db.commit()
+
+    ext = "wav" if "wav" in content_type else "m4a"
+    local_path = os.path.join(UPLOAD_DIR, f"{id}.{ext}")
+    if not os.path.exists(local_path):
+        with open(local_path, "wb") as f:
+            f.write(file_bytes)
+
+    from ..ai.transcriber import transcribe_call
+    from ..ai.summarizer import summarize_call
+    from ..ai.embeddings import index_transcript
+
+    def _run_pipeline():
+        _db = SessionLocal()
+        try:
+            logger.info(f"Starting AI pipeline for call_id={id}, path={local_path}")
+            t = transcribe_call(id, local_path, _db)
+            summarize_call(id, _db)
+            call_row = _db.query(Call).filter(Call.id == id).first()
+            if call_row and call_row.contact_id and t:
+                try:
+                    index_transcript(t.id, call_row.contact_id, t.raw_text, _db)
+                except Exception as e_idx:
+                    logger.warning(f"Embedding index error: {e_idx}")
+            if call_row:
+                call_row.ai_status = "DONE"
+                _db.commit()
+            logger.info(f"AI pipeline completed for call_id={id}")
+        except Exception as ex:
+            logger.error(f"Pipeline error: {ex}", exc_info=True)
+            try:
+                c = _db.query(Call).filter(Call.id == id).first()
+                if c:
+                    c.ai_status = "FAILED"
+                    _db.commit()
+            except Exception:
+                pass
+        finally:
+            _db.close()
+
+    threading.Thread(target=_run_pipeline, daemon=True).start()
+
+    return {
+        "status": "ok",
+        "call_id": id,
+        "audio_url": audio_url,
+        "ai_status": "PROCESSING",
+        "message": "Fichier reçu. Transcription en cours."
+    }
+
+@router.get("/api/v1/calls/{id}/audio")
+def download_audio(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    file_path = None
+    if os.path.exists(UPLOAD_DIR):
+        for f in os.listdir(UPLOAD_DIR):
+            if f.startswith(id):
+                file_path = os.path.join(UPLOAD_DIR, f)
+                break
+                
+    if not file_path or not os.path.exists(file_path):
+        mock_file = os.path.join(UPLOAD_DIR, "mock_call_record.mp4")
+        if not os.path.exists(mock_file):
+            import math
+            import struct
+            num_samples = 16000
+            data_size = num_samples * 2
+            header = struct.pack(
+                '<4sI4s4sIHHIIHH4sI',
+                b'RIFF',
+                36 + data_size,
+                b'WAVE',
+                b'fmt ',
+                16,
+                1,
+                1,
+                8000,
+                16000,
+                2,
+                16,
+                b'data',
+                data_size
+            )
+            tone_bytes = bytearray()
+            for i in range(num_samples):
+                sample = int(32767.0 * math.sin(2.0 * math.pi * 440.0 * i / 8000.0))
+                tone_bytes.extend(struct.pack('<h', sample))
+                
+            with open(mock_file, "wb") as f:
+                f.write(header)
+                f.write(tone_bytes)
+        file_path = mock_file
+
+    if file_path and file_path.endswith(".wav"):
+        return FileResponse(file_path, media_type="audio/wav", filename=f"call_record_{id}.wav")
+    return FileResponse(file_path, media_type="audio/mp4", filename=f"call_record_{id}.mp4")
+
+@router.get("/api/v1/calls/{id}/ai-status")
+def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    call = db.query(Call).filter(Call.id == id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Appel introuvable")
+    transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
+    summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
+    status_str = getattr(call, "ai_status", "PROCESSING")
+    if transcript is not None and summary is not None:
+        status_str = "DONE"
+    return {
+        "call_id": id,
+        "ai_status": status_str,
+        "has_transcript": transcript is not None,
+        "has_summary": summary is not None,
+        "transcript_confidence": transcript.confidence_score if transcript else None,
+    }

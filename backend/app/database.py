@@ -125,6 +125,10 @@ class FileModel(Base):
     size = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
 
+Task = TaskModel
+Agenda = AgendaModel
+File = FileModel
+
 
 class TranscriptEmbedding(Base):
     """
@@ -254,5 +258,12 @@ def init_db():
             db.add_all(files)
             db.commit()
             print("Seeded files records")
+    finally:
+        db.close()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
     finally:
         db.close()

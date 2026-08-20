@@ -1,0 +1,10 @@
+from .auth import router as auth_router
+from .contacts import router as contacts_router
+from .calls import router as calls_router
+from .agenda import router as agenda_router
+from .tasks import router as tasks_router
+from .files import router as files_router
+from .assistant import router as assistant_router
+from .gdpr import router as gdpr_router
+from .webhooks import router as webhooks_router
+from .websocket import router as websocket_router
