@@ -946,7 +946,7 @@ fun SummaryScreen(
                                 if (!segments.isNullOrEmpty()) {
                                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                                         segments.forEach { seg ->
-                                            val isAgent = seg.speaker == "agent"
+                                            val isAgent = seg.speaker == "agent" || seg.speaker == "SPEAKER_00"
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = if (isAgent) Arrangement.Start else Arrangement.End
@@ -981,7 +981,7 @@ fun SummaryScreen(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = if (isAgent) "Agent · ${String.format("%.1f", seg.start)}s · 98.5%" else "97.2% · ${String.format("%.1f", seg.start)}s · Contact",
+                                                            text = if (isAgent) "Agent · ${String.format(Locale.getDefault(), "%.1f", seg.start)}s" else "${String.format(Locale.getDefault(), "%.1f", seg.start)}s · Contact",
                                                             color = Text3,
                                                             fontSize = 9.5.sp,
                                                             fontFamily = FontFamily.Monospace
@@ -992,8 +992,8 @@ fun SummaryScreen(
                                         }
                                     }
                                 } else {
-                                    val raw = transcript?.rawText
-                                    if (!raw.isNullOrBlank()) {
+                                    val raw = transcript?.rawText?.trim()
+                                    if (!raw.isNullOrBlank() && raw != "...") {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -1005,7 +1005,7 @@ fun SummaryScreen(
                                             Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
                                         }
                                     } else {
-                                        Text(text = "Transcription en cours par l'IA...", color = Text3, fontSize = 12.5.sp)
+                                        Text(text = "Aucune parole distincte détectée dans cet enregistrement.", color = Text3, fontSize = 12.5.sp)
                                     }
                                 }
                             }
