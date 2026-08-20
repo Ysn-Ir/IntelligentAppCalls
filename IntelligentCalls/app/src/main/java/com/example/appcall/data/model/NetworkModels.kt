@@ -139,7 +139,10 @@ data class CallHistoryItemDto(
     @SerializedName("ended_at") val endedAt: String?,
     @SerializedName("contact_name") val contactName: String? = null,
     @SerializedName("phone_number") val phoneNumber: String? = null,
-    @SerializedName("summary_preview") val summaryPreview: String? = null
+    @SerializedName("summary_preview") val summaryPreview: String? = null,
+    @SerializedName("sentiment") val sentiment: String? = null,
+    @SerializedName("intent") val intent: String? = null,
+    @SerializedName("tags") val tags: List<String>? = null
 )
 
 data class ReminderDto(

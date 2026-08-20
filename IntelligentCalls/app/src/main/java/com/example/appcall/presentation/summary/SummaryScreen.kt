@@ -1098,14 +1098,46 @@ fun SummaryScreen(
                                          Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
                                      }
                                  } else {
-                                     Row(
-                                         modifier = Modifier.fillMaxWidth(),
-                                         verticalAlignment = Alignment.CenterVertically,
-                                         horizontalArrangement = Arrangement.SpaceBetween
-                                     ) {
-                                         Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
-                                         TextButton(onClick = { viewModel.refreshTranscript() }) {
-                                             Text("Recharger", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                     val summaryFallback = summary.summaryText.takeIf { !it.startsWith("Traitement IA") }?.trim()
+                                     if (!summaryFallback.isNullOrBlank()) {
+                                         Box(
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .clip(RoundedCornerShape(10.dp))
+                                                 .background(Surface1)
+                                                 .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                                 .padding(14.dp)
+                                         ) {
+                                             Column {
+                                                 Text(text = summaryFallback, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
+                                                 Spacer(modifier = Modifier.height(8.dp))
+                                                 Row(
+                                                     modifier = Modifier.fillMaxWidth(),
+                                                     horizontalArrangement = Arrangement.SpaceBetween,
+                                                     verticalAlignment = Alignment.CenterVertically
+                                                 ) {
+                                                     Text(
+                                                         text = "Contexte extrait de l'appel",
+                                                         color = Text3,
+                                                         fontSize = 10.5.sp,
+                                                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                                     )
+                                                     TextButton(onClick = { viewModel.refreshTranscript() }) {
+                                                         Text("Recharger l'audio", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     } else {
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             verticalAlignment = Alignment.CenterVertically,
+                                             horizontalArrangement = Arrangement.SpaceBetween
+                                         ) {
+                                             Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
+                                             TextButton(onClick = { viewModel.refreshTranscript() }) {
+                                                 Text("Recharger", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                             }
                                          }
                                      }
                                  }

@@ -94,6 +94,9 @@ class CallHistoryItemDto(BaseModel):
     contact_name: Optional[str] = None
     phone_number: Optional[str] = None
     summary_preview: Optional[str] = None
+    sentiment: Optional[str] = None
+    intent: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 class ReminderDto(BaseModel):
     id: str

@@ -374,24 +374,35 @@ fun CallHistoryRow(
                     )
 
                     if (!item.summaryPreview.isNullOrBlank()) {
+                        val rawSent = (item.sentiment ?: "NEUTRAL").uppercase()
+                        val (sentText, sentColor, sentBg) = when {
+                            rawSent in listOf("HOSTILE", "MENACE", "THREAT", "CONFLICT") -> Triple("Menace / Conflit", Color(0xFFEF4444), Color(0x33EF4444))
+                            rawSent in listOf("NEGATIVE", "NEGATIF", "NÉGATIF") -> Triple("Négatif", WarnColor, WarnDim)
+                            rawSent in listOf("POSITIVE", "POSITIF") -> Triple("Positif", SuccessColor, SuccessDim)
+                            else -> Triple("Neutre", Text2, Surface2)
+                        }
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(SuccessDim)
-                                .border(0.5.dp, SuccessColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                .background(sentBg)
+                                .border(0.5.dp, sentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(SuccessColor))
+                                Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(sentColor))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Positif",
-                                    color = SuccessColor,
+                                    text = sentText,
+                                    color = sentColor,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
+
+                        val primaryTag = item.tags?.firstOrNull() ?: item.intent?.takeIf { it.isNotBlank() } ?: "#IA"
+                        val cleanTag = if (primaryTag.startsWith("#")) primaryTag else "#$primaryTag"
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
@@ -400,7 +411,7 @@ fun CallHistoryRow(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "#IA",
+                                text = cleanTag,
                                 color = Text3,
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.SemiBold

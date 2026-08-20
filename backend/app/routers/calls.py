@@ -351,6 +351,23 @@ def get_calls(
         summary_row = db.query(CallSummary).filter(CallSummary.call_id == c.id).first()
         summary_prev = summary_row.summary_text if summary_row and not summary_row.summary_text.startswith("Traitement IA") else None
 
+        tags_list = []
+        if summary_row and summary_row.tags:
+            try:
+                tags_list = json.loads(summary_row.tags)
+            except Exception:
+                tags_list = [t.strip() for t in summary_row.tags.split(",") if t.strip()]
+
+        from ..ai.summarizer import _refine_sentiment_and_intent
+        refined = _refine_sentiment_and_intent(
+            summary_prev or "",
+            {
+                "sentiment": (summary_row.sentiment if summary_row else None) or "NEUTRAL",
+                "intent": (summary_row.intent if summary_row else None) or "General Call",
+                "tags": tags_list
+            }
+        )
+
         result.append(schemas.CallHistoryItemDto(
             id=c.id,
             contact_id=c.contact_id or "unknown",
@@ -360,7 +377,10 @@ def get_calls(
             ended_at=c.ended_at.isoformat() + "Z" if c.ended_at else None,
             contact_name=name,
             phone_number=phone,
-            summary_preview=summary_prev
+            summary_preview=summary_prev,
+            sentiment=refined["sentiment"],
+            intent=refined["intent"],
+            tags=refined["tags"]
         ))
     return result
 
