@@ -61,6 +61,8 @@ fun SummaryScreen(
     val isLowConfidence by viewModel.isLowConfidence.collectAsState()
     val aiStatus by viewModel.aiStatus.collectAsState()
     val transcript by viewModel.transcript.collectAsState()
+    val audioFile by viewModel.audioFile.collectAsState()
+    val isAudioLoading by viewModel.isAudioLoading.collectAsState()
 
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -71,6 +73,10 @@ fun SummaryScreen(
     var voiceCommandText by remember { mutableStateOf("") }
 
     fun findCallAudioFile(targetCallId: String): File? {
+        if (audioFile != null && audioFile!!.exists() && audioFile!!.length() > 512) {
+            return audioFile
+        }
+
         val targetDirs = listOf(
             File(context.filesDir, "recordings"),
             File(context.filesDir, "recordings_native"),
@@ -82,17 +88,20 @@ fun SummaryScreen(
         targetDirs.forEach { dir ->
             if (dir.exists() && dir.isDirectory) {
                 dir.listFiles()?.filter {
-                    it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 0
+                    it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 512
                 }?.let { allFiles.addAll(it) }
             }
         }
         val targetPrefix = if (targetCallId.length >= 8) targetCallId.take(8) else targetCallId
-        return allFiles.firstOrNull { it.name.contains(targetPrefix, ignoreCase = true) }
-            ?: allFiles.firstOrNull { it.name.contains(targetCallId, ignoreCase = true) }
-            ?: allFiles.maxByOrNull { it.lastModified() }
+        val cleanId = targetCallId.removePrefix("native-")
+        return allFiles.firstOrNull {
+            it.name.contains(targetCallId, ignoreCase = true) ||
+            it.name.contains(targetPrefix, ignoreCase = true) ||
+            (cleanId.isNotBlank() && it.name.contains(cleanId, ignoreCase = true))
+        }
     }
 
-    val matchedAudioFile = remember(callId) { findCallAudioFile(callId) }
+    val matchedAudioFile = remember(callId, audioFile) { findCallAudioFile(callId) }
 
     fun formatDuration(ms: Int): String {
         val totalSec = ms / 1000
@@ -142,9 +151,10 @@ fun SummaryScreen(
         }
     }
 
-    // Load summary once when callId changes
+    // Load summary & audio once when callId changes
     LaunchedEffect(callId) {
         viewModel.loadSummary(callId)
+        viewModel.resolveAndFetchAudio(callId, context)
     }
 
     Box(
@@ -492,8 +502,13 @@ fun SummaryScreen(
                                                             isPlaying = false
                                                         } else {
                                                             if (mediaPlayer == null) {
-                                                                if (matchedAudioFile == null || matchedAudioFile.length() <= 512) {
-                                                                    Toast.makeText(context, "Enregistrement audio introuvable ou vide", Toast.LENGTH_SHORT).show()
+                                                                val activeAudio = audioFile ?: matchedAudioFile
+                                                                if (activeAudio == null || !activeAudio.exists() || activeAudio.length() <= 512) {
+                                                                    if (isAudioLoading) {
+                                                                        Toast.makeText(context, "Téléchargement de l'audio en cours...", Toast.LENGTH_SHORT).show()
+                                                                    } else {
+                                                                        Toast.makeText(context, "Enregistrement audio introuvable pour cet appel", Toast.LENGTH_SHORT).show()
+                                                                    }
                                                                     return@clickable
                                                                 }
 
@@ -511,7 +526,7 @@ fun SummaryScreen(
                                                                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                                                                     .build()
                                                                 player.setAudioAttributes(attrib)
-                                                                player.setDataSource(matchedAudioFile.absolutePath)
+                                                                player.setDataSource(activeAudio.absolutePath)
                                                                 player.setVolume(1.0f, 1.0f)
                                                                 player.prepare()
                                                                 totalDurationMs = player.duration

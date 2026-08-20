@@ -169,6 +169,13 @@ interface ApiService {
         @Header("X-Phone-Number") phoneNumber: String? = null
     ): Response<ResponseBody>
 
+    @retrofit2.http.Streaming
+    @GET("calls/{id}/audio")
+    suspend fun getCallAudio(
+        @Header("Authorization") token: String,
+        @Path("id") callId: String
+    ): Response<ResponseBody>
+
     // ── AI Pipeline & Transcript Endpoints ───────────────────────────────
     @GET("calls/{id}/ai-status")
     suspend fun getAiStatus(

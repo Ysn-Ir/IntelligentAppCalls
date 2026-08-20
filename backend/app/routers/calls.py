@@ -748,8 +748,21 @@ def download_audio(id: str, token: str = Depends(verify_token), db: Session = De
     file_path = None
     if os.path.exists(UPLOAD_DIR):
         for f in os.listdir(UPLOAD_DIR):
-            if f.startswith(id) or f.endswith(f"_{id}.wav") or f.endswith(f"_{id}.mp4"):
-                file_path = os.path.join(UPLOAD_DIR, f)
+            cand = os.path.join(UPLOAD_DIR, f)
+            if not os.path.isfile(cand) or os.path.getsize(cand) < 100:
+                continue
+            name_no_ext = os.path.splitext(f)[0]
+            if (
+                f == id 
+                or name_no_ext == id 
+                or f.startswith(f"{id}.") 
+                or f.startswith(f"{id}_") 
+                or f.endswith(f"_{id}.wav") 
+                or f.endswith(f"_{id}.mp4") 
+                or f.endswith(f"_{id}.m4a")
+                or id in f
+            ):
+                file_path = cand
                 break
                 
     if not file_path or not os.path.exists(file_path):
@@ -757,7 +770,7 @@ def download_audio(id: str, token: str = Depends(verify_token), db: Session = De
         call = db.query(Call).filter(Call.id == id).first()
         if call and call.audio_url:
             candidate = os.path.join(UPLOAD_DIR, os.path.basename(call.audio_url))
-            if os.path.exists(candidate):
+            if os.path.exists(candidate) and os.path.getsize(candidate) > 100:
                 file_path = candidate
 
     if not file_path or not os.path.exists(file_path):
@@ -766,9 +779,9 @@ def download_audio(id: str, token: str = Depends(verify_token), db: Session = De
             detail=f"Enregistrement audio introuvable pour l'appel '{id}'"
         )
 
-    if file_path.endswith(".wav"):
-        return FileResponse(file_path, media_type="audio/wav", filename=f"call_record_{id}.wav")
-    return FileResponse(file_path, media_type="audio/mp4", filename=f"call_record_{id}.mp4")
+    ext = os.path.splitext(file_path)[1].lower()
+    media_type = "audio/wav" if ext == ".wav" else ("audio/x-m4a" if ext == ".m4a" else "audio/mp4")
+    return FileResponse(file_path, media_type=media_type, filename=os.path.basename(file_path))
 
 @router.get("/api/v1/calls/{id}/ai-status")
 def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):

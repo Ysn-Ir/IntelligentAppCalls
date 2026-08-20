@@ -44,6 +44,7 @@ interface VoipRepository {
     // ── AI Pipeline & Transcripts ─────────────────────────────────────────
     suspend fun getAiStatus(callId: String): Result<com.example.appcall.data.model.AiStatusDto>
     suspend fun getTranscript(callId: String): Result<com.example.appcall.data.model.TranscriptDto>
+    suspend fun downloadCallAudio(callId: String, destFile: java.io.File): Result<java.io.File>
 
     // ── Chatbot RAG ───────────────────────────────────────────────────────
     suspend fun chatWithContact(contactId: String, message: String, sessionId: String? = null): Result<com.example.appcall.data.model.ChatResponseDto>

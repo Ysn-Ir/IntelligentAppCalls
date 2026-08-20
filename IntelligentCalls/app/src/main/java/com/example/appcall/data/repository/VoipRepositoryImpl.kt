@@ -621,6 +621,27 @@ class VoipRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun downloadCallAudio(callId: String, destFile: java.io.File): Result<java.io.File> {
+        val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        return try {
+            val response = apiService.getCallAudio(auth, callId)
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                destFile.parentFile?.mkdirs()
+                destFile.outputStream().use { output ->
+                    body.byteStream().use { input ->
+                        input.copyTo(output)
+                    }
+                }
+                Result.success(destFile)
+            } else {
+                Result.failure(Exception("Audio non disponible sur le serveur (${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // ── Chatbot RAG ───────────────────────────────────────────────────────
 
     private fun generateLocalFactualReply(message: String, contactId: String?): ChatResponseDto? {

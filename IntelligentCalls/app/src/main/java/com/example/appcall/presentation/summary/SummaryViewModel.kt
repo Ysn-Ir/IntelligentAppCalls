@@ -52,14 +52,74 @@ class SummaryViewModel @Inject constructor(
     private val _transcript = MutableStateFlow<TranscriptDto?>(null)
     val transcript: StateFlow<TranscriptDto?> = _transcript
 
+    private val _audioFile = MutableStateFlow<java.io.File?>(null)
+    val audioFile: StateFlow<java.io.File?> = _audioFile
+
+    private val _isAudioLoading = MutableStateFlow(false)
+    val isAudioLoading: StateFlow<Boolean> = _isAudioLoading
+
     private var currentCallId: String? = null
     private var pollingJob: kotlinx.coroutines.Job? = null
+
+    fun resolveAndFetchAudio(callId: String, context: android.content.Context) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val targetDirs = listOf(
+                java.io.File(context.filesDir, "recordings"),
+                java.io.File(context.filesDir, "recordings_native"),
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "recordings") },
+                context.cacheDir
+            ).filterNotNull()
+
+            val allFiles = mutableListOf<java.io.File>()
+            targetDirs.forEach { dir ->
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.filter {
+                        it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 512
+                    }?.let { allFiles.addAll(it) }
+                }
+            }
+
+            val prefix = if (callId.length >= 8) callId.take(8) else callId
+            val cleanId = callId.removePrefix("native-")
+            val matchedLocal = allFiles.firstOrNull {
+                it.name.contains(callId, ignoreCase = true) ||
+                it.name.contains(prefix, ignoreCase = true) ||
+                (cleanId.isNotBlank() && it.name.contains(cleanId, ignoreCase = true))
+            }
+
+            if (matchedLocal != null && matchedLocal.exists() && matchedLocal.length() > 512) {
+                _audioFile.value = matchedLocal
+                return@launch
+            }
+
+            // Check if already downloaded cached file
+            val cachedFile = java.io.File(context.filesDir, "recordings/call_remote_${callId}.mp4")
+            if (cachedFile.exists() && cachedFile.length() > 512) {
+                _audioFile.value = cachedFile
+                return@launch
+            }
+
+            // If not found locally, fetch from backend
+            _isAudioLoading.value = true
+            voipRepository.downloadCallAudio(callId, cachedFile)
+                .onSuccess { downloaded ->
+                    if (downloaded.exists() && downloaded.length() > 100) {
+                        _audioFile.value = downloaded
+                    }
+                }
+                .onFailure {
+                    // Audio not on server, leave as null
+                }
+            _isAudioLoading.value = false
+        }
+    }
 
     fun loadSummary(callId: String) {
         currentCallId = callId
         _uiState.value = SummaryScreenState.Loading
         _transcript.value = null
         _aiStatus.value = null
+        _audioFile.value = null
         pollingJob?.cancel()
 
         viewModelScope.launch {
