@@ -298,6 +298,74 @@ def create_call(request: schemas.CallRequest, user_id: str = Depends(verify_toke
         twilio_params=json.loads(new_call.twilio_params) if new_call.twilio_params else None
     )
 
+@app.post("/api/v1/calls/twilio-outbound")
+def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    Triggers an active outbound call from your Twilio virtual number to the target contact
+    using the Twilio REST API, recording the conversation in dual-channel HD.
+    """
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
+
+    contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
+    if not contact or not contact.phone_number:
+        raise HTTPException(status_code=404, detail="Contact introuvable ou sans numéro de téléphone")
+
+    if not account_sid or not auth_token or not twilio_number:
+        raise HTTPException(
+            status_code=400,
+            detail="Twilio non configuré sur le serveur (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER manquants)"
+        )
+
+    try:
+        from twilio.rest import Client
+        client = Client(account_sid, auth_token)
+
+        # Base URL for webhooks
+        server_url = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:8000")
+        voice_url = f"{server_url.rstrip('/')}/webhooks/twilio/voice"
+        recording_cb = f"{server_url.rstrip('/')}/webhooks/twilio/recording-complete"
+        status_cb = f"{server_url.rstrip('/')}/webhooks/twilio/status"
+
+        call = client.calls.create(
+            to=contact.phone_number,
+            from_=twilio_number,
+            url=voice_url,
+            record=True,
+            recording_status_callback=recording_cb,
+            recording_status_callback_method="POST",
+            status_callback=status_cb,
+            status_callback_method="POST"
+        )
+
+        new_call = Call(
+            id=call.sid,
+            contact_id=contact.id,
+            user_id=user_id,
+            direction="OUTBOUND",
+            status="QUEUED",
+            ai_status="PROCESSING",
+            twilio_params=json.dumps({
+                "call_sid": call.sid,
+                "caller_id": twilio_number,
+                "target": contact.phone_number
+            })
+        )
+        db.add(new_call)
+        db.commit()
+
+        return {
+            "id": call.sid,
+            "contact_id": contact.id,
+            "status": call.status,
+            "direction": "OUTBOUND",
+            "message": f"Appel Twilio lancé vers {contact.phone_number}"
+        }
+    except Exception as e:
+        logger.error(f"Error creating Twilio outbound call: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur Twilio: {str(e)}")
+
 @app.post("/api/v1/calls/bridge")
 def initiate_call_bridge(request: schemas.CallInitiateRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
     contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
