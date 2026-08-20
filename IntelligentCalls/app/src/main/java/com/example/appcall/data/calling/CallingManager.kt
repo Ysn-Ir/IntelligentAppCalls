@@ -231,15 +231,22 @@ class CallingManager @Inject constructor(
             } else contact.phoneNumber
             Log.d(TAG, "Dialing: $dialNumber (TwilioEnabled=$isTwilioEnabled, Target=${contact.phoneNumber})")
 
-            // Launch native dialer
-            val dialIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${dialNumber}"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             try {
+                val dialIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${dialNumber}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(dialIntent)
                 _callState.value = CallState.Active(callId = callId, contactName = activeContactName)
 
                 // Start local recorder service
                 Log.d(TAG, "Starting recorder early for callId=$callId")
+                PhoneCallRecorderService.start(context, callId)
+
+            } catch (se: SecurityException) {
+                Log.w(TAG, "CALL_PHONE permission missing, falling back to ACTION_DIAL: ${se.message}")
+                val fallbackIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${dialNumber}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(fallbackIntent)
+                _callState.value = CallState.Active(callId = callId, contactName = activeContactName)
                 PhoneCallRecorderService.start(context, callId)
 
             } catch (e: Exception) {
