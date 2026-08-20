@@ -96,10 +96,33 @@ Interactive Swagger docs: **`http://localhost:8000/docs`**
 
 ---
 
-## 📱 Connecting Android Device
+## 📱 Connecting Android Device & Network Configuration
 
-For physical Android devices over USB:
-```bash
-adb reverse tcp:8000 tcp:8000
-```
-Then configure the app to connect to `http://localhost:8000` or `http://10.0.2.2:8000` (for emulator).
+### 📶 Mode 1: Wi-Fi LAN Mode (Wireless / Same Wi-Fi / Hotspot)
+1. Ensure your PC and Android device are on the same Wi-Fi network (or connect PC to the phone's mobile hotspot).
+2. Find your PC's IP address:
+   - **Windows**: `ipconfig` (look for `IPv4 Address` under Wi-Fi, e.g. `192.168.1.12`).
+   - **macOS / Linux**: `ip a` or `ifconfig`.
+3. Start the backend with `--host 0.0.0.0` so it accepts incoming Wi-Fi connections:
+   ```bash
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+4. In the Android App:
+   - Go to the **⚙️ Paramètres** tab.
+   - Under **CONFIGURATION SERVEUR & IA**, enter: `http://<YOUR_PC_IP>:8000` (e.g. `http://192.168.1.12:8000`).
+   - Tap **Enregistrer** then **🔄 Tester**.
+
+### 🔌 Mode 2: USB Reverse Tethering (No Wi-Fi Needed)
+1. Connect device with USB cable (USB Debugging enabled).
+2. Run:
+   ```bash
+   adb reverse tcp:8000 tcp:8000
+   ```
+3. In the Android App:
+   - Go to **⚙️ Paramètres** tab ➡️ Tap **🔌 Mode USB** (`http://127.0.0.1:8000`).
+   - Tap **🔄 Tester**.
+
+### 🔄 When Switching Wi-Fi Networks
+Whenever you change networks (Home ➡️ Office ➡️ Hotspot):
+1. Run `ipconfig` on your PC to get the new IPv4 address.
+2. In the Android App **⚙️ Paramètres** tab, enter the new IP and tap **Enregistrer**. No app recompilation or reinstall required!

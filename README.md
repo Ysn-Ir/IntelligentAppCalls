@@ -110,18 +110,70 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the server with hot reload
+# Run the server on all network interfaces (0.0.0.0)
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 *API Documentation will be available at:* **`http://localhost:8000/docs`**
 
 ---
 
-### 2. Forward ADB Ports (For Physical USB Android Devices)
+### 2. 🌐 Network & IP Configuration Guide (Wi-Fi, USB & Changing Networks)
 
-```bash
-adb reverse tcp:8000 tcp:8000
-```
+The Android app features a dynamic URL interceptor (`DynamicUrlInterceptor`), allowing you to switch between Wi-Fi networks, USB reverse tethering, or remote VPNs without recompiling the app!
+
+#### 📍 How to find your PC's IP address:
+- **On Windows**: Open PowerShell or Command Prompt and run:
+  ```powershell
+  ipconfig
+  ```
+  Look for **IPv4 Address** under `Wireless LAN adapter Wi-Fi` (e.g. `192.168.1.12` or `192.168.1.177`).
+- **On macOS / Linux**:
+  ```bash
+  ip a   # or: ifconfig
+  ```
+
+---
+
+#### 📶 Mode A — Wi-Fi LAN Mode (Same Wi-Fi / Hotspot)
+1. **Connect both your PC and Android phone to the same Wi-Fi network** (or connect your PC to your phone's Mobile Hotspot).
+2. **Start the backend** ensuring `--host 0.0.0.0` is used so it accepts external incoming connections:
+   ```bash
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+3. **Configure the IP in the Android App**:
+   - Open the **IntelligentCalls** app on your phone.
+   - Tap the **⚙️ Paramètres** tab in the bottom bar.
+   - Under **CONFIGURATION SERVEUR & IA**, enter your PC's IP and port:
+     ```
+     http://192.168.1.12:8000
+     ```
+   - Tap **Enregistrer** (Save), then tap **🔄 Tester**.
+   - You should see the confirmation toast: `✅ Backend connecté (HTTP 200)`.
+
+> [!TIP]
+> **Switching Wi-Fi Networks (e.g. Home ➡️ Work ➡️ Mobile Hotspot)**:
+> Whenever you change Wi-Fi networks, your router assigns a new local IP to your PC.
+> 1. Run `ipconfig` on your PC to get the new IPv4 address.
+> 2. Open the app ➡️ **⚙️ Paramètres** ➡️ enter the new IP address ➡️ Tap **Enregistrer** & **🔄 Tester**.
+> You don't need to rebuild or reinstall the application!
+
+---
+
+#### 🔌 Mode B — USB Reverse Tethering Mode (No Wi-Fi Needed / Ultra Low Latency)
+If you don't have Wi-Fi or want direct USB communication:
+1. Connect your phone to your PC with a USB cable (with **USB Debugging** enabled).
+2. Run the ADB reverse port forwarding command on your PC:
+   ```bash
+   adb reverse tcp:8000 tcp:8000
+   ```
+3. In the Android app ➡️ **⚙️ Paramètres** ➡️ tap the **🔌 Mode USB** button (automatically sets `http://127.0.0.1:8000`).
+4. Tap **🔄 Tester** to verify the connection.
+
+---
+
+#### 🔒 Mode C — Tailscale / VPN / Remote Server
+If running over a VPN (e.g. Tailscale / WireGuard):
+- Enter the VPN IP (e.g., `http://100.89.108.117:8000`) into the **⚙️ Paramètres** URL input in the Android app.
 
 ---
 
