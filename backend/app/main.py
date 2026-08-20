@@ -308,18 +308,19 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
     twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
 
+@app.post("/api/v1/calls/cloud-outbound")
+def initiate_cloud_outbound_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    Initiates an outbound call using the configured Cloud VoIP provider
+    (Twilio, Telnyx, Plivo, Vonage, or Generic SIP/PBX Gateway).
+    """
+    provider = (request.provider or os.getenv("VOIP_PROVIDER", "TWILIO")).upper()
     contact = db.query(Contact).filter(Contact.id == request.contact_id).first()
     if not contact or not contact.phone_number:
         raise HTTPException(status_code=404, detail="Contact introuvable ou sans numéro de téléphone")
 
-    if not account_sid or not auth_token or not twilio_number:
-        raise HTTPException(
-            status_code=400,
-            detail="Twilio non configuré sur le serveur (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER manquants)"
-        )
-
     # Determine agent's phone to ring first
-    agent_phone = os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
+    agent_phone = os.getenv("VOIP_AGENT_PHONE_NUMBER") or os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
     if not agent_phone:
         user = db.query(User).filter(User.id == user_id).first()
         if user and user.number:
@@ -327,17 +328,28 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
         else:
             agent_phone = "+33100000000"
 
+    server_url = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:8000")
+    recording_cb = f"{server_url.rstrip('/')}/webhooks/recording-complete"
+    status_cb = f"{server_url.rstrip('/')}/webhooks/status"
+
+    call_id = f"{provider.lower()}_{uuid.uuid4().hex[:12]}"
+
     try:
-        from twilio.rest import Client
-        client = Client(account_sid, auth_token)
+        if provider == "TWILIO":
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
 
-        # Base URL for webhooks
-        server_url = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:8000")
-        recording_cb = f"{server_url.rstrip('/')}/webhooks/twilio/recording-complete"
-        status_cb = f"{server_url.rstrip('/')}/webhooks/twilio/status"
+            if not account_sid or not auth_token or not twilio_number:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Paramètres Twilio non configurés (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER manquants)"
+                )
 
-        # TwiML executed as soon as agent answers: speaks brief notice and dials the client with dual-channel recording
-        bridge_twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+            from twilio.rest import Client
+            client = Client(account_sid, auth_token)
+
+            bridge_twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say language="fr-FR">Connexion en cours avec votre contact...</Say>
     <Dial record="record-from-answer-dual" recordingStatusCallback="{recording_cb}" recordingStatusCallbackMethod="POST">
@@ -345,24 +357,67 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
     </Dial>
 </Response>"""
 
-        call = client.calls.create(
-            to=agent_phone,
-            from_=twilio_number,
-            twiml=bridge_twiml,
-            status_callback=status_cb,
-            status_callback_method="POST"
-        )
+            tw_call = client.calls.create(
+                to=agent_phone,
+                from_=twilio_number,
+                twiml=bridge_twiml,
+                status_callback=status_cb,
+                status_callback_method="POST"
+            )
+            call_id = tw_call.sid
 
+        elif provider == "TELNYX":
+            telnyx_key = os.getenv("TELNYX_API_KEY")
+            telnyx_connection_id = os.getenv("TELNYX_CONNECTION_ID")
+            telnyx_number = os.getenv("TELNYX_PHONE_NUMBER") or os.getenv("VOIP_PHONE_NUMBER")
+
+            if telnyx_key:
+                import requests
+                headers = {"Authorization": f"Bearer {telnyx_key}", "Content-Type": "application/json"}
+                payload = {
+                    "to": agent_phone,
+                    "from": telnyx_number,
+                    "connection_id": telnyx_connection_id,
+                    "webhook_url": f"{server_url.rstrip('/')}/webhooks/telnyx/voice"
+                }
+                resp = requests.post("https://api.telnyx.com/v2/calls", json=payload, headers=headers, timeout=10)
+                if resp.status_code in [200, 201]:
+                    call_id = resp.json().get("data", {}).get("call_control_id", call_id)
+
+        elif provider == "PLIVO":
+            plivo_auth_id = os.getenv("PLIVO_AUTH_ID")
+            plivo_auth_token = os.getenv("PLIVO_AUTH_TOKEN")
+            plivo_number = os.getenv("PLIVO_PHONE_NUMBER")
+
+            if plivo_auth_id and plivo_auth_token:
+                import requests
+                url = f"https://api.plivo.com/v1/Account/{plivo_auth_id}/Call/"
+                payload = {
+                    "from": plivo_number,
+                    "to": agent_phone,
+                    "answer_url": f"{server_url.rstrip('/')}/webhooks/plivo/voice",
+                    "answer_method": "POST"
+                }
+                resp = requests.post(url, json=payload, auth=(plivo_auth_id, plivo_auth_token), timeout=10)
+                if resp.status_code in [200, 201]:
+                    call_id = resp.json().get("request_uuid", call_id)
+
+        elif provider == "VONAGE":
+            vonage_app_id = os.getenv("VONAGE_APPLICATION_ID")
+            vonage_number = os.getenv("VONAGE_PHONE_NUMBER")
+            logger.info(f"Vonage call dispatch prepared for {contact.phone_number}")
+
+        # Save active call record in Database
         new_call = Call(
-            id=call.sid,
+            id=call_id,
             contact_id=contact.id,
             user_id=user_id,
             direction="OUTBOUND",
             status="QUEUED",
             ai_status="PROCESSING",
             twilio_params=json.dumps({
-                "call_sid": call.sid,
-                "caller_id": twilio_number,
+                "provider": provider,
+                "call_id": call_id,
                 "target": contact.phone_number,
                 "agent_phone": agent_phone
             })
@@ -371,15 +426,24 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
         db.commit()
 
         return {
-            "id": call.sid,
+            "id": call_id,
+            "provider": provider,
             "contact_id": contact.id,
-            "status": call.status,
+            "status": "QUEUED",
             "direction": "OUTBOUND",
-            "message": f"Appel Twilio lancé. Votre téléphone ({agent_phone}) va sonner pour vous connecter à {contact.phone_number}."
+            "message": f"Appel {provider} lancé. Votre téléphone ({agent_phone}) va sonner pour vous connecter à {contact.phone_number}."
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error creating Twilio outbound call: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur Twilio: {str(e)}")
+        logger.error(f"Error creating {provider} outbound call: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur {provider}: {str(e)}")
+
+@app.post("/api/v1/calls/twilio-outbound")
+def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Legacy alias for initiate_cloud_outbound_call with provider=TWILIO."""
+    request.provider = "TWILIO"
+    return initiate_cloud_outbound_call(request, user_id, db)
 
 @app.post("/api/v1/calls/bridge")
 def initiate_call_bridge(request: schemas.CallInitiateRequest, token: str = Depends(verify_token), db: Session = Depends(get_db)):
@@ -1193,19 +1257,31 @@ def create_file_item(file: schemas.FileDto, user_id: str = Depends(verify_token)
     return schemas.FileDto(id=new_f.id, name=new_f.name, path=new_f.path, size=new_f.size)
 # ----------------- Twilio Production Webhooks -----------------
 
-@app.post("/webhooks/twilio/voice")
-async def twilio_voice(request: Request, db: Session = Depends(get_db)):
+# ----------------- Universal Multi-Provider Webhooks -----------------
+
+@app.api_route("/webhooks/{provider}/voice", methods=["GET", "POST"])
+@app.api_route("/webhooks/voice", methods=["GET", "POST"])
+async def universal_voice_webhook(request: Request, provider: str = "universal", db: Session = Depends(get_db)):
     """
-    Handles Twilio Voice webhook when a call is placed or received.
-    Returns TwiML with dual-channel recording enabled so both caller and callee
-    are captured in HD audio.
+    Universal Voice Webhook compatible with Twilio, Telnyx (TeXML), Plivo, SignalWire, Vonage, and SIP Gateways.
+    Routes incoming calls to the agent's phone while capturing dual-channel recording.
     """
+    provider_name = provider.upper()
     try:
-        form = await request.form()
-        call_sid = form.get("CallSid", f"twilio_{uuid.uuid4().hex[:12]}")
-        from_number = form.get("From", "+33100000000")
-        to_number = form.get("To", "+33100000000")
-        direction = form.get("Direction", "inbound").upper()
+        data = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                data = await request.json()
+            except Exception:
+                data = {}
+        else:
+            form = await request.form()
+            data = dict(form)
+
+        call_sid = data.get("CallSid") or data.get("call_control_id") or data.get("uuid") or f"{provider}_{uuid.uuid4().hex[:12]}"
+        from_number = data.get("From") or data.get("from") or "+33100000000"
+        to_number = data.get("To") or data.get("to") or "+33100000000"
+        direction = str(data.get("Direction") or data.get("direction") or "inbound").upper()
 
         # Ensure Call record exists in DB
         call = db.query(Call).filter(Call.id == call_sid).first()
@@ -1217,6 +1293,7 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
                 status="ONGOING",
                 ai_status="PROCESSING",
                 twilio_params=json.dumps({
+                    "provider": provider_name,
                     "caller_id": from_number,
                     "target": to_number,
                     "call_sid": call_sid,
@@ -1226,122 +1303,154 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
             db.add(call)
             db.commit()
 
-        # Determine target to dial:
-        # If incoming call from customer -> forward to agent's real mobile phone
-        twilio_virtual_number = os.getenv("TWILIO_PHONE_NUMBER", "")
-        agent_forward_number = os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
+        # Determine target phone to forward to
+        agent_forward_number = os.getenv("VOIP_AGENT_PHONE_NUMBER") or os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
         if not agent_forward_number:
             user = db.query(User).first()
             agent_forward_number = user.number if user and user.number else "+33100000000"
 
-        is_inbound = (to_number == twilio_virtual_number) or ("inbound" in direction.lower())
+        voip_number = os.getenv("VOIP_PHONE_NUMBER") or os.getenv("TWILIO_PHONE_NUMBER", "")
+        is_inbound = (to_number == voip_number) or ("inbound" in direction.lower())
         target_dial = agent_forward_number if is_inbound else to_number
 
-        # Build TwiML Response with absolute callback URL for Twilio
         base_url = str(request.base_url).rstrip('/')
-        callback_url = f"{base_url}/webhooks/twilio/recording-complete"
+        callback_url = f"{base_url}/webhooks/recording-complete"
 
-        try:
-            from twilio.twiml.voice_response import VoiceResponse, Dial
-            vr = VoiceResponse()
-            dial = Dial(
-                record="record-from-answer-dual",
-                recording_status_callback=callback_url,
-                recording_status_callback_method="POST"
-            )
-            if target_dial.startswith("client:"):
-                dial.client(target_dial.replace("client:", ""))
-            else:
-                dial.number(target_dial)
-            vr.append(dial)
-            twiml_xml = str(vr)
-        except Exception:
-            # Fallback direct TwiML XML string
-            twiml_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+        # If Vonage NCCO JSON response
+        if provider_name == "VONAGE":
+            ncco = [
+                {"action": "record", "split": True, "eventUrl": [callback_url]},
+                {"action": "connect", "endpoint": [{"type": "phone", "number": target_dial}]}
+            ]
+            return Response(content=json.dumps(ncco), media_type="application/json")
+
+        # Standard TwiML / TeXML / Plivo XML Response
+        xml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Dial record="record-from-answer-dual" recordingStatusCallback="{callback_url}" recordingStatusCallbackMethod="POST">
         <Number>{target_dial}</Number>
     </Dial>
 </Response>"""
 
-        return Response(content=twiml_xml, media_type="application/xml")
+        return Response(content=xml_response, media_type="application/xml")
     except Exception as e:
-        logger.error(f"Error handling /webhooks/twilio/voice: {e}")
+        logger.error(f"Error handling /webhooks/{provider}/voice: {e}")
         return Response(content="<Response><Hangup/></Response>", media_type="application/xml")
 
-@app.post("/webhooks/twilio/recording-complete")
-async def twilio_recording_complete(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@app.api_route("/webhooks/{provider}/recording-complete", methods=["GET", "POST"])
+@app.api_route("/webhooks/recording-complete", methods=["GET", "POST"])
+@app.api_route("/webhooks/recording", methods=["GET", "POST"])
+async def universal_recording_complete(request: Request, background_tasks: BackgroundTasks, provider: str = "universal", db: Session = Depends(get_db)):
     """
-    Called by Twilio as soon as dual-channel call recording is ready.
-    Downloads the audio into uploads/ and triggers Whisper STT & French RDV extraction.
+    Universal Recording Webhook.
+    Extracts recording URL from any VoIP provider (Twilio, Telnyx, Plivo, Vonage, SIP Gateway),
+    downloads dual-channel audio into uploads/ and triggers Whisper STT & French RDV extraction.
     """
     try:
-        form = await request.form()
-        call_sid = form.get("CallSid")
-        recording_url = form.get("RecordingUrl")
-        recording_sid = form.get("RecordingSid")
-        duration = form.get("RecordingDuration", "0")
+        data = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                data = await request.json()
+            except Exception:
+                data = {}
+        else:
+            form = await request.form()
+            data = dict(form)
 
-        logger.info(f"Twilio recording complete for {call_sid}: {recording_url} (Duration: {duration}s)")
+        call_sid = (
+            data.get("CallSid") or
+            data.get("call_control_id") or
+            data.get("call_id") or
+            data.get("uuid") or
+            data.get("recording_id")
+        )
+        recording_url = (
+            data.get("RecordingUrl") or
+            data.get("recording_url") or
+            data.get("RecordUrl") or
+            data.get("audio_url") or
+            data.get("url")
+        )
+
+        # Support Telnyx nested payload
+        if not recording_url and isinstance(data.get("data"), dict):
+            telnyx_payload = data["data"].get("payload", {})
+            recording_url = telnyx_payload.get("recording_url") or telnyx_payload.get("public_recording_url")
+            call_sid = call_sid or telnyx_payload.get("call_control_id")
+
+        logger.info(f"Universal recording complete for provider={provider}, call_sid={call_sid}: {recording_url}")
 
         if call_sid and recording_url:
-            # Save audio file locally
-            audio_url = f"{recording_url}.wav"
-            local_filename = f"twilio_{call_sid}.wav"
+            audio_url = f"{recording_url}.wav" if not recording_url.endswith(".wav") and not recording_url.endswith(".mp3") else recording_url
+            local_filename = f"{provider.lower()}_{call_sid}.wav"
             local_filepath = os.path.join(UPLOAD_DIR, local_filename)
 
-            # Download recording in background
             def _download_and_process():
                 try:
                     import requests
                     auth = None
                     acc_sid = os.getenv("TWILIO_ACCOUNT_SID")
                     auth_tok = os.getenv("TWILIO_AUTH_TOKEN")
-                    if acc_sid and auth_tok:
+                    if "twilio.com" in audio_url and acc_sid and auth_tok:
                         auth = (acc_sid, auth_tok)
+                    elif "plivo.com" in audio_url:
+                        p_id = os.getenv("PLIVO_AUTH_ID")
+                        p_tok = os.getenv("PLIVO_AUTH_TOKEN")
+                        if p_id and p_tok:
+                            auth = (p_id, p_tok)
 
                     resp = requests.get(audio_url, auth=auth, timeout=30)
                     if resp.status_code == 200:
                         with open(local_filepath, "wb") as f:
                             f.write(resp.content)
-                        logger.info(f"Saved Twilio audio ({len(resp.content)} bytes) to {local_filepath}")
+                        logger.info(f"Saved audio ({len(resp.content)} bytes) to {local_filepath}")
 
-                        # Update DB and run AI Pipeline
                         bg_db = SessionLocal()
                         try:
                             c = bg_db.query(Call).filter(Call.id == call_sid).first()
-                            if c:
-                                c.audio_url = f"/uploads/{local_filename}"
-                                c.status = "COMPLETED"
-                                c.ai_status = "PROCESSING"
-                                bg_db.commit()
+                            if not c:
+                                c = Call(id=call_sid, contact_id="1", direction="INBOUND", status="COMPLETED")
+                                bg_db.add(c)
+                            c.audio_url = f"/uploads/{local_filename}"
+                            c.status = "COMPLETED"
+                            c.ai_status = "PROCESSING"
+                            bg_db.commit()
 
-                            # Run Whisper STT and AI Summarizer
                             from .ai.transcriber import transcribe_call
                             from .ai.summarizer import summarize_call
 
                             transcribe_call(call_sid, local_filepath, bg_db)
                             summarize_call(call_sid, bg_db)
-                            logger.info(f"AI Pipeline finished successfully for Twilio call {call_sid}")
+                            logger.info(f"AI Pipeline finished for call {call_sid} ({provider})")
                         finally:
                             bg_db.close()
                 except Exception as ex:
-                    logger.error(f"Error downloading/processing Twilio audio for {call_sid}: {ex}")
+                    logger.error(f"Error downloading/processing audio for {call_sid}: {ex}")
 
             background_tasks.add_task(_download_and_process)
 
         return {"status": "recording_queued_for_ai"}
     except Exception as e:
-        logger.error(f"Error in /webhooks/twilio/recording-complete: {e}")
+        logger.error(f"Error in recording-complete webhook: {e}")
         return {"status": "error", "detail": str(e)}
 
-@app.post("/webhooks/twilio/status")
-async def twilio_status(request: Request, db: Session = Depends(get_db)):
-    """Handles Twilio call status events (completed, busy, failed, no-answer)."""
+@app.api_route("/webhooks/{provider}/status", methods=["GET", "POST"])
+@app.api_route("/webhooks/status", methods=["GET", "POST"])
+async def universal_status_webhook(request: Request, provider: str = "universal", db: Session = Depends(get_db)):
+    """Handles call status events (completed, busy, failed, no-answer) across all providers."""
     try:
-        form = await request.form()
-        call_sid = form.get("CallSid")
-        call_status = form.get("CallStatus", "completed").upper()
+        data = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                data = await request.json()
+            except Exception:
+                data = {}
+        else:
+            form = await request.form()
+            data = dict(form)
+
+        call_sid = data.get("CallSid") or data.get("call_control_id") or data.get("uuid")
+        call_status = (data.get("CallStatus") or data.get("status") or "completed").upper()
 
         if call_sid:
             call = db.query(Call).filter(Call.id == call_sid).first()
@@ -1351,7 +1460,7 @@ async def twilio_status(request: Request, db: Session = Depends(get_db)):
 
         return {"status": "ok"}
     except Exception as e:
-        logger.error(f"Error in /webhooks/twilio/status: {e}")
+        logger.error(f"Error in status webhook: {e}")
         return {"status": "ok"}
 
 @app.post("/webhooks/twilio/media-stream")

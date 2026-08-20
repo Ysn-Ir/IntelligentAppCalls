@@ -32,6 +32,7 @@ class TokenResponse(BaseModel):
 class CallRequest(BaseModel):
     contact_id: str
     direction: str = "OUTBOUND"
+    provider: Optional[str] = "TWILIO"  # TWILIO, TELNYX, PLIVO, VONAGE, SIP_PBX
 
 class CallResponse(BaseModel):
     id: str
@@ -39,6 +40,7 @@ class CallResponse(BaseModel):
     direction: str
     status: str
     twilio_params: Optional[Dict[str, str]] = None
+    provider: Optional[str] = "TWILIO"
 
 class ConsentRequest(BaseModel):
     consent_given: bool

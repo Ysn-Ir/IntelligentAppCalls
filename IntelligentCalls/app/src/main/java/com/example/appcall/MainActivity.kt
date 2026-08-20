@@ -1067,7 +1067,7 @@ fun SettingsSection(
             }
         }
 
-        // ── 2. TWILIO CLOUD TELEPHONY (2-WAY HD) ────────────────────────────────
+        // ── 2. CLOUD TELEPHONY & VOIP PROVIDERS (MULTI-FOURNISSEUR) ────────────
         item {
             Box(
                 modifier = Modifier
@@ -1078,12 +1078,21 @@ fun SettingsSection(
                     .padding(14.dp)
             ) {
                 Column {
-                    val twilioPrefs = remember { context.getSharedPreferences("twilio_settings", android.content.Context.MODE_PRIVATE) }
-                    var twilioEnabled by remember { mutableStateOf(twilioPrefs.getBoolean("twilio_enabled", false)) }
-                    var accountSid by remember { mutableStateOf(twilioPrefs.getString("twilio_account_sid", "") ?: "") }
-                    var authToken by remember { mutableStateOf(twilioPrefs.getString("twilio_auth_token", "") ?: "") }
-                    var twilioNumber by remember { mutableStateOf(twilioPrefs.getString("twilio_phone_number", "") ?: "") }
-                    var twimlAppSid by remember { mutableStateOf(twilioPrefs.getString("twilio_twiml_app_sid", "") ?: "") }
+                    val voipPrefs = remember { context.getSharedPreferences("twilio_settings", android.content.Context.MODE_PRIVATE) }
+                    var voipEnabled by remember { mutableStateOf(voipPrefs.getBoolean("twilio_enabled", false)) }
+                    var selectedProvider by remember { mutableStateOf(voipPrefs.getString("voip_provider", "TWILIO") ?: "TWILIO") }
+                    var accountSid by remember { mutableStateOf(voipPrefs.getString("twilio_account_sid", "") ?: "") }
+                    var authToken by remember { mutableStateOf(voipPrefs.getString("twilio_auth_token", "") ?: "") }
+                    var voipNumber by remember { mutableStateOf(voipPrefs.getString("twilio_phone_number", "") ?: "") }
+                    var twimlAppSid by remember { mutableStateOf(voipPrefs.getString("twilio_twiml_app_sid", "") ?: "") }
+
+                    val providers = listOf(
+                        "TWILIO" to "Twilio",
+                        "TELNYX" to "Telnyx",
+                        "PLIVO" to "Plivo",
+                        "VONAGE" to "Vonage",
+                        "SIP_PBX" to "SIP Trunk / PBX"
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1091,33 +1100,105 @@ fun SettingsSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("TWILIO CLOUD TELEPHONY", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                            Text("Enregistrement 2-Way HD opérateur", color = Text2, fontSize = 11.5.sp)
+                            Text("CLOUD TELEPHONY & MULTI-VOIP", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                            Text("Twilio, Telnyx, Plivo, Vonage & SIP Trunk", color = Text2, fontSize = 11.5.sp)
                         }
                         Switch(
-                            checked = twilioEnabled,
+                            checked = voipEnabled,
                             onCheckedChange = {
-                                twilioEnabled = it
-                                twilioPrefs.edit().putBoolean("twilio_enabled", it).apply()
+                                voipEnabled = it
+                                voipPrefs.edit().putBoolean("twilio_enabled", it).apply()
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
                         )
                     }
 
-                    if (twilioEnabled) {
+                    if (voipEnabled) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Les appels VoIP passent directement par le réseau Twilio avec enregistrement stéréo 2 voix (Opérateur + Client) et transcription Whisper automatique.",
+                            text = "Sélectionnez votre opérateur VoIP Cloud pour l'enregistrement 2-Way HD et la transcription automatique :",
                             color = Text3,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // Provider selector chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            providers.take(3).forEach { (id, label) ->
+                                val isSelected = selectedProvider == id
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Text1 else Surface2)
+                                        .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedProvider = id
+                                            voipPrefs.edit().putString("voip_provider", id).apply()
+                                        }
+                                        .padding(vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected) BgColor else Text2,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            providers.drop(3).forEach { (id, label) ->
+                                val isSelected = selectedProvider == id
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Text1 else Surface2)
+                                        .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedProvider = id
+                                            voipPrefs.edit().putString("voip_provider", id).apply()
+                                        }
+                                        .padding(vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected) BgColor else Text2,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = accountSid,
                             onValueChange = { accountSid = it },
-                            label = { Text("Account SID (ACxxxxxxxx...)", color = Text3, fontSize = 11.5.sp) },
+                            label = {
+                                Text(
+                                    when (selectedProvider) {
+                                        "TELNYX" -> "API Key / Connection ID"
+                                        "PLIVO" -> "Auth ID"
+                                        "VONAGE" -> "API Key / Application ID"
+                                        "SIP_PBX" -> "SIP Server Host (sip.company.com)"
+                                        else -> "Account SID (ACxxxxxxxx...)"
+                                    },
+                                    color = Text3,
+                                    fontSize = 11.5.sp
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = BorderStrong,
@@ -1131,7 +1212,19 @@ fun SettingsSection(
                         OutlinedTextField(
                             value = authToken,
                             onValueChange = { authToken = it },
-                            label = { Text("Auth Token", color = Text3, fontSize = 11.5.sp) },
+                            label = {
+                                Text(
+                                    when (selectedProvider) {
+                                        "TELNYX" -> "Telnyx Secret Key"
+                                        "PLIVO" -> "Auth Token"
+                                        "VONAGE" -> "API Secret / Private Key"
+                                        "SIP_PBX" -> "SIP Password / Secret"
+                                        else -> "Auth Token"
+                                    },
+                                    color = Text3,
+                                    fontSize = 11.5.sp
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1144,9 +1237,9 @@ fun SettingsSection(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
-                            value = twilioNumber,
-                            onValueChange = { twilioNumber = it },
-                            label = { Text("Numéro Virtuel Twilio (+33...)", color = Text3, fontSize = 11.5.sp) },
+                            value = voipNumber,
+                            onValueChange = { voipNumber = it },
+                            label = { Text("Numéro Virtuel / Passerelle (+33...)", color = Text3, fontSize = 11.5.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = BorderStrong,
@@ -1156,37 +1249,40 @@ fun SettingsSection(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = twimlAppSid,
-                            onValueChange = { twimlAppSid = it },
-                            label = { Text("TwiML App SID (APxxxxxxxx...)", color = Text3, fontSize = 11.5.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
+                        if (selectedProvider == "TWILIO" || selectedProvider == "TELNYX") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = twimlAppSid,
+                                onValueChange = { twimlAppSid = it },
+                                label = { Text("App SID / TeXML App ID", color = Text3, fontSize = 11.5.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = BorderStrong,
+                                    unfocusedBorderColor = BorderColor,
+                                    focusedTextColor = Text1,
+                                    unfocusedTextColor = Text1
+                                )
                             )
-                        )
+                        }
 
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = {
-                                twilioPrefs.edit()
+                                voipPrefs.edit()
                                     .putBoolean("twilio_enabled", true)
+                                    .putString("voip_provider", selectedProvider)
                                     .putString("twilio_account_sid", accountSid.trim())
                                     .putString("twilio_auth_token", authToken.trim())
-                                    .putString("twilio_phone_number", twilioNumber.trim())
+                                    .putString("twilio_phone_number", voipNumber.trim())
                                     .putString("twilio_twiml_app_sid", twimlAppSid.trim())
                                     .apply()
-                                Toast.makeText(context, "Configuration Twilio enregistrée", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Configuration $selectedProvider enregistrée", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Enregistrer Twilio", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
