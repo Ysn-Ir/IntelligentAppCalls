@@ -223,14 +223,17 @@ class PhoneCallRecorderService : Service() {
             val sizeKb = "${(file.length() + 1023) / 1024} KB"
             val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
 
+            val db = com.example.appcall.data.local.AppLocalDatabase(this)
+            val existing = db.getCallHistory().firstOrNull { it.id == callId }
             val prefs = getSharedPreferences("call_recording_prefs", Context.MODE_PRIVATE)
-            val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
-            val phoneNumber = prefs.getString("active_phone_number", null)
+            val contactName = existing?.contactName?.takeIf { it.isNotBlank() && it != "native" }
+                ?: prefs.getString("active_contact_name", null)
+                ?: "Appel Téléphonique"
+            val phoneNumber = existing?.contactId?.takeIf { it.startsWith("+") || it.any { c -> c.isDigit() } }
+                ?: prefs.getString("active_phone_number", null)
 
             try {
-                val db = com.example.appcall.data.local.AppLocalDatabase(this)
                 db.saveFile(id = callId, name = file.name, path = file.absolutePath, size = sizeKb)
-                val existing = db.getCallHistory().firstOrNull { it.id == callId }
                 db.saveCallHistoryItem(
                     id = callId,
                     contactId = phoneNumber ?: existing?.contactId ?: "native",

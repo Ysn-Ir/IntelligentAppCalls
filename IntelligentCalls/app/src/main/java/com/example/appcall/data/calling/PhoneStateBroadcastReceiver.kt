@@ -59,14 +59,14 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
 
                 var (resolvedNum, resolvedName) = resolveLatestCallInfo(context)
                 if (resolvedNum.isNullOrBlank()) {
-                    resolvedNum = prefs.getString("active_phone_number", null) ?: incomingNumber
+                    resolvedNum = incomingNumber
                 }
                 if (resolvedName.isNullOrBlank() && !resolvedNum.isNullOrBlank()) {
                     resolvedName = resolveContactNameFromNumber(context, resolvedNum)
                 }
 
-                val finalContactName = resolvedName ?: prefs.getString("active_contact_name", null) ?: resolvedNum ?: "Appel Téléphonique"
-                val finalPhoneNumber = resolvedNum ?: prefs.getString("active_phone_number", null)
+                val finalContactName = resolvedName ?: resolvedNum ?: "Appel Téléphonique"
+                val finalPhoneNumber = resolvedNum
 
                 prefs.edit()
                     .putString("active_contact_name", finalContactName)
@@ -128,8 +128,12 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 PhoneCallRecorderService.stop(context)
-                // Clear stored callId
-                prefs.edit().remove(KEY_ACTIVE_CALL_ID).apply()
+                // Clear stored callId and active contact data so subsequent calls don't inherit stale values
+                prefs.edit()
+                    .remove(KEY_ACTIVE_CALL_ID)
+                    .remove("active_contact_name")
+                    .remove("active_phone_number")
+                    .apply()
             }
 
             TelephonyManager.EXTRA_STATE_RINGING -> {

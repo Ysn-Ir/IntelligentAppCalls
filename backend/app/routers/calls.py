@@ -324,19 +324,29 @@ def get_calls(
             try:
                 p = json.loads(c.twilio_params)
                 phone = p.get("caller_id") or p.get("phone_number")
-                name = p.get("contact_name")
+                raw_name = p.get("contact_name")
+                if raw_name and raw_name not in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+                    name = raw_name
             except Exception:
                 pass
 
         if c.contact:
-            contact_full = f"{c.contact.first_name} {c.contact.last_name}".strip()
-            if contact_full and contact_full not in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+            contact_full = f"{c.contact.first_name or ''} {c.contact.last_name or ''}".strip()
+            is_contact_name_phone = contact_full.startswith("+") or any(char.isdigit() for char in contact_full)
+            if contact_full and not is_contact_name_phone and contact_full not in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
+                name = contact_full
+            elif not name and contact_full:
                 name = contact_full
             if not phone and c.contact.phone_number:
                 phone = c.contact.phone_number
 
         if not name or name in ["Anon", "Appel", "Appel Téléphonique", "Unknown Contact"]:
             name = phone or "Appel Téléphonique"
+
+        # If name is a phone number and phone is not set or placeholder, unify them
+        if name and (name.startswith("+") or (len(name) >= 6 and name.replace(" ", "").isdigit())):
+            if not phone or phone == "+331234567":
+                phone = name
 
         summary_row = db.query(CallSummary).filter(CallSummary.call_id == c.id).first()
         summary_prev = summary_row.summary_text if summary_row and not summary_row.summary_text.startswith("Traitement IA") else None
@@ -586,10 +596,13 @@ async def upload_audio(
         db.commit()
         db.refresh(call)
     else:
-        if contact_id and not call.contact_id:
+        if contact_id:
             call.contact_id = contact_id
-        if x_phone_number:
-            call.twilio_params = json.dumps({"caller_id": x_phone_number, "contact_name": x_contact_name or "Appel"})
+        if x_phone_number or x_contact_name:
+            call.twilio_params = json.dumps({
+                "caller_id": x_phone_number or (c.phone_number if c else "+331234567"),
+                "contact_name": x_contact_name or (c.first_name if c else "Appel")
+            })
         db.commit()
 
     call.consent_given = True

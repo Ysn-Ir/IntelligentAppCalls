@@ -303,6 +303,7 @@ class VoipRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             // Read call history from local SQLite DB
             val localItems = localDatabase.getCallHistory().map { item ->
+                val phone = if (item.contactId.startsWith("+") || item.contactId.any { it.isDigit() }) item.contactId else null
                 CallHistoryItemDto(
                     id = item.id,
                     contactId = item.contactId,
@@ -310,7 +311,8 @@ class VoipRepositoryImpl @Inject constructor(
                     status = item.status,
                     startedAt = item.startedAt,
                     endedAt = item.endedAt,
-                    contactName = item.contactName
+                    contactName = item.contactName,
+                    phoneNumber = phone
                 )
             }
             Result.success(localItems)
@@ -413,15 +415,18 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun uploadCallAudio(callId: String, audioFile: java.io.File): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        val existing = localDatabase.getCallHistory().firstOrNull { it.id == callId }
         val prefs = context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE)
-        val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
-        val phoneNumber = prefs.getString("active_phone_number", null)
+        val contactName = existing?.contactName?.takeIf { it.isNotBlank() && it != "native" }
+            ?: prefs.getString("active_contact_name", null)
+            ?: "Appel Téléphonique"
+        val phoneNumber = existing?.contactId?.takeIf { it.startsWith("+") || it.any { c -> c.isDigit() } }
+            ?: prefs.getString("active_phone_number", null)
 
         val sizeKb = "${(audioFile.length() + 1023) / 1024} KB"
         val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
 
         localDatabase.saveFile(id = callId, name = audioFile.name, path = audioFile.absolutePath, size = sizeKb)
-        val existing = localDatabase.getCallHistory().firstOrNull { it.id == callId }
         localDatabase.saveCallHistoryItem(
             id = callId,
             contactId = phoneNumber ?: existing?.contactId ?: "native",
