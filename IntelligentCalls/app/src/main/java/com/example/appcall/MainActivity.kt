@@ -1608,12 +1608,12 @@ fun SettingsSection(
                         }
                         Button(
                             onClick = {
-                                customUrlText = "http://192.168.1.177:8000"
+                                customUrlText = "http://192.168.1.12:8000"
                                 context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
                                     .edit()
-                                    .putString("custom_base_url", "http://192.168.1.177:8000")
+                                    .putString("custom_base_url", "http://192.168.1.12:8000")
                                     .apply()
-                                Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.177:8000)", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.12:8000)", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),

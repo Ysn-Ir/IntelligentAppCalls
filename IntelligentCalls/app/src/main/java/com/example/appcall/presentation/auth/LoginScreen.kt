@@ -143,16 +143,16 @@ fun LoginScreen(
                             }
                             Button(
                                 onClick = {
-                                    serverUrl = "http://192.168.1.177:8000"
-                                    prefs.edit().putString("custom_base_url", "http://192.168.1.177:8000").apply()
-                                    android.widget.Toast.makeText(context, "Mode Wi-Fi activé (192.168.1.177:8000)", android.widget.Toast.LENGTH_SHORT).show()
+                                    serverUrl = "http://192.168.1.12:8000"
+                                    prefs.edit().putString("custom_base_url", "http://192.168.1.12:8000").apply()
+                                    android.widget.Toast.makeText(context, "Mode Wi-Fi activé (192.168.1.12:8000)", android.widget.Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
                                 shape = RoundedCornerShape(6.dp),
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                             ) {
-                                Text("📶 Wi-Fi (192.168.1.177)", color = Color(0xFF60A5FA), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Wi-Fi (192.168.1.12)", color = Color(0xFF60A5FA), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Button(
                                 onClick = {
