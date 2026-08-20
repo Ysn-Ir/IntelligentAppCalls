@@ -240,9 +240,15 @@ To ensure crystal-clear 2-way call audio on Samsung Galaxy devices running Andro
 - Filter chat context by specific contact or search across all calls.
 - Sources citation badge indicating which call the answer was derived from.
 
-### 7. ⚙️ Settings (Paramètres & Mon Profil)
+### 7. ⚙️ Settings (Paramètres, Profil & Multi-Fournisseur VoIP)
 - **Mon Profil & Identifiants**: View active account avatar/initials, edit user information (Prénom, Nom, Email, Téléphone), and change account password securely with old password validation.
-- **Twilio Cloud Telephony (2-Way HD)**: Instant toggle to activate carrier-level dual-channel recording with custom Account SID, Auth Token, Virtual Phone Number, and TwiML App SID.
+- **Universal Cloud Telephony & Multi-VoIP**: Full support for any cloud VoIP provider with dynamic switching:
+  - 🔵 **Twilio** (TwiML Dual-Channel HD + REST Call Bridge)
+  - 🟢 **Telnyx** (TeXML + Call Control v2 API)
+  - 🟣 **Plivo** (Plivo XML + Voice API)
+  - 🟠 **Vonage / Nexmo** (NCCO JSON + Voice Application API)
+  - ⚪ **SignalWire** (SWML / TwiML)
+  - 🏢 **SIP Trunk / PBX Gateway** (Asterisk, FreePBX, 3CX, Cisco Webhook Ingestion)
 - **Shizuku API Elevation**: Live Shizuku ADB service connection detector and permission granter.
 - **Server URL & Connectivity**: USB / Wi-Fi mode selector with instant connection tester (`/health`).
 - **GDPR Privacy Suite**: Article 15 JSON data export and Article 17 full account & audio records purge (`Droit à l'oubli`).
