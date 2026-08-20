@@ -536,14 +536,16 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             }
 
                             val title = when {
-                                matched?.contactName != null && matched.contactName.isNotBlank() && !matched.contactName.startsWith("Appel") ->
+                                matched?.contactName != null && matched.contactName.isNotBlank() &&
+                                !matched.contactName.equals("Appel Téléphonique", ignoreCase = true) &&
+                                !matched.contactName.equals("Appel", ignoreCase = true) &&
+                                !matched.contactName.equals("native", ignoreCase = true) &&
+                                !matched.contactName.equals("Contact", ignoreCase = true) ->
                                     "Appel avec ${matched.contactName}"
-                                matched?.contactName != null && matched.contactName.isNotBlank() ->
-                                    matched.contactName
                                 rawName.startsWith("Appel_") -> {
                                     val clean = rawName.removePrefix("Appel_").removeSuffix(".mp4").removeSuffix(".wav").removeSuffix(".m4a")
                                     val parts = clean.split("_")
-                                    if (parts.isNotEmpty() && parts[0].isNotBlank() && !parts[0].all { it.isDigit() }) {
+                                    if (parts.isNotEmpty() && parts[0].isNotBlank() && !parts[0].all { it.isDigit() } && !parts[0].equals("native", ignoreCase = true)) {
                                         "Appel avec ${parts[0].replace("-", " ")}"
                                     } else {
                                         "Appel Enregistré"
@@ -574,6 +576,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             )
                         }
 
+                        // Share Button
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
@@ -600,6 +603,38 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.Share, contentDescription = strings.shareRecording, tint = Text2, modifier = Modifier.size(14.dp))
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        // Delete Button
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(Surface2)
+                                .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                                .clickable {
+                                    try {
+                                        if (isPlayingThis) {
+                                            mediaPlayer?.stop()
+                                            mediaPlayer?.release()
+                                            mediaPlayer = null
+                                            currentlyPlayingPath = null
+                                        }
+                                        if (file.delete()) {
+                                            audioFiles = getRecordingsList()
+                                            Toast.makeText(context, "Enregistrement supprimé", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Impossible de supprimer le fichier", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Erreur suppression: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = strings.delete, tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
                         }
                     }
 
