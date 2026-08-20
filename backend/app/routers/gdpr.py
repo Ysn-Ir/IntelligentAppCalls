@@ -57,9 +57,9 @@ def delete_call_gdpr(id: str, user_id: str = Depends(verify_token), db: Session 
 
 @router.delete("/api/v1/contacts/{id}/data")
 def erase_contact_gdpr(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    """RGPD — Anonymise un contact et supprime son historique d'appels."""
+    """RGPD — Anonymise un contact et supprime tout l'historique d'appels lié."""
     contact = db.query(Contact).filter(Contact.id == id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact introuvable")
     result = erase_contact_data(id, db)
-    return {"status": "deleted", "summary": result}
+    return {"status": "erased", "summary": result}
