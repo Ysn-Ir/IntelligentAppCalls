@@ -1,346 +1,344 @@
-# 🌐 Guide Complet d'Hébergement, Déploiement & Architecture des Données
-## Intelligent Calls — Mise en Production, Schémas de Base de Données & Flux Réseau
+# 🌐 Complete Hosting, Deployment & Database Architecture Guide
+## Intelligent Calls — Production Setup, Database Schemas & Zero-Recompilation Routing
 
 ---
 
-## 📑 Sommaire
+## 📑 Table of Contents
 
-1. [Vue d'Ensemble de l'Infrastructure & Topologie Réseau](#1-vue-densemble-de-linfrastructure--topologie-réseau)
-2. [Où se Trouvent les Données ? (Détails des Bases de Données)](#2-où-se-trouvent-les-données--détails-des-bases-de-données)
-   - [2.1 Base de Données Serveur (MySQL / PostgreSQL / SQLite)](#21-base-de-données-serveur-mysql--postgresql--sqlite)
-   - [2.2 Schéma Détaillé des Tables Backend (SQLAlchemy)](#22-schéma-détaillé-des-tables-backend-sqlalchemy)
-   - [2.3 Base de Données Locale Android (SQLite)](#23-base-de-données-locale-android-sqlite)
-3. [Flux de Données de Bout en Bout (Dataflow)](#3-flux-de-données-de-bout-en-bout-dataflow)
-4. [Que Faut-il Modifier pour Remplacer `localhost` ?](#4-que-faut-il-modifier-pour-remplacer-localhost-)
-5. [Options d'Hébergement & Déploiement du Serveur Backend](#5-options-dhébergement--déploiement-du-serveur-backend)
-   - [Option A : Hébergement Cloud Gratuit / Clé en Main (Railway / Render / Fly.io)](#option-a--hébergement-cloud-gratuit--clé-en-main-railway--render--flyio)
-   - [Option B : Serveur VPS Dédié (Ubuntu 22.04 / 24.04 + Docker + Nginx SSL)](#option-b--serveur-vps-dédié-ubuntu-2204--2404--docker--nginx-ssl)
-   - [Option C : Tunnel Sécurisé Gratuit depuis votre PC (Cloudflare Tunnel / Ngrok)](#option-c--tunnel-sécurisé-gratuit-depuis-votre-pc-cloudflare-tunnel--ngrok)
-6. [Déploiement du Dashboard Web (Next.js 16) sur Vercel](#6-déploiement-du-dashboard-web-nextjs-16-sur-vercel)
-7. [Fichier de Variables d'Environnement de Production (`.env`)](#7-fichier-de-variables-denvironnement-de-production-env)
+1. [Infrastructure Topology & Network Flow](#1-infrastructure-topology--network-flow)
+2. [Where is the Data Stored? (Database Details)](#2-where-is-the-data-stored-database-details)
+   - [2.1 Server Database (MySQL / PostgreSQL / SQLite)](#21-server-database-mysql--postgresql--sqlite)
+   - [2.2 Detailed Backend Table Schemas (SQLAlchemy)](#22-detailed-backend-table-schemas-sqlalchemy)
+   - [2.3 Android Local Database (SQLite)](#23-android-local-database-sqlite)
+3. [End-to-End Dataflow & Call Lifecycle](#3-end-to-end-dataflow--call-lifecycle)
+4. [How to Replace `localhost` (Zero Recompilation)](#4-how-to-replace-localhost-zero-recompilation)
+5. [Hosting & Deployment Options for FastAPI Backend](#5-hosting--deployment-options-for-fastapi-backend)
+   - [Option A: Free / Managed Cloud (Railway / Render / Fly.io)](#option-a-free--managed-cloud-railway--render--flyio)
+   - [Option B: Dedicated VPS (Ubuntu 22.04 / 24.04 + Docker + Nginx SSL)](#option-b-dedicated-vps-ubuntu-2204--2404--docker--nginx-ssl)
+   - [Option C: Free Secure Tunnel from Your PC (Cloudflare Tunnel / Ngrok)](#option-c-free-secure-tunnel-from-your-pc-cloudflare-tunnel--ngrok)
+6. [Deploying the Web Dashboard (Next.js 16) on Vercel](#6-deploying-the-web-dashboard-nextjs-16-on-vercel)
+7. [Production Environment Variables Reference (`.env`)](#7-production-environment-variables-reference-env)
 
 ---
 
-## 1. Vue d'Ensemble de l'Infrastructure & Topologie Réseau
+## 1. Infrastructure Topology & Network Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    TOPOLOGIE GLOBALE                                   │
+│                                   GLOBAL TOPOLOGY                                      │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                        │
-│   [Smartphone Android]               [Dashboard Web Next.js]                           │
-│   (En mobilité 4G/5G/Wi-Fi)          (Navigateur Chrome/Safari)                        │
+│   [Android Smartphone]               [Next.js Web Dashboard]                           │
+│   (On 4G / 5G / Wi-Fi)               (Chrome / Safari Browser)                         │
 │            │                                    │                                      │
 │            │ HTTPS / WSS                        │ HTTPS (Vercel)                       │
 │            ▼                                    ▼                                      │
 │   ┌─────────────────────────────────────────────────────────┐                          │
-│   │              REVERSE PROXY NGINX / CLOUDFLARE           │                          │
+│   │              NGINX / CLOUDFLARE REVERSE PROXY           │                          │
 │   │              (SSL / HTTPS / Port 443 / WSS)             │                          │
 │   └────────────────────────────┬────────────────────────────┘                          │
 │                                │ Reverse Proxy (Port 8000)                             │
 │                                ▼                                                       │
 │   ┌─────────────────────────────────────────────────────────┐                          │
-│   │             BACKEND FASTAPI (Python 3.12)               │                          │
-│   │             (Uvicorn Worker / Asynchrone)               │                          │
+│   │             FASTAPI BACKEND (Python 3.12)               │                          │
+│   │             (Uvicorn Worker / Async Engine)             │                          │
 │   └───────────────┬─────────────────────────┬───────────────┘                          │
 │                   │                         │                                          │
 │                   ▼                         ▼                                          │
 │   ┌───────────────────────────────┐ ┌────────────────────────────────┐                 │
-│   │   BASE DE DONNÉES MYSQL       │ │      GROQ INFERENCE CLOUD      │                 │
+│   │   MYSQL DATABASE              │ │      GROQ INFERENCE CLOUD      │                 │
 │   │   (appcall_db / Port 3306)    │ │   - Whisper Large v3 Turbo     │                 │
 │   │   - Users & Contacts          │ │   - GPT-OSS 120B / LLaMA 3.3   │                 │
-│   │   - Calls, Transcripts, RDV   │ └────────────────────────────────┘                 │
+│   │   - Calls, Transcripts, RDVs  │ └────────────────────────────────┘                 │
 │   └───────────────────────────────┘                                                    │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Où se Trouvent les Données ? (Détails des Bases de Données)
+## 2. Where is the Data Stored? (Database Details)
 
-Le système utilise **deux niveaux de bases de données synchronisées** :
+The architecture maintains **two synchronized database layers**:
 
-### 2.1 Base de Données Serveur (MySQL / PostgreSQL / SQLite)
-- **Localisation** : Sur le serveur hébergeant le backend FastAPI (par défaut MySQL sur le port `3306`, base `appcall_db`).
-- **Configuration** : Définie dans le fichier `backend/.env` via la variable `DATABASE_URL`.
-  - Format MySQL : `mysql+pymysql://<user>:<password>@<host>:3306/appcall_db`
-  - Format PostgreSQL : `postgresql://<user>:<password>@<host>:5432/appcall_db`
-  - Format SQLite (fichier unique sans serveur) : `sqlite:///./appcall_db.sqlite3`
+### 2.1 Server Database (MySQL / PostgreSQL / SQLite)
+- **Location**: On the host running FastAPI (default MySQL on port `3306`, database `appcall_db`).
+- **Configuration**: Defined in `backend/.env` via the `DATABASE_URL` parameter.
+  - MySQL format: `mysql+pymysql://<user>:<password>@<host>:3306/appcall_db`
+  - PostgreSQL format: `postgresql://<user>:<password>@<host>:5432/appcall_db`
+  - SQLite format (single file without server): `sqlite:///./appcall_db.sqlite3`
 
-### 2.2 Schéma Détaillé des Tables Backend (SQLAlchemy)
+### 2.2 Detailed Backend Table Schemas (SQLAlchemy)
 
 ```mermaid
 erDiagram
-    users ||--o{ calls : passes
-    users ||--o{ contacts : gere
-    users ||--o{ tasks : assigne
-    users ||--o{ agenda_items : organise
-    users ||--o{ files : televerse
-    users ||--o{ reminders : configure
-    users ||--o{ audit_logs : declenche
+    users ||--o{ calls : makes
+    users ||--o{ contacts : owns
+    users ||--o{ tasks : assigns
+    users ||--o{ agenda_items : organizes
+    users ||--o{ files : uploads
+    users ||--o{ reminders : configures
+    users ||--o{ audit_logs : triggers
 
-    contacts ||--o{ calls : est_associe
-    calls ||--o| transcripts : possede
-    calls ||--o| call_summaries : genere
-    call_summaries ||--o| appointments : extrait
+    contacts ||--o{ calls : linked_to
+    calls ||--o| transcripts : contains
+    calls ||--o| call_summaries : generates
+    call_summaries ||--o| appointments : extracts
 
     users {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(255) email UK "Email de connexion"
-        VARCHAR(255) hashed_password "Bcrypt hash"
-        VARCHAR(255) full_name "Nom complet"
-        BOOLEAN is_active "Compte actif"
-        BOOLEAN is_superuser "Admin"
-        BOOLEAN gdpr_voice_consent "Consentement vocal global"
-        DATETIME created_at "Horodatage création"
-        DATETIME updated_at "Horodatage modification"
+        VARCHAR(255) email UK "Login email"
+        VARCHAR(255) hashed_password "Bcrypt password hash"
+        VARCHAR(255) full_name "Full name"
+        BOOLEAN is_active "Active status"
+        BOOLEAN is_superuser "Admin flag"
+        BOOLEAN gdpr_voice_consent "Global voice GDPR consent"
+        DATETIME created_at "Created timestamp"
+        DATETIME updated_at "Updated timestamp"
     }
 
     contacts {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(100) first_name "Prénom"
-        VARCHAR(100) last_name "Nom"
-        VARCHAR(50) phone_number "Numéro E.164"
-        VARCHAR(255) email "Email"
-        VARCHAR(255) company "Entreprise"
-        BOOLEAN gdpr_consent "Consentement contact"
-        DATETIME gdpr_consent_date "Date consentement"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(100) first_name "First name"
+        VARCHAR(100) last_name "Last name"
+        VARCHAR(50) phone_number "E.164 phone number"
+        VARCHAR(255) email "Email address"
+        VARCHAR(255) company "Company name"
+        BOOLEAN gdpr_consent "Contact consent flag"
+        DATETIME gdpr_consent_date "Consent timestamp"
     }
 
     calls {
-        VARCHAR(36) id PK "UUID ou ID natif (native-timestamp)"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(36) contact_id FK "Lien contact"
-        VARCHAR(20) direction "INBOUND ou OUTBOUND"
-        DATETIME started_at "Date et heure de début"
-        DATETIME ended_at "Date et heure de fin"
+        VARCHAR(36) id PK "UUID or native ID (native-timestamp)"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(36) contact_id FK "Contact relation"
+        VARCHAR(20) direction "INBOUND or OUTBOUND"
+        DATETIME started_at "Call start timestamp"
+        DATETIME ended_at "Call end timestamp"
         VARCHAR(20) status "INITIATED, RECORDING, COMPLETED"
-        BOOLEAN consent_given "Consentement d'enregistrement"
-        DATETIME consent_timestamp "Horodatage du consentement"
-        JSON twilio_params "Métadonnées d'appel (numéro, nom)"
-        VARCHAR(512) audio_url "URL ou chemin local de l'audio"
+        BOOLEAN consent_given "Call recording consent flag"
+        DATETIME consent_timestamp "Consent recorded timestamp"
+        JSON twilio_params "Call metadata (caller_id, contact_name)"
+        VARCHAR(512) audio_url "Local path or remote URL to audio"
         VARCHAR(20) ai_status "PENDING, PROCESSING, DONE, FAILED"
     }
 
     transcripts {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) call_id FK "Lien appel (Unique)"
-        LONGTEXT raw_text "Texte complet transcrit par Whisper"
-        VARCHAR(10) language "Code langue (fr, en...)"
-        FLOAT confidence_score "Score de confiance (ex: 98.5%)"
-        JSON speaker_segments "Tableau des segments horodatés et diarisés"
-        DATETIME created_at "Date transcription"
+        VARCHAR(36) call_id FK "Call relation (Unique)"
+        LONGTEXT raw_text "Full transcript text from Whisper"
+        VARCHAR(10) language "Language code (fr, en, etc.)"
+        FLOAT confidence_score "Confidence score (e.g., 98.5%)"
+        JSON speaker_segments "Diarized timestamped speaker segments"
+        DATETIME created_at "Created timestamp"
     }
 
     call_summaries {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) call_id FK "Lien appel (Unique)"
-        LONGTEXT summary_text "Résumé IA synthétique et contextuel"
+        VARCHAR(36) call_id FK "Call relation (Unique)"
+        LONGTEXT summary_text "Contextual synthesis generated by LLM"
         VARCHAR(20) status "PROPOSED, VALIDATED, MODIFIED, CONFIRMED"
-        FLOAT confidence_score "Score de confiance du résumé"
-        VARCHAR(36) detected_appointment_id "ID du RDV détecté associé"
-        DATETIME created_at "Date de génération"
+        FLOAT confidence_score "Summary confidence score"
+        VARCHAR(36) detected_appointment_id "Associated appointment ID"
+        DATETIME created_at "Created timestamp"
     }
 
     appointments {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) call_summary_id FK "Lien résumé d'appel"
-        VARCHAR(255) title "Objet du rendez-vous (ex: Signature contrat)"
-        DATETIME scheduled_at "Date et heure ISO-8601 du RDV"
+        VARCHAR(36) call_summary_id FK "Summary relation"
+        VARCHAR(255) title "Subject of the meeting / contract"
+        DATETIME scheduled_at "ISO-8601 appointment datetime"
         VARCHAR(20) status "PROPOSED, CONFIRMED, CANCELLED, DISMISSED"
-        VARCHAR(255) contact_name "Nom de l'interlocuteur"
-        VARCHAR(50) phone_number "Numéro de téléphone"
-        TEXT summary_context "Extrait contextuel de la discussion"
+        VARCHAR(255) contact_name "Contact name"
+        VARCHAR(50) phone_number "Contact phone number"
+        TEXT summary_context "Extracted context snippet"
     }
 
     tasks {
-        VARCHAR(36) id PK "UUID ou task_id local"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(255) title "Description de la tâche"
-        BOOLEAN completed "Statut de complétion (0 ou 1)"
-        DATETIME due_date "Date d'échéance optionnelle"
+        VARCHAR(36) id PK "UUID or local task_id"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(255) title "Task description"
+        BOOLEAN completed "Completion status (0 or 1)"
+        DATETIME due_date "Optional due date"
         VARCHAR(20) priority "LOW, MEDIUM, HIGH"
     }
 
     agenda_items {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(255) title "Titre de l'événement"
-        DATETIME scheduled_at "Date et heure de l'événement"
-        VARCHAR(255) contact_name "Nom du contact"
-        VARCHAR(50) phone_number "Numéro associé"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(255) title "Event title"
+        DATETIME scheduled_at "Event datetime"
+        VARCHAR(255) contact_name "Contact name"
+        VARCHAR(50) phone_number "Associated phone number"
         VARCHAR(20) status "CONFIRMED, TENTATIVE"
     }
 
     files {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(255) filename "Nom original du fichier"
-        VARCHAR(512) stored_path "Chemin sur le disque serveur"
-        BIGINT file_size "Taille en octets"
-        VARCHAR(100) mime_type "Type MIME"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(255) filename "Original filename"
+        VARCHAR(512) stored_path "Path on server storage"
+        BIGINT file_size "File size in bytes"
+        VARCHAR(100) mime_type "MIME type"
     }
 
     audit_logs {
         VARCHAR(36) id PK "UUID"
-        VARCHAR(36) user_id FK "Lien utilisateur"
-        VARCHAR(100) action "Type d'action (LOGIN, EXPORT, PURGE...)"
-        VARCHAR(50) ip_address "Adresse IP"
-        TEXT details "Détails de l'action"
-        DATETIME timestamp "Horodatage"
+        VARCHAR(36) user_id FK "User relation"
+        VARCHAR(100) action "Action type (LOGIN, EXPORT, PURGE...)"
+        VARCHAR(50) ip_address "IP address"
+        TEXT details "Action details"
+        DATETIME timestamp "Timestamp"
     }
 ```
 
-### 2.3 Base de Données Locale Android (SQLite)
-- **Localisation** : Dans la mémoire interne de l'application Android : `/data/data/com.example.appcall/databases/appcall_local.db`.
-- **Rôle** : Fournir l'affichage instantané sans latence, le fonctionnement hors-ligne (mode avion) et la file d'attente d'upload `sync_queue`.
+### 2.3 Android Local Database (SQLite)
+- **Location**: In the app's sandboxed private storage: `/data/data/com.example.appcall/databases/appcall_local.db`.
+- **Role**: Provides zero-latency UI rendering, complete offline mode (airplane mode), and the `sync_queue` table for caching audio files until network reconnection.
 
 ---
 
-## 3. Flux de Données de Bout en Bout (Dataflow)
+## 3. End-to-End Dataflow & Call Lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as Contact Téléphonique
-    actor User as Commercial / Utilisateur Android
-    participant App as Application Android
-    participant SQLite as SQLite Local (appcall_local.db)
-    participant Backend as Serveur FastAPI
-    participant DB as Base MySQL (appcall_db)
-    participant Groq as Moteur IA Groq Cloud
+    actor Client as Phone Contact / Client
+    actor User as Sales Agent / Android User
+    participant App as Android Mobile App
+    participant SQLite as Local SQLite (appcall_local.db)
+    participant Backend as FastAPI Server
+    participant DB as MySQL Database (appcall_db)
+    participant Groq as Groq AI Cloud
 
-    User->>Client: Appel téléphonique PSTN
-    App->>App: Interception & Enregistrement Audio (.m4a)
-    User->>Client: Fin de l'appel (Raccrochage)
+    User->>Client: PSTN Phone Call
+    App->>App: Intercepts & Records Audio (.m4a)
+    User->>Client: Call Ends (Hangup)
     
-    App->>SQLite: Enregistrement immédiat (Statut: PENDING)
-    App->>Backend: POST /api/v1/calls/{id}/audio (Fichier + Headers Contact)
+    App->>SQLite: Instant Local Save (Status: PENDING)
+    App->>Backend: POST /api/v1/calls/{id}/audio (Multipart File + Contact Headers)
     
-    Backend->>DB: Sauvegarde de l'appel (ai_status = PROCESSING)
+    Backend->>DB: Saves Call Record (ai_status = PROCESSING)
     Backend->>Groq: Audio Stream ➔ Whisper Large v3 Turbo
-    Groq-->>Backend: Transcription textuelle + Segments diarisés
+    Groq-->>Backend: Raw Text + Diarized Segments
     Backend->>DB: INSERT INTO transcripts (raw_text, speaker_segments)
     
-    Backend->>Groq: Prompt Transcription ➔ LLM Cascade (GPT-OSS 120B / LLaMA 3.3)
-    Groq-->>Backend: JSON Structuré (Résumé + Rendez-vous détecté)
+    Backend->>Groq: Transcript Prompt ➔ LLM Cascade (GPT-OSS 120B / LLaMA 3.3)
+    Groq-->>Backend: Structured JSON (Summary + Extracted Appointment)
     Backend->>DB: INSERT INTO call_summaries & appointments
     Backend->>DB: UPDATE calls SET ai_status = 'DONE'
     
     App->>Backend: Polling GET /api/v1/calls/{id}/summary
-    Backend-->>App: 200 OK (Résumé + Transcription + RDV)
-    App->>SQLite: Mise à jour du cache local
-    App->>User: Affichage du résumé, bulles de dialogue et bouton validation RDV
+    Backend-->>App: 200 OK (Summary + Transcript + Appointment)
+    App->>SQLite: Updates Local SQLite Cache
+    App->>User: Displays Summary, Dialogue Bubbles & One-Click RDV Validation Card
 ```
 
 ---
 
-## 4. Que Faut-il Modifier pour Remplacer `localhost` ?
+## 4. How to Replace `localhost` (Zero Recompilation)
 
-Par défaut, l'application est configurée pour pointer vers `http://127.0.0.1:8000` (pour émulateur) ou `http://192.168.1.12:8000` (pour réseau local Wi-Fi).
+By default, the application is pre-configured to point to `http://127.0.0.1:8000` (for emulator) or `http://192.168.1.12:8000` (for local Wi-Fi testing).
 
-### 📱 1. Dans l'Application Android (AUCUNE RECOMPILATION NÉCESSAIRE !)
-L'application intègre un intercepteur dynamique d'URL ([DynamicUrlInterceptor.kt](file:///c:/Users/khali/OneDrive/Bureau/intelligentCall/IntelligentCalls/app/src/main/java/com/example/appcall/data/api/DynamicUrlInterceptor.kt)) :
+### 📱 1. On the Android App (NO RECOMPILATION NEEDED!)
+The app includes a dynamic URL interceptor ([DynamicUrlInterceptor.kt](file:///c:/Users/khali/OneDrive/Bureau/intelligentCall/IntelligentCalls/app/src/main/java/com/example/appcall/data/api/DynamicUrlInterceptor.kt)):
 
-1. Ouvrez l'application Android sur votre téléphone.
-2. Sur l'écran de **Connexion (Login)** ou dans la section **Paramètres (Settings)** :
-   - Cliquez sur **"Changer l'adresse du serveur"** (ou le champ d'URL du serveur).
-   - Entrez simplement votre adresse d'hébergement publique (ex: `https://api.monserveur.com` ou `https://mon-app.up.railway.app`).
-   - Appuyez sur **Enregistrer**.
-3. **Toutes les requêtes Retrofit, d'upload audio et de synchronisation basculent instantanément vers cette adresse !**
+1. Open the Android app on your phone.
+2. On the **Login Screen** or in the **Settings Screen**:
+   - Tap **"Change Server URL"** (or edit the Server URL field).
+   - Enter your public server URL (e.g. `https://api.yourdomain.com` or `https://your-app.up.railway.app`).
+   - Tap **Save**.
+3. **All Retrofit HTTP calls, audio uploads, and sync workers immediately route to your public server!**
 
-### ⚙️ 2. Dans le Backend (`backend/.env`)
-Mettez à jour le fichier `.env` sur le serveur :
+### ⚙️ 2. On the Backend Server (`backend/.env`)
+Update the `.env` file on your server:
 ```env
-# URL publique de votre serveur (utilisée pour les webhooks Twilio/Vonage et liens audio)
-SERVER_BASE_URL=https://api.monserveur.com
+# Public URL of your server (used for webhooks and audio URLs)
+SERVER_BASE_URL=https://api.yourdomain.com
 
-# Hôte d'écoute (0.0.0.0 pour accepter les connexions externes)
+# Listening host (0.0.0.0 accepts public incoming connections)
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
 
-# Autoriser les origines CORS (Dashboard Web et Mobile)
-CORS_ORIGINS=http://localhost:3000,https://dashboard.monserveur.com,https://mon-app.vercel.app
+# Allowed CORS origins
+CORS_ORIGINS=http://localhost:3000,https://dashboard.yourdomain.com,https://your-app.vercel.app
 
-# Connexion à la base de données de production
-DATABASE_URL=mysql+pymysql://admin_calls:MonSuperMotDePasse@localhost:3306/appcall_db
+# Production Database Connection
+DATABASE_URL=mysql+pymysql://appcall_user:YourSecurePassword2026!@localhost:3306/appcall_db
 
-# Clé API Groq Cloud (Production)
-GROQ_API_KEY=gsk_votre_cle_groq_reelle
+# Production Groq API Key
+GROQ_API_KEY=gsk_your_production_groq_key
 ```
 
-### 💻 3. Dans le Dashboard Web (`dashboard/.env.local`)
+### 💻 3. On the Web Dashboard (`dashboard/.env.local`)
 ```env
-NEXT_PUBLIC_API_URL=https://api.monserveur.com
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```
 
 ---
 
-## 5. Options d'Hébergement & Déploiement du Serveur Backend
+## 5. Hosting & Deployment Options for FastAPI Backend
 
 ---
 
-### Option A : Hébergement Cloud Gratuit / Clé en Main (Railway / Render / Fly.io)
-> 💡 **Idéal pour une mise en ligne en 5 minutes sans gérer de serveur Linux, avec HTTPS automatique inclus.**
+### Option A: Free / Managed Cloud (Railway / Render / Fly.io)
+> 💡 **Best for deploying in 5 minutes with zero Linux server management and automatic HTTPS.**
 
-#### Déploiement sur Railway :
-1. Créez un compte sur [railway.app](https://railway.app).
-2. Cliquez sur **"New Project"** $\rightarrow$ **"Deploy from GitHub repo"** $\rightarrow$ Sélectionnez `IntelligentAppCalls`.
-3. Définissez le **Root Directory** sur `/backend`.
-4. Ajoutez un plugin **MySQL** (ou **PostgreSQL**) dans le tableau de bord Railway.
-5. Dans l'onglet **Variables**, ajoutez :
+#### Deploying on Railway:
+1. Create an account on [railway.app](https://railway.app).
+2. Click **"New Project"** $\rightarrow$ **"Deploy from GitHub repo"** $\rightarrow$ Select `IntelligentAppCalls`.
+3. Set **Root Directory** to `/backend`.
+4. Add a **MySQL** (or **PostgreSQL**) database plugin in Railway.
+5. In the **Variables** tab, add:
    - `DATABASE_URL` = `${{MySQL.DATABASE_URL}}`
    - `GROQ_API_KEY` = `gsk_...`
-   - `JWT_SECRET` = `une_cle_secrete_aleatoire_tres_longue`
+   - `JWT_SECRET` = `a_long_random_64_char_secret_key`
    - `CORS_ORIGINS` = `*`
-6. Railway génère une URL publique HTTPS (ex : `https://intelligent-calls-production.up.railway.app`).
-7. **Copiez cette URL et collez-la dans l'application Android !**
+6. Railway generates a public HTTPS URL (e.g. `https://intelligent-calls-production.up.railway.app`).
+7. **Paste this URL into your Android app!**
 
 ---
 
-### Option B : Serveur VPS Dédié (Ubuntu 22.04 / 24.04 + Docker + Nginx SSL)
-> 🛡️ **Idéal pour la souveraineté des données, conformité RGPD européenne et performances maximales (Hetzner, OVH, DigitalOcean, AWS EC2).**
+### Option B: Dedicated VPS (Ubuntu 22.04 / 24.04 + Docker + Nginx SSL)
+> 🛡️ **Best for data sovereignty, GDPR compliance, and maximum performance (Hetzner, OVH, DigitalOcean, AWS EC2).**
 
-#### 1. Configuration Initiale du Serveur Ubuntu
+#### 1. Server Setup on Ubuntu
 ```bash
-# Mettre à jour le système
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-pip python3-venv git nginx certbot python3-certbot-nginx mysql-server
 
-# Sécuriser MySQL
+# Secure MySQL
 sudo mysql_secure_installation
 ```
 
-#### 2. Création de la Base de Données MySQL
+#### 2. Create MySQL Database
 ```sql
 sudo mysql -u root -p
 CREATE DATABASE appcall_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'appcall_user'@'localhost' IDENTIFIED BY 'MotDePasseTresSecurise2026!';
+CREATE USER 'appcall_user'@'localhost' IDENTIFIED BY 'YourSecurePassword2026!';
 GRANT ALL PRIVILEGES ON appcall_db.* TO 'appcall_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
-#### 3. Clonage & Installation du Backend
+#### 3. Clone & Setup Backend
 ```bash
 cd /var/www
 sudo git clone https://github.com/Ysn-Ir/IntelligentAppCalls.git
 cd IntelligentAppCalls/backend
 
-# Créer l'environnement virtuel Python
+# Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Créer le fichier de configuration .env
+# Configure .env
 cp .env.example .env
 nano .env
 ```
-*(Renseignez votre `DATABASE_URL=mysql+pymysql://appcall_user:MotDePasseTresSecurise2026!@localhost:3306/appcall_db` et votre `GROQ_API_KEY`)*.
 
-#### 4. Configuration du Service Systemd (Redémarrage Automatique)
-Créez le fichier `/etc/systemd/system/intelligent-calls.service` :
+#### 4. Configure Systemd Service (Auto-Restart)
+Create `/etc/systemd/system/intelligent-calls.service`:
 ```ini
 [Unit]
 Description=Intelligent Calls FastAPI Backend
@@ -357,7 +355,7 @@ Environment=PYTHONUNBUFFERED=1
 [Install]
 WantedBy=multi-user.target
 ```
-Activez et démarrez le service :
+Enable and start the service:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable intelligent-calls
@@ -365,11 +363,11 @@ sudo systemctl start intelligent-calls
 sudo systemctl status intelligent-calls
 ```
 
-#### 5. Configuration Nginx & Certificat SSL Gratuit Let's Encrypt
-Créez le fichier `/etc/nginx/sites-available/api.votredomaine.com` :
+#### 5. Nginx & Free Let's Encrypt SSL
+Create `/etc/nginx/sites-available/api.yourdomain.com`:
 ```nginx
 server {
-    server_name api.votredomaine.com;
+    server_name api.yourdomain.com;
 
     client_max_body_size 50M;
 
@@ -385,79 +383,78 @@ server {
     }
 }
 ```
-Activez le site et générez le certificat SSL HTTPS :
+Enable site and obtain SSL certificate:
 ```bash
-sudo ln -s /etc/nginx/sites-available/api.votredomaine.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/api.yourdomain.com /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d api.votredomaine.com
+sudo certbot --nginx -d api.yourdomain.com
 ```
 
 ---
 
-### Option C : Tunnel Sécurisé Gratuit depuis votre PC (Cloudflare Tunnel / Ngrok)
-> 🚀 **Idéal pour tester immédiatement l'application sur un vrai téléphone en 4G sans payer de serveur ni ouvrir de ports sur votre box Internet.**
+### Option C: Free Secure Tunnel from Your PC (Cloudflare Tunnel / Ngrok)
+> 🚀 **Best for testing immediately on a physical phone in 4G/5G without paying for a server or opening router ports.**
 
-#### Utilisation de Cloudflare Tunnel (100% Gratuit & Illimité) :
-1. Téléchargez `cloudflared` pour Windows :
+#### Using Cloudflare Tunnel (100% Free & Unlimited):
+1. Install `cloudflared` on Windows:
    ```powershell
    winget install Cloudflare.cloudflared
    ```
-2. Lancez le tunnel directement sur le port de votre backend (8000) :
+2. Start the tunnel targeting your local backend port:
    ```powershell
    cloudflared tunnel --url http://localhost:8000
    ```
-3. Cloudflare vous fournit instantanément une URL HTTPS publique sécurisée du type :
-   `https://random-words-1234.trycloudflare.com`
-4. **Tapez cette URL dans votre application Android : vos appels en 4G/5G se synchroniseront immédiatement avec votre PC !**
+3. Cloudflare gives you a secure HTTPS URL (e.g. `https://random-name-1234.trycloudflare.com`).
+4. **Type this URL into your Android app: live calls recorded over 4G/5G will sync straight to your PC!**
 
 ---
 
-## 6. Déploiement du Dashboard Web (Next.js 16) sur Vercel
+## 6. Deploying the Web Dashboard (Next.js 16) on Vercel
 
-1. Créez un compte sur [vercel.com](https://vercel.com).
-2. Importez votre dépôt GitHub `IntelligentAppCalls`.
-3. Configurez le **Root Directory** sur `dashboard`.
-4. Ajoutez la variable d'environnement :
-   - `NEXT_PUBLIC_API_URL` = `https://api.votredomaine.com` (ou l'URL Railway/Cloudflare)
-5. Cliquez sur **Deploy**. Votre dashboard CRM web est en ligne et connecté au backend.
+1. Create an account on [vercel.com](https://vercel.com).
+2. Import your GitHub repository `IntelligentAppCalls`.
+3. Set **Root Directory** to `dashboard`.
+4. Add Environment Variable:
+   - `NEXT_PUBLIC_API_URL` = `https://api.yourdomain.com` (or your Railway/Cloudflare URL)
+5. Click **Deploy**. Your CRM analytics web dashboard is live.
 
 ---
 
-## 7. Fichier de Variables d'Environnement de Production (`.env`)
+## 7. Production Environment Variables Reference (`.env`)
 
 ```env
 # ==============================================================================
-# CONFIGURATION SERVEUR ET API
+# SERVER AND API CONFIGURATION
 # ==============================================================================
 ENVIRONMENT=production
-SERVER_BASE_URL=https://api.votredomaine.com
+SERVER_BASE_URL=https://api.yourdomain.com
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
-CORS_ORIGINS=https://dashboard.votredomaine.com,http://localhost:3000
+CORS_ORIGINS=https://dashboard.yourdomain.com,http://localhost:3000
 
 # ==============================================================================
-# BASE DE DONNÉES MYSQL DE PRODUCTION
+# PRODUCTION MYSQL DATABASE
 # ==============================================================================
-DATABASE_URL=mysql+pymysql://appcall_user:MotDePasseTresSecurise2026!@localhost:3306/appcall_db
+DATABASE_URL=mysql+pymysql://appcall_user:YourSecurePassword2026!@localhost:3306/appcall_db
 
 # ==============================================================================
-# AUTHENTIFICATION & SÉCURITÉ JWT
+# AUTHENTICATION & JWT SECURITY
 # ==============================================================================
-JWT_SECRET=super_cle_secrete_production_a_remplacer_par_une_chaine_aleatoire_64_bits
+JWT_SECRET=super_secret_64_character_random_hex_string_for_production
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=43200
 
 # ==============================================================================
-# MOTEURS IA CLOUD GROQ (STT WHISPER & LLM CASCADE)
+# GROQ CLOUD AI ENGINES (WHISPER STT & CASCADE LLMS)
 # ==============================================================================
-GROQ_API_KEY=gsk_votre_cle_groq_production
+GROQ_API_KEY=gsk_your_real_production_groq_key
 GROQ_BASE_URL=https://api.groq.com/openai/v1
 GROQ_MODEL=openai/gpt-oss-120b
 GROQ_FALLBACK_MODEL=llama-3.3-70b-versatile
 GROQ_STT_MODEL=whisper-large-v3-turbo
 
 # ==============================================================================
-# STOCKAGE AUDIO & RGPD
+# AUDIO STORAGE & GDPR POLICIES
 # ==============================================================================
 AUDIO_UPLOAD_DIR=./uploads
 GDPR_DATA_RETENTION_DAYS=365

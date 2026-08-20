@@ -1,155 +1,155 @@
-# 📜 Journal d'Évolution, Technologies & Résolution des Problèmes
-## Intelligent Calls — Historique Détaillé des Incidents, Causes Racines & Solutions Techniques
+# 📜 Project History, Technologies & Incident Resolution Log
+## Intelligent Calls — Comprehensive Engineering Log, Root Cause Analyses & Technical Solutions
 
 ---
 
-## 📑 Sommaire
+## 📑 Table of Contents
 
-1. [Matrice des Technologies & Modèles IA Utilisés](#1-matrice-des-technologies--modèles-ia-utilisés)
-2. [Journal Chronologique des Problèmes & Solutions Implémentées](#2-journal-chronologique-des-problèmes--solutions-implémentées)
-   - [Incident #1 : Données Factices (Mocks) & Stickers Inutiles](#incident-1--données-factices-mocks--stickers-inutiles)
-   - [Incident #2 : Numéro Fixé (+212716194292) Écrasant Tous les Appels](#incident-2--numéro-fixé-212716194292-écrasant-tous-les-appels)
-   - [Incident #3 : Assistant IA Bloqué sur une Réponse Unique (Erreur 500)](#incident-3--assistant-ia-bloqué-sur-une-réponse-unique-erreur-500)
-   - [Incident #4 : Absence de Persistance Hors-Ligne des Transcriptions & Synchronisation](#incident-4--absence-de-persistance-hors-ligne-des-transcriptions--synchronisation)
-   - [Incident #5 : Gestion des Appels Silencieux et Affichage du Résumé](#incident-5--gestion-des-appels-silencieux-et-affichage-du-résumé)
-   - [Incident #6 : Séparation Profil vs Paramètres & Gestion Avancée des Tâches](#incident-6--séparation-profil-vs-paramètres--gestion-avancée-des-tâches)
-3. [Tableau de Synthèse des Composants & Statuts Actuels](#3-tableau-de-synthèse-des-composants--statuts-actuels)
+1. [Technology Matrix & AI Model Stack](#1-technology-matrix--ai-model-stack)
+2. [Chronological Problem, Root Cause & Solution Log](#2-chronological-problem-root-cause--solution-log)
+   - [Incident #1: Mock Data Placeholders & Non-Professional Stickers](#incident-1-mock-data-placeholders--non-professional-stickers)
+   - [Incident #2: Stuck Fixed Phone Number (+212716194292) Overwriting All Calls](#incident-2-stuck-fixed-phone-number-212716194292-overwriting-all-calls)
+   - [Incident #3: AI Assistant Stuck on a Single Static Response (HTTP 500)](#incident-3-ai-assistant-stuck-on-a-single-static-response-http-500)
+   - [Incident #4: Missing Offline Local Persistence for Transcripts & Sync Gaps](#incident-4-missing-offline-local-persistence-for-transcripts--sync-gaps)
+   - [Incident #5: Handling Silent / Low-Speech Calls and Summary Display](#incident-5-handling-silent--low-speech-calls-and-summary-display)
+   - [Incident #6: User Profile vs Settings Separation & Advanced Task Deletion](#incident-6-user-profile-vs-settings-separation--advanced-task-deletion)
+3. [Component Status & Verification Summary](#3-component-status--verification-summary)
 
 ---
 
-## 1. Matrice des Technologies & Modèles IA Utilisés
+## 1. Technology Matrix & AI Model Stack
 
-### 📱 Client Mobile (Android)
-| Technologie / Bibliothèque | Version / Outil | Usage & Rôle dans le Projet |
+### 📱 Android Mobile Client
+| Technology / Library | Version / Tool | Usage & Role in the Project |
 | :--- | :--- | :--- |
-| **Kotlin** | `2.0+` | Langage principal de développement natif Android |
-| **Jetpack Compose** | `Material 3` | Interface utilisateur déclarative, design glassmorphism sombre, zéro XML |
-| **Hilt / Dagger** | `2.51+` | Injection de dépendances modulaire (Singleton, ViewModelScoped) |
-| **SQLite Local** | `SQLiteOpenHelper v8` | Moteur de base de données hors-ligne (`appcall_local.db`), cache et file d'attente |
-| **Retrofit 2 & OkHttp 3** | `2.9.0` | Client HTTP REST, WebSockets streaming et envoi multipart de fichiers audio |
-| **Shizuku & Knox Privileged** | `v13.5+` | Élévation de privilèges pour l'interception audio directe et microphone sécurisé |
+| **Kotlin** | `2.0+` | Primary language for native Android development |
+| **Jetpack Compose** | `Material 3` | Declarative UI, dark glassmorphism theme, 100% Kotlin (Zero XML) |
+| **Hilt / Dagger** | `2.51+` | Dependency injection across Singletons and ViewModels |
+| **Local SQLite** | `SQLiteOpenHelper v8` | Offline database (`appcall_local.db`), cache engine, and sync queue |
+| **Retrofit 2 & OkHttp 3** | `2.9.0` | REST client, WebSockets streaming, multipart audio upload |
+| **Shizuku & Knox Elevation** | `v13.5+` | Privilege elevation for native audio call recording and mic capture |
 | **Android Telephony & Telecom** | `API 34/35` | `PhoneStateBroadcastReceiver`, `TelecomManager`, `ContactsContract` |
-| **Coroutines & StateFlow** | `1.8+` | Traitement asynchrone, réactivité UI, polling d'état IA non bloquant |
+| **Coroutines & StateFlow** | `1.8+` | Asynchronous concurrency, non-blocking UI state management |
 
-### ⚙️ Serveur Backend
-| Technologie / Bibliothèque | Version | Usage & Rôle |
+### ⚙️ Backend Server
+| Technology / Library | Version | Usage & Role |
 | :--- | :--- | :--- |
-| **Python** | `3.12` | Runtime backend haute performance |
-| **FastAPI** | `0.110+` | Framework API REST & WebSocket asynchrone |
-| **Uvicorn** | `0.29+` | Serveur ASGI de production avec rechargement à chaud |
-| **SQLAlchemy** | `2.0+` | ORM relationnel pour la persistance des données |
-| **PyMySQL** | `1.1+` | Pilote de connexion à la base de données MySQL / MariaDB |
-| **Passlib & Bcrypt** | `1.7+` | Hachage cryptographique des mots de passe utilisateurs |
-| **PyJWT** | `2.8+` | Génération et validation des jetons d'accès JWT |
+| **Python** | `3.12` | High-performance backend runtime |
+| **FastAPI** | `0.110+` | Async REST API & WebSocket streaming framework |
+| **Uvicorn** | `0.29+` | Production ASGI server with hot reload |
+| **SQLAlchemy** | `2.0+` | Relational ORM for schema definitions and data persistence |
+| **PyMySQL** | `1.1+` | Pure Python MySQL / MariaDB database driver |
+| **Passlib & Bcrypt** | `1.7+` | Cryptographic password hashing and verification |
+| **PyJWT** | `2.8+` | JWT token generation, encoding and decoding |
 
-### 🧠 Modèles d'Intelligence Artificielle (Groq Inference Cloud)
-| Modèle / Moteur | Rôle Spécifique | Temps de Réponse Moyen |
+### 🧠 Cloud AI Models (Groq Inference Engine)
+| Model / Engine | Specific Role | Average Latency |
 | :--- | :--- | :--- |
-| **Groq `whisper-large-v3-turbo`** | Speech-to-Text (STT) haute précision avec diarisation des interlocuteurs (`Agent` / `Client`) | ~1.1s pour 60s d'audio |
-| **`openai/gpt-oss-120b`** | Modèle LLM principal pour la synthèse d'appels et l'extraction stricte de RDV | ~1.5s |
-| **`llama-3.3-70b-versatile`** | Fallback LLM de niveau 1 pour la génération de résumés structurés en français | ~1.2s |
-| **`openai/gpt-oss-20b`** | Fallback LLM de niveau 2 (haute disponibilité) | ~0.8s |
-| **Moteur RAG Contextuel** | Injection dynamique des Tâches, Agenda, Contacts et Transcriptions dans le Chatbot | Instantané (< 50ms) |
+| **Groq `whisper-large-v3-turbo`** | Speech-to-Text (STT) with multi-speaker diarization (`Agent` / `Contact`) | ~1.1s for 60s audio |
+| **`openai/gpt-oss-120b`** | Primary LLM for call synthesis and strict ISO-8601 appointment extraction | ~1.5s |
+| **`llama-3.3-70b-versatile`** | Fallback LLM tier 1 for structured French summaries | ~1.2s |
+| **`openai/gpt-oss-20b`** | Fallback LLM tier 2 for high availability | ~0.8s |
+| **Contextual RAG Engine** | Dynamic real-time context injection (Tasks, Agenda, Contacts, Transcripts) into the Chatbot | Instant (< 50ms) |
 
 ---
 
-## 2. Journal Chronologique des Problèmes & Solutions Implémentées
+## 2. Chronological Problem, Root Cause & Solution Log
 
 ---
 
-### Incident #1 : Données Factices (Mocks) & Stickers Inutiles
-* **Date de Détection** : Début du projet
-* **Symptômes** :
-  - Des contacts fictifs (*"Jean Dupont"*, *"Marie Martin"*, `+33612345678`) apparaissaient dans le carnet d'adresses et dans l'historique lors d'erreurs de connexion.
-  - L'interface contenait des stickers visuels non professionnels.
-* **Cause Racine** :
-  - Dans `CallViewModel.kt`, la méthode `loadContacts()` renvoyait une liste `listOf(Contact(...))` en dur en cas d'échec de lecture du carnet d'adresses.
-* **Solution Appliquée** :
-  - Remplacement complet des listes statiques par `emptyList()`.
-  - Connexion exclusive à `ContactsContract.PhoneLookup` et `CallLog.Calls` d'Android.
-  - Suppression de tous les stickers au profit d'un design moderne, sombre et épuré.
+### Incident #1: Mock Data Placeholders & Non-Professional Stickers
+* **Discovery**: Early development phase
+* **Symptoms**:
+  - Dummy mock contacts (*"Jean Dupont"*, *"Marie Martin"*, `+33612345678`) were shown in the address book and history during connection failures.
+  - UI displayed non-professional cartoonish AI stickers.
+* **Root Cause**:
+  - In `CallViewModel.kt`, `loadContacts()` returned a hardcoded `listOf(Contact(...))` fallback on error.
+* **Solution Implemented**:
+  - Removed all hardcoded contact lists, replacing fallbacks with `emptyList()`.
+  - Wired contact resolution exclusively to Android's real `ContactsContract.PhoneLookup` and `CallLog.Calls`.
+  - Removed all stickers in favor of a sleek, dark-themed dashboard.
 
 ---
 
-### Incident #2 : Numéro Fixé (+212716194292) Écrasant Tous les Appels
-* **Date de Détection** : Phase de test d'appels réels
-* **Symptômes** :
-  - Quel que soit le numéro composé sur le téléphone, le numéro `+212716194292` s'affichait systématiquement en grand en haut de l'historique et des résumés. Le vrai numéro composé n'apparaissait qu'en petit en dessous.
-* **Causes Racines Identifiées** :
-  1. **Fuite dans les SharedPreferences Android** : Dans `PhoneStateBroadcastReceiver.kt`, les clés `active_contact_name` et `active_phone_number` n'étaient jamais purgées lors du raccrochage (`EXTRA_STATE_IDLE`). Chaque nouvel appel héritait donc du nom/numéro du tout premier appel en cache.
-  2. **Priorisation Backend Inversée** : Dans `backend/app/routers/calls.py` (`get_calls`), le backend privilégiait le libellé de la table `Contact` même si celui-ci contenait une ancienne chaîne de numéro, au lieu du véritable numéro composé présent dans `twilio_params`.
-* **Solution Appliquée** :
-  - Nettoyage obligatoire de toutes les clés de contact temporaires dans `PhoneStateBroadcastReceiver.kt` sur l'événement `EXTRA_STATE_IDLE`.
-  - Lecture directe depuis `AppLocalDatabase.kt` (SQLite) pour l'envoi de l'enregistrement audio.
-  - Mise à jour de la logique backend dans `calls.py` pour afficher le nom du contact réel s'il existe, ou le numéro composé directement sans répétition.
-  - Script de nettoyage SQL exécuté pour corriger les anciens enregistrements croisés en base de données.
+### Incident #2: Stuck Fixed Phone Number (+212716194292) Overwriting All Calls
+* **Discovery**: Live call testing
+* **Symptoms**:
+  - Regardless of what number was dialed, `+212716194292` appeared as the primary title in call history and summaries. The actual dialed number only showed in small font below.
+* **Root Causes**:
+  1. **SharedPreferences Leak in Android**: In `PhoneStateBroadcastReceiver.kt`, keys `active_contact_name` and `active_phone_number` were never cleared upon call hangup (`EXTRA_STATE_IDLE`). Every subsequent call inherited the cached number.
+  2. **Inverted Backend Precedence**: In `backend/app/routers/calls.py` (`get_calls`), the backend prioritized the `Contact` model name even when it contained an old raw phone string instead of the real caller ID in `twilio_params`.
+* **Solution Implemented**:
+  - Cleared all active contact SharedPreferences immediately on `EXTRA_STATE_IDLE` in `PhoneStateBroadcastReceiver.kt`.
+  - Prioritized `AppLocalDatabase.kt` (SQLite) call records for audio recording upload headers.
+  - Updated backend `get_calls` precedence in `calls.py` to prioritize genuine human contact names or display the real dialed number cleanly without duplication.
+  - Executed a database migration script to repair mismatched call records.
 
 ---
 
-### Incident #3 : Assistant IA Bloqué sur une Réponse Unique (Erreur 500)
-* **Date de Détection** : Phase de test de l'Assistant Conversationnel
-* **Symptômes** :
-  - L'assistant IA répondait constamment la même phrase fixe : *"Je suis votre assistant Intelligent Calls..."*, ignorant les questions sur l'agenda ou les tâches.
-* **Causes Racines Identifiées** :
-  1. **Crash HTTP 500 côté Backend** : `backend/app/ai/chatbot.py` tentait d'importer `AgendaItem` depuis `app.database`, alors que le modèle SQLAlchemy se nomme `AgendaModel`. Cela provoquait un `ImportError` fatal à chaque appel `POST /api/v1/chat`.
-  2. **Bouchon de Secours Côté Client** : Dans `VoipRepositoryImpl.kt`, le bloc `catch` interceptait l'erreur HTTP 500 et renvoyait une réponse statique codée en dur au lieu de propager l'erreur ou d'utiliser le moteur RAG local.
-* **Solution Appliquée** :
-  - Correction des imports et de l'accès aux attributs (`scheduled_at`, `phone_number`) dans `chatbot.py`.
-  - Suppression de la chaîne de fallback statique dans `VoipRepositoryImpl.kt`.
-  - Implémentation d'un moteur RAG injectant le contexte réel de l'utilisateur (tâches réelles, rendez-vous réels, contacts réels).
+### Incident #3: AI Assistant Stuck on a Single Static Response (HTTP 500)
+* **Discovery**: AI Chatbot testing
+* **Symptoms**:
+  - The AI assistant constantly returned the same static greeting (*"Je suis votre assistant Intelligent Calls..."*), ignoring user questions regarding tasks and agenda.
+* **Root Causes**:
+  1. **HTTP 500 Backend Crash**: `backend/app/ai/chatbot.py` had an invalid `ImportError: AgendaItem` from `app.database` (the model is named `AgendaModel`). This crashed `POST /api/v1/chat` with HTTP 500.
+  2. **Client-Side Swallowed Failure**: In `VoipRepositoryImpl.kt`, the `catch` block swallowed the HTTP 500 error and returned a hardcoded static string.
+* **Solution Implemented**:
+  - Fixed model imports and attribute mappings (`scheduled_at`, `phone_number`) in `chatbot.py`.
+  - Removed hardcoded fallback strings in `VoipRepositoryImpl.kt`.
+  - Implemented dynamic contextual RAG injecting real tasks, agenda, contacts, and call history.
 
 ---
 
-### Incident #4 : Absence de Persistance Hors-Ligne des Transcriptions & Synchronisation
-* **Date de Détection** : Phase de test en mode Hors-Ligne (Mode Avion)
-* **Symptômes** :
-  - Les transcriptions n'étaient pas visibles hors-ligne.
-  - Lors de la reconnexion à Internet, les fichiers audio n'étaient pas toujours envoyés automatiquement.
-* **Causes Racines Identifiées** :
-  1. **Schéma SQLite Incomplet** : `appcall_local.db` ne disposait d'aucune colonne pour stocker `raw_transcript` ou `speaker_segments`.
-  2. **Blocage de Synchronisation sur Token Null** : Dans `OfflineSyncManager.kt`, un test `if (token.isNullOrBlank()) return;` annulait la synchronisation si le token n'était pas encore en mémoire.
-  3. **Manque d'En-têtes lors de l'Upload Différé** : Lors de l'envoi d'un audio stocké dans `sync_queue`, les métadonnées du contact n'étaient pas transmises au serveur.
-* **Solution Appliquée** :
-  - Ajout des colonnes `raw_transcript` et `speaker_segments` dans la table SQLite locale `calls` avec méthodes `saveTranscript()` et `getLocalTranscript()`.
-  - Ajout d'une gestion résiliente des tokens d'authentification dans `OfflineSyncManager.kt`.
-  - Association automatique des en-têtes `X-Contact-Name` et `X-Phone-Number` lors de la vidange de la file d'attente d'enregistrement.
-  - Implémentation du Pull bidirectionnel pour rapatrier les résumés et transcriptions calculés sur le serveur dès le retour de la connexion.
+### Incident #4: Missing Offline Local Persistence for Transcripts & Sync Gaps
+* **Discovery**: Offline / Airplane mode testing
+* **Symptoms**:
+  - Transcripts were unavailable when offline.
+  - Uploading queued offline recordings upon reconnecting sometimes failed to link to contacts.
+* **Root Causes**:
+  1. **Incomplete SQLite Schema**: `appcall_local.db` lacked columns for `raw_transcript` and `speaker_segments`.
+  2. **Null Token Guard Aborted Sync**: In `OfflineSyncManager.kt`, `if (token.isNullOrBlank()) return;` silently aborted sync when token wasn't yet loaded in memory.
+  3. **Missing Contact Headers on Deferred Upload**: Audio uploads queued in `sync_queue` lacked `X-Contact-Name` and `X-Phone-Number` headers.
+* **Solution Implemented**:
+  - Added `raw_transcript` and `speaker_segments` columns to SQLite `calls` table with `saveTranscript()` and `getLocalTranscript()` methods.
+  - Added resilient authorization fallback handling in `OfflineSyncManager.kt`.
+  - Attached real contact names and phone numbers to deferred uploads from the local SQLite database.
+  - Implemented bidirectional pull sync to download newly processed transcripts and summaries from the server upon reconnection.
 
 ---
 
-### Incident #5 : Gestion des Appels Silencieux et Affichage du Résumé
-* **Date de Détection** : Test d'appels courts / sans parole
-* **Symptômes** :
-  - Lorsqu'un appel enregistré ne contenait aucun mot distinct (silence ou bruit de fond), Whisper renvoyait `...` et l'écran de résumé semblait vide ou figé.
-* **Cause Racine** :
-  - L'interface `SummaryScreen.kt` n'avait pas de composant visuel explicite pour signaler l'absence de parole détectée, rendant l'état ambigu pour l'utilisateur.
-* **Solution Appliquée** :
-  - Ajout d'une condition d'affichage explicite dans `SummaryScreen.kt` :
+### Incident #5: Handling Silent / Low-Speech Calls and Summary Display
+* **Discovery**: Testing short / silent recordings
+* **Symptoms**:
+  - When a recording contained no audible speech, Whisper returned `...` and the summary was `"Aucun détail d'appel fourni."`, displaying as an empty block on screen.
+* **Root Cause**:
+  - `SummaryScreen.kt` lacked explicit handling for empty or silence transcripts.
+* **Solution Implemented**:
+  - Added explicit status display in `SummaryScreen.kt`:
     `"Aucune parole distincte détectée dans cet enregistrement."`
-  - Affichage dynamique des bulles de dialogue avec timestamps et identification des interlocuteurs dès que des paroles sont transcrites.
+  - Rendered timestamped dialogue bubbles with speaker badges (`Agent` / `Contact`) as soon as speech segments are transcribed.
 
 ---
 
-### Incident #6 : Séparation Profil vs Paramètres & Gestion Avancée des Tâches
-* **Date de Détection** : Revue d'ergonomie UI/UX
-* **Symptômes** :
-  - Les paramètres mélangeaient le profil utilisateur, les réglages Shizuku et la configuration audio.
-  - Les tâches ne disposaient pas de bouton de suppression.
-* **Solution Appliquée** :
-  - Ajout d'un bouton de suppression pour chaque tâche (`DELETE /api/v1/tasks/{id}`) avec mise à jour immédiate de la base SQLite et de la file de synchronisation.
-  - Séparation claire dans l'interface entre la carte **Profil Utilisateur** et la section **Paramètres Avancés** (Source audio, Shizuku, Élévation Knox, Exports RGPD).
+### Incident #6: User Profile vs Settings Separation & Advanced Task Deletion
+* **Discovery**: UI/UX ergonomics review
+* **Symptoms**:
+  - Settings screen mixed user profile information with advanced Shizuku and audio configurations.
+  - Tasks lacked a delete action.
+* **Solution Implemented**:
+  - Added a delete button on each task (`DELETE /api/v1/tasks/{id}`) with immediate SQLite and sync queue updates.
+  - Separated the **User Profile** card from the **Advanced Settings** section (Audio source, Shizuku, Knox elevation, GDPR data exports).
 
 ---
 
-## 3. Tableau de Synthèse des Composants & Statuts Actuels
+## 3. Component Status & Verification Summary
 
-| Fonctionnalité / Module | Statut | Résultat des Tests |
+| Feature / Module | Status | Verification Result |
 | :--- | :---: | :--- |
-| **Interception & Enregistrement Audio** | **OPÉRATIONNEL** | 100% fonctionnel sur appels entrants & sortants |
-| **Résolution Nom & Numéro de Contact** | **OPÉRATIONNEL** | Priorité au carnet d'adresses réel, zéro nom figé |
-| **Speech-to-Text (Whisper Large v3 Turbo)** | **OPÉRATIONNEL** | Vitesse ~1.1s, score de confiance > 96% |
-| **Résumé & Détection de RDV (Cascade LLM)** | **OPÉRATIONNEL** | Extraction dynamique date, heure, objet, statut |
-| **Assistant RAG & Chatbot** | **OPÉRATIONNEL** | Réponses contextuelles basées sur les vraies données |
-| **Moteur Hors-Ligne & Synchronisation** | **OPÉRATIONNEL** | Cache SQLite intégral, reprise auto sur `NetworkCallback` |
-| **Audit des 35 Endpoints Backend** | **100% SUCCÈS** | Score : 35/35 endpoints validés |
-| **Compilation Android Debug** | **100% SUCCÈS** | `BUILD SUCCESSFUL` (0 erreurs) |
+| **Call Interception & Recording** | **OPERATIONAL** | 100% functional on inbound & outbound PSTN calls |
+| **Contact Name & Phone Resolution** | **OPERATIONAL** | Real address book prioritized, zero stuck numbers |
+| **Speech-to-Text (Whisper Large v3 Turbo)** | **OPERATIONAL** | Latency ~1.1s, confidence score > 96% |
+| **Call Summary & RDV Extraction (Cascade LLM)** | **OPERATIONAL** | Dynamic extraction of date, time, subject, status |
+| **Contextual RAG Chatbot** | **OPERATIONAL** | Real-time factual answers based on actual data |
+| **Offline-First Engine & Sync Queue** | **OPERATIONAL** | Full SQLite caching, automatic `NetworkCallback` sync |
+| **Backend Integration Audit (35 Endpoints)** | **100% PASS** | Score: 35/35 endpoints passing |
+| **Android Compilation** | **100% PASS** | `BUILD SUCCESSFUL` (0 errors) |

@@ -1,8 +1,8 @@
 # IntelligentAppCalls 📞🤖
 
-> 📖 **Consultez la [Documentation d'Architecture Détaillée (ARCHITECTURE.md)](ARCHITECTURE.md) pour les diagrammes Mermaid, les flux hors-ligne et les 35 endpoints de l'API.**  
-> 📜 **Consultez le [Journal d'Évolution & Résolution des Problèmes (PROJECT_HISTORY_LOG.md)](PROJECT_HISTORY_LOG.md) pour l'historique complet des technologies, des causes racines et des solutions apportées.**  
-> 🌐 **Consultez le [Guide d'Hébergement & Déploiement (HOSTING_AND_DEPLOYMENT_GUIDE.md)](HOSTING_AND_DEPLOYMENT_GUIDE.md) pour la mise en production, la configuration des bases de données et le remplacement de localhost.**
+> 📖 **Read the [Detailed Architecture Documentation (ARCHITECTURE.md)](ARCHITECTURE.md) for full Mermaid diagrams, offline dataflows, and all 35 API endpoints.**  
+> 📜 **Read the [Engineering & Incident Resolution Log (PROJECT_HISTORY_LOG.md)](PROJECT_HISTORY_LOG.md) for the complete technology matrix and root-cause solutions.**  
+> 🌐 **Read the [Hosting & Deployment Guide (HOSTING_AND_DEPLOYMENT_GUIDE.md)](HOSTING_AND_DEPLOYMENT_GUIDE.md) for production setup, database schemas, and zero-recompilation server routing.**
 
 **IntelligentAppCalls** is a state-of-the-art, end-to-end AI telephony intelligence platform. It seamlessly combines:
 1. **Android Client (Kotlin + Jetpack Compose)**: Native PSTN SIM-card call recording (with Samsung Knox process elevation), live speech transcription, offline SQLite cache, task manager, and dynamic agenda calendar.
