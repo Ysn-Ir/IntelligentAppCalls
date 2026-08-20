@@ -255,6 +255,11 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     AppScreen.DASHBOARD -> {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+                        var appLanguageCode by remember { mutableStateOf(netPrefs.getString("app_language", "en") ?: "en") }
+                        val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+
                         Scaffold(
                             bottomBar = {
                                 NavigationBar(
@@ -263,11 +268,11 @@ class MainActivity : ComponentActivity() {
                                     tonalElevation = 0.dp
                                 ) {
                                     val sections = listOf(
-                                        Triple("Appels", Icons.Default.Call, 0),
-                                        Triple("Assistant IA", Icons.Default.Face, 1),
-                                        Triple("Agenda", Icons.Default.Menu, 2),
-                                        Triple("Tâches", Icons.Default.Check, 3),
-                                        Triple("Paramètres", Icons.Default.Settings, 4)
+                                        Triple(strings.navCalls, Icons.Default.Call, 0),
+                                        Triple(strings.navAssistant, Icons.Default.Face, 1),
+                                        Triple(strings.navAgenda, Icons.Default.Menu, 2),
+                                        Triple(strings.navTasks, Icons.Default.Check, 3),
+                                        Triple(strings.navSettings, Icons.Default.Settings, 4)
                                     )
                                     sections.forEach { (title, iconVector, index) ->
                                         val isSelected = selectedSection == index
@@ -339,6 +344,11 @@ class MainActivity : ComponentActivity() {
                                             voipRepository = voipRepository,
                                             shizukuManager = shizukuManager,
                                             currentThemeMode = currentThemeMode,
+                                            currentLanguage = appLanguageCode,
+                                            onLanguageChange = { newLang ->
+                                                appLanguageCode = newLang
+                                                netPrefs.edit().putString("app_language", newLang).apply()
+                                            },
                                             onThemeChange = { newMode -> currentThemeMode = newMode },
                                             onLogout = {
                                                 tokenStorage.clear()
@@ -1098,11 +1108,14 @@ fun SettingsSection(
     voipRepository: VoipRepository,
     shizukuManager: com.example.appcall.data.calling.ShizukuManager? = null,
     currentThemeMode: AppThemeMode = AppThemeMode.DARK,
+    currentLanguage: String = "en",
+    onLanguageChange: (String) -> Unit = {},
     onThemeChange: (AppThemeMode) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val strings = com.example.appcall.presentation.theme.getAppStrings(currentLanguage)
     var selectedTab by remember { mutableStateOf(0) } // 0: Profil & Préférences, 1: Paramètres Avancés
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showDeleteVoiceDialog by remember { mutableStateOf(false) }
@@ -1140,8 +1153,8 @@ fun SettingsSection(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Paramètres", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Text1)
-            Text("Profil, Thème, IA, VoIP, Réseau & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
+            Text(strings.settingsTitle, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Text1)
+            Text(strings.settingsSubtitle, fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
         }
 
         // ── TOP SEGMENTED TAB SELECTOR (PROFIL VS ADVANCED) ─────────────────────
@@ -1176,7 +1189,7 @@ fun SettingsSection(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Profil & Préférences",
+                            text = strings.profileTab,
                             color = if (isTab0) Text1 else Text3,
                             fontSize = 11.5.sp,
                             fontWeight = if (isTab0) FontWeight.Bold else FontWeight.Normal,
@@ -1207,7 +1220,7 @@ fun SettingsSection(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Paramètres Avancés",
+                            text = strings.advancedTab,
                             color = if (isTab1) Text1 else Text3,
                             fontSize = 11.5.sp,
                             fontWeight = if (isTab1) FontWeight.Bold else FontWeight.Normal,
@@ -1330,17 +1343,17 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("APPARENCE & THÈME", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                                Text("Personnalisez l'affichage visuel", color = Text2, fontSize = 11.5.sp)
+                                Text(strings.themeSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text(strings.themeSubtitle, color = Text2, fontSize = 11.5.sp)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val themeOptions = listOf(
-                            Triple(AppThemeMode.DARK, "Sombre", "Obscur"),
-                            Triple(AppThemeMode.LIGHT, "Clair", "Lumineux"),
-                            Triple(AppThemeMode.SYSTEM, "Système", "Auto")
+                            Triple(AppThemeMode.DARK, strings.themeDark, "Dark"),
+                            Triple(AppThemeMode.LIGHT, strings.themeLight, "Light"),
+                            Triple(AppThemeMode.SYSTEM, strings.themeSystem, "Auto")
                         )
 
                         Row(
@@ -1389,9 +1402,6 @@ fun SettingsSection(
 
             // ── 2.5 LANGUAGE & AI SPEECH (7 LANGUAGES + AUTO) ───────────────────
             item {
-                val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
-                var currentLanguage by remember { mutableStateOf(netPrefs.getString("app_language", "en") ?: "en") }
-
                 val languages = listOf(
                     Triple("en", "English 🇬🇧", "EN"),
                     Triple("fr", "Français 🇫🇷", "FR"),
@@ -1418,8 +1428,8 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("LANGUE & INTELLIGENCE IA", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                                Text("Transcription Whisper, Résumés IA & Assistant", color = Text2, fontSize = 11.5.sp)
+                                Text(strings.languageSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text(strings.languageSubtitle, color = Text2, fontSize = 11.5.sp)
                             }
                         }
 
@@ -1441,8 +1451,7 @@ fun SettingsSection(
                                                 .background(if (isSelected) AccentColor else Surface2)
                                                 .border(1.dp, if (isSelected) AccentColor else BorderColor, RoundedCornerShape(8.dp))
                                                 .clickable {
-                                                    currentLanguage = code
-                                                    netPrefs.edit().putString("app_language", code).apply()
+                                                    onLanguageChange(code)
                                                 }
                                                 .padding(vertical = 9.dp),
                                             contentAlignment = Alignment.Center
