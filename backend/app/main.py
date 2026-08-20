@@ -1269,14 +1269,21 @@ async def universal_voice_webhook(request: Request, provider: str = "universal",
     provider_name = provider.upper()
     try:
         data = {}
-        if request.headers.get("content-type", "").startswith("application/json"):
+        data.update(dict(request.query_params))
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
             try:
-                data = await request.json()
+                body_json = await request.json()
+                if isinstance(body_json, dict):
+                    data.update(body_json)
             except Exception:
-                data = {}
-        else:
-            form = await request.form()
-            data = dict(form)
+                pass
+        elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            try:
+                form = await request.form()
+                data.update(dict(form))
+            except Exception:
+                pass
 
         call_sid = data.get("CallSid") or data.get("call_control_id") or data.get("uuid") or f"{provider}_{uuid.uuid4().hex[:12]}"
         from_number = data.get("From") or data.get("from") or "+33100000000"
@@ -1348,14 +1355,21 @@ async def universal_recording_complete(request: Request, background_tasks: Backg
     """
     try:
         data = {}
-        if request.headers.get("content-type", "").startswith("application/json"):
+        data.update(dict(request.query_params))
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
             try:
-                data = await request.json()
+                body_json = await request.json()
+                if isinstance(body_json, dict):
+                    data.update(body_json)
             except Exception:
-                data = {}
-        else:
-            form = await request.form()
-            data = dict(form)
+                pass
+        elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            try:
+                form = await request.form()
+                data.update(dict(form))
+            except Exception:
+                pass
 
         call_sid = (
             data.get("CallSid") or
