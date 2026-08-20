@@ -1,5 +1,7 @@
 # IntelligentAppCalls 📞🤖
 
+> 📖 **Consultez la [Documentation d'Architecture Détaillée (ARCHITECTURE.md)](ARCHITECTURE.md) pour les diagrammes Mermaid, les flux hors-ligne et les 35 endpoints de l'API.**
+
 **IntelligentAppCalls** is a state-of-the-art, end-to-end AI telephony intelligence platform. It seamlessly combines:
 1. **Android Client (Kotlin + Jetpack Compose)**: Native PSTN SIM-card call recording (with Samsung Knox process elevation), live speech transcription, offline SQLite cache, task manager, and dynamic agenda calendar.
 2. **AI Telephony Backend (FastAPI + Groq / OpenAI)**: Audio processing, Whisper speech-to-text, French temporal reasoning for automatic appointment scheduling, LLM summarization, and vector RAG search.
