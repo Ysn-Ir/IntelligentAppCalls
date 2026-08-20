@@ -19,7 +19,7 @@ class AppLocalDatabase @Inject constructor(
     companion object {
         private const val TAG = "AppLocalDatabase"
         private const val DATABASE_NAME = "appcall_local.db"
-        private const val DATABASE_VERSION = 8
+        private const val DATABASE_VERSION = 9
 
         // Table Calls (Summaries cache)
         private const val TABLE_CALLS = "calls"
@@ -32,6 +32,11 @@ class AppLocalDatabase @Inject constructor(
         private const val KEY_APPOINTMENT_STATUS = "appointment_status"
         private const val KEY_RAW_TRANSCRIPT = "raw_transcript"
         private const val KEY_SPEAKER_SEGMENTS = "speaker_segments"
+        private const val KEY_SENTIMENT = "sentiment"
+        private const val KEY_INTENT = "intent"
+        private const val KEY_TAGS = "tags"
+        private const val KEY_CONTACT_NAME_CALL = "contact_name"
+        private const val KEY_PHONE_NUMBER_CALL = "phone_number"
 
         // Table Sync Queue
         private const val TABLE_SYNC_QUEUE = "sync_queue"
@@ -93,7 +98,12 @@ class AppLocalDatabase @Inject constructor(
                 $KEY_SUMMARY_STATUS TEXT,
                 $KEY_APPOINTMENT_ID TEXT,
                 $KEY_APPOINTMENT_DATE TEXT,
-                $KEY_APPOINTMENT_STATUS TEXT
+                $KEY_APPOINTMENT_STATUS TEXT,
+                $KEY_SENTIMENT TEXT,
+                $KEY_INTENT TEXT,
+                $KEY_TAGS TEXT,
+                $KEY_CONTACT_NAME_CALL TEXT,
+                $KEY_PHONE_NUMBER_CALL TEXT
             )
         """.trimIndent()
 
@@ -189,6 +199,21 @@ class AppLocalDatabase @Inject constructor(
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Safe migration: never drop user tables!
         onCreate(db)
+        try {
+            db.execSQL("ALTER TABLE $TABLE_CALLS ADD COLUMN $KEY_SENTIMENT TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_CALLS ADD COLUMN $KEY_INTENT TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_CALLS ADD COLUMN $KEY_TAGS TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_CALLS ADD COLUMN $KEY_CONTACT_NAME_CALL TEXT")
+        } catch (e: Exception) {}
+        try {
+            db.execSQL("ALTER TABLE $TABLE_CALLS ADD COLUMN $KEY_PHONE_NUMBER_CALL TEXT")
+        } catch (e: Exception) {}
         try {
             db.execSQL("ALTER TABLE $TABLE_AGENDA ADD COLUMN $KEY_AGENDA_CONTACT_NAME TEXT")
         } catch (e: Exception) {}
@@ -364,6 +389,11 @@ class AppLocalDatabase @Inject constructor(
             put(KEY_APPOINTMENT_ID, summary.detectedAppointmentId)
             put(KEY_APPOINTMENT_DATE, summary.appointment?.scheduledAt)
             put(KEY_APPOINTMENT_STATUS, summary.appointment?.status)
+            put(KEY_SENTIMENT, summary.sentiment)
+            put(KEY_INTENT, summary.intent)
+            put(KEY_TAGS, summary.tags.joinToString(","))
+            put(KEY_CONTACT_NAME_CALL, summary.contactName ?: summary.appointment?.contactName)
+            put(KEY_PHONE_NUMBER_CALL, summary.phoneNumber ?: summary.appointment?.phoneNumber)
         }
         db.insertWithOnConflict(TABLE_CALLS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
@@ -386,14 +416,45 @@ class AppLocalDatabase @Inject constructor(
                     )
                 } else null
 
+                val tagsRaw = try {
+                    val idx = it.getColumnIndex(KEY_TAGS)
+                    if (idx >= 0 && !it.isNull(idx)) it.getString(idx) else null
+                } catch (e: Exception) { null }
+                val tagsList = tagsRaw?.split(",")?.map { t -> t.trim() }?.filter { t -> t.isNotEmpty() } ?: emptyList()
+
+                val sentiment = try {
+                    val idx = it.getColumnIndex(KEY_SENTIMENT)
+                    if (idx >= 0 && !it.isNull(idx)) it.getString(idx) else null
+                } catch (e: Exception) { null }
+
+                val intent = try {
+                    val idx = it.getColumnIndex(KEY_INTENT)
+                    if (idx >= 0 && !it.isNull(idx)) it.getString(idx) else null
+                } catch (e: Exception) { null }
+
+                val contactName = try {
+                    val idx = it.getColumnIndex(KEY_CONTACT_NAME_CALL)
+                    if (idx >= 0 && !it.isNull(idx)) it.getString(idx) else null
+                } catch (e: Exception) { null }
+
+                val phoneNumber = try {
+                    val idx = it.getColumnIndex(KEY_PHONE_NUMBER_CALL)
+                    if (idx >= 0 && !it.isNull(idx)) it.getString(idx) else null
+                } catch (e: Exception) { null }
+
                 return CallSummary(
                     id = "local-sum-$callId",
                     callId = callId,
                     summaryText = it.getString(it.getColumnIndexOrThrow(KEY_SUMMARY_TEXT)) ?: "",
                     status = it.getString(it.getColumnIndexOrThrow(KEY_SUMMARY_STATUS)) ?: "PROPOSED",
+                    sentiment = sentiment,
+                    intent = intent,
+                    tags = tagsList,
                     confidenceScore = if (it.isNull(it.getColumnIndexOrThrow(KEY_CONFIDENCE_SCORE))) null else it.getDouble(it.getColumnIndexOrThrow(KEY_CONFIDENCE_SCORE)),
                     detectedAppointmentId = appointmentId,
-                    appointment = appointment
+                    appointment = appointment,
+                    contactName = contactName,
+                    phoneNumber = phoneNumber
                 )
             }
         }

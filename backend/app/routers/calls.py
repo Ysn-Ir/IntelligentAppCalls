@@ -379,10 +379,7 @@ def get_transcript(id: str, token: str = Depends(verify_token), db: Session = De
                 except Exception as e:
                     logger.warning(f"On-demand transcript failed for {candidate}: {e}")
 
-    summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
     raw_text = transcript.raw_text if (transcript and transcript.raw_text) else ""
-    if not raw_text and summary and summary.summary_text and not summary.summary_text.startswith("Traitement IA"):
-        raw_text = summary.summary_text
 
     segments = []
     if transcript and transcript.speaker_segments:
@@ -399,7 +396,7 @@ def get_transcript(id: str, token: str = Depends(verify_token), db: Session = De
         "call_id": id,
         "raw_text": raw_text,
         "language": transcript.language if transcript else "en",
-        "confidence_score": transcript.confidence_score if transcript else 90.0,
+        "confidence_score": transcript.confidence_score if transcript else 0.0,
         "speaker_segments": segments
     }
 

@@ -1037,7 +1037,6 @@ fun SummaryScreen(
 
                                  val segments = transcript?.speakerSegments
                                  val raw = transcript?.rawText?.trim()
-                                 val summaryRaw = summary.summaryText.takeIf { !it.startsWith("Traitement IA") }?.trim()
 
                                  if (!segments.isNullOrEmpty()) {
                                      Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1097,20 +1096,6 @@ fun SummaryScreen(
                                              .padding(14.dp)
                                      ) {
                                          Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
-                                     }
-                                 } else if (!summaryRaw.isNullOrBlank()) {
-                                     Box(
-                                         modifier = Modifier
-                                             .fillMaxWidth()
-                                             .clip(RoundedCornerShape(10.dp))
-                                             .background(Surface1)
-                                             .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                                             .padding(14.dp)
-                                     ) {
-                                         Column {
-                                             Text(text = summaryRaw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
-                                             Text(text = "Extrait de transcription issu de l'analyse IA", color = Text3, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-                                         }
                                      }
                                  } else {
                                      Row(

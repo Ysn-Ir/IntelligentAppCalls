@@ -192,27 +192,7 @@ class VoipRepositoryImpl @Inject constructor(
             val response = apiService.getCallSummary(auth, callId)
             if (response.isSuccessful && response.body() != null) {
                 val dto = response.body()!!
-                val appointment = dto.appointment?.let {
-                    com.example.appcall.domain.model.Appointment(
-                        id = it.id,
-                        contactId = it.contactId,
-                        scheduledAt = it.scheduledAt,
-                        status = it.status,
-                        title = it.title,
-                        summaryContext = it.summaryContext,
-                        phoneNumber = it.phoneNumber,
-                        contactName = it.contactName
-                    )
-                }
-                val summary = CallSummary(
-                    id = dto.id,
-                    callId = dto.callId,
-                    summaryText = dto.summaryText,
-                    status = dto.status,
-                    confidenceScore = dto.confidenceScore,
-                    detectedAppointmentId = dto.detectedAppointmentId,
-                    appointment = appointment
-                )
+                val summary = dto.toDomain()
                 // Cache locally only if real summary
                 if (dto.status != "PROCESSING" && !dto.summaryText.startsWith("Traitement IA")) {
                     localDatabase.saveCallSummary(summary)
