@@ -1387,6 +1387,85 @@ fun SettingsSection(
                 }
             }
 
+            // ── 2.5 LANGUAGE & AI SPEECH (7 LANGUAGES + AUTO) ───────────────────
+            item {
+                val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+                var currentLanguage by remember { mutableStateOf(netPrefs.getString("app_language", "en") ?: "en") }
+
+                val languages = listOf(
+                    Triple("en", "English 🇬🇧", "EN"),
+                    Triple("fr", "Français 🇫🇷", "FR"),
+                    Triple("ar", "العربية 🇸🇦", "AR"),
+                    Triple("es", "Español 🇪🇸", "ES"),
+                    Triple("de", "Deutsch 🇩🇪", "DE"),
+                    Triple("zh", "中文 🇨🇳", "ZH"),
+                    Triple("ja", "日本語 🇯🇵", "JA"),
+                    Triple("auto", "Auto 🌐", "AUTO")
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("LANGUE & INTELLIGENCE IA", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text("Transcription Whisper, Résumés IA & Assistant", color = Text2, fontSize = 11.5.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Grid of 8 options (4 rows of 2 or 2 rows of 4)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            languages.chunked(4).forEach { rowLangs ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    rowLangs.forEach { (code, title, shortLabel) ->
+                                        val isSelected = currentLanguage == code
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) AccentColor else Surface2)
+                                                .border(1.dp, if (isSelected) AccentColor else BorderColor, RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    currentLanguage = code
+                                                    netPrefs.edit().putString("app_language", code).apply()
+                                                }
+                                                .padding(vertical = 9.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    text = title,
+                                                    color = if (isSelected) Text1 else Text2,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── 3. PRÉFÉRENCES D'APPLICATION ────────────────────────────────────
             item {
                 Box(

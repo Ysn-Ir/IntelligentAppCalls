@@ -25,21 +25,33 @@ logger = logging.getLogger(__name__)
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 MAX_HISTORY = int(os.getenv("CHATBOT_MAX_HIST", "10"))
 
-CHATBOT_SYSTEM_PROMPT = """Tu es un assistant IA professionnel pour l'application Intelligent Calls.
-Tu as accès en temps réel aux données exactes de l'utilisateur :
-1. Ses Tâches (To-Do list)
-2. Son Agenda & Rendez-vous
-3. Son Carnet de Contacts (noms, numéros de téléphone, emails)
-4. Ses Résumés d'Appels récents & Transcriptions
+LANGUAGE_LABELS = {
+    "en": "English",
+    "fr": "French",
+    "ar": "Arabic",
+    "es": "Spanish",
+    "de": "German",
+    "zh": "Chinese",
+    "ja": "Japanese",
+}
 
-Règles strictes :
-- Réponds toujours en français, de manière claire, concise et professionnelle.
-- Réponds UNIQUEMENT sur la base des données réelles fournies dans le contexte ci-dessous.
-- Ne JAMAIS inventer de numéros de téléphone, de faux contacts ou de faux rendez-vous.
-- Si l'utilisateur demande ses tâches, liste-les fidèlement avec leur statut (terminée ou en cours).
-- Si l'utilisateur demande ses rendez-vous ou son agenda, liste les événements réels avec date et heure.
-- Si l'utilisateur demande les coordonnées d'un contact, donne son numéro de téléphone exact présent dans la liste de contacts.
-- Si une information demandée n'existe pas dans les données fournies, réponds honnêtement que l'information n'a pas été trouvée.
+def get_chatbot_system_prompt(language: str = "en") -> str:
+    lang_name = LANGUAGE_LABELS.get(language, "English")
+    return f"""You are an advanced enterprise AI assistant for the Intelligent Calls telephony platform.
+You have real-time access to the user's authentic CRM data:
+1. Tasks & To-Do list (with completion statuses)
+2. Agenda & Scheduled Appointments (dates, times, titles)
+3. Address Book & Contacts (names, verified phone numbers, emails, companies)
+4. Recent Call Summaries & Verbatim Transcriptions
+
+Strict Operating Rules:
+- Respond fluently, professionally, and concisely in {lang_name} (or match the user's inquiry language).
+- Base your answers STRICTLY on the authentic context provided below.
+- NEVER fabricate phone numbers, fake contacts, or hallucinated meetings.
+- If the user asks about their tasks, accurately list their tasks with their completed/pending status.
+- If the user asks about their appointments or agenda, list the real scheduled events with date and time.
+- If the user asks for a contact's info, provide their exact phone number or email from the context.
+- If the requested information is absent from the provided context, state clearly and honestly that the record was not found.
 """
 
 
@@ -61,6 +73,7 @@ def chat(
     contact_id: Optional[str],
     db,
     session_id: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> dict:
     """
     Processes a user message and returns an AI reply with source attribution.
@@ -132,21 +145,23 @@ def chat(
     chunks_text = "\n\n---\n\n".join(chunks_parts) if chunks_parts else "(Aucun extrait textuel supplémentaire)"
 
     # 7. Build Full System Context
-    target_contact_label = "Tous les contacts"
+    target_lang = language if language and language != "auto" else "en"
+    target_contact_label = "All Contacts"
     if contact_id:
         c_found = db.query(Contact).filter(Contact.id == contact_id).first()
         if c_found:
             target_contact_label = f"{c_found.first_name} {c_found.last_name} ({c_found.phone_number})"
 
+    system_instructions = get_chatbot_system_prompt(target_lang)
     full_context = (
-        f"{CHATBOT_SYSTEM_PROMPT}\n\n"
-        f"=== CONTEXTE ACTUEL DU COMPTE ===\n"
-        f"Filtre de contact actif : {target_contact_label}\n\n"
-        f"--- TÂCHES DE L'UTILISATEUR ---\n{tasks_text}\n\n"
-        f"--- AGENDA & RENDEZ-VOUS ---\n{agenda_text}\n\n"
-        f"--- CARNET DE CONTACTS ---\n{contacts_text}\n\n"
-        f"--- DERNIERS APPELS & RÉSUMÉS ---\n{calls_text}\n\n"
-        f"--- EXTRAITS DE TRANSCRIPTION PERTINENTS ---\n{chunks_text}\n"
+        f"{system_instructions}\n\n"
+        f"=== CURRENT USER ACCOUNT CONTEXT ===\n"
+        f"Active Contact Scope : {target_contact_label}\n\n"
+        f"--- USER TASKS ---\n{tasks_text}\n\n"
+        f"--- AGENDA & APPOINTMENTS ---\n{agenda_text}\n\n"
+        f"--- CONTACTS BOOK ---\n{contacts_text}\n\n"
+        f"--- RECENT CALLS & SUMMARIES ---\n{calls_text}\n\n"
+        f"--- RELEVANT TRANSCRIPT EXCERPTS ---\n{chunks_text}\n"
     )
 
     context_message = {"role": "system", "content": full_context}

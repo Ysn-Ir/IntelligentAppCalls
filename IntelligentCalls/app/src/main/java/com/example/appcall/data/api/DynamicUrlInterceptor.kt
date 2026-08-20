@@ -24,9 +24,19 @@ class DynamicUrlInterceptor @Inject constructor(
             prefs.edit().putString("custom_base_url", value).apply()
         }
 
+    var appLanguage: String
+        get() = prefs.getString("app_language", "en") ?: "en"
+        set(value) {
+            prefs.edit().putString("app_language", value).apply()
+        }
+
     override fun intercept(chain: Interceptor.Chain): Response {
         var request = chain.request()
         val rawCustomUrl = customBaseUrl?.trim()
+
+        val requestBuilder = request.newBuilder()
+            .header("X-App-Language", appLanguage)
+            .header("Accept-Language", appLanguage)
 
         if (!rawCustomUrl.isNullOrEmpty()) {
             var normalizedUrl = rawCustomUrl
@@ -40,9 +50,9 @@ class DynamicUrlInterceptor @Inject constructor(
                     .host(newHttpUrl.host)
                     .port(if (newHttpUrl.port != 80 && newHttpUrl.port != 443) newHttpUrl.port else if (rawCustomUrl.contains(":8000")) 8000 else newHttpUrl.port)
                     .build()
-                request = request.newBuilder().url(updatedUrl).build()
+                requestBuilder.url(updatedUrl)
             }
         }
-        return chain.proceed(request)
+        return chain.proceed(requestBuilder.build())
     }
 }

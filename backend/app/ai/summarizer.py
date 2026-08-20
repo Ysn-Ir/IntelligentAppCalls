@@ -27,45 +27,56 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
 
 # ─────────────────────────────────────────────
-# Dynamic System prompt
+# Multilingual Dynamic System prompt
 # ─────────────────────────────────────────────
 
-def get_system_prompt() -> str:
+LANGUAGE_LABELS = {
+    "en": "English",
+    "fr": "French",
+    "ar": "Arabic",
+    "es": "Spanish",
+    "de": "German",
+    "zh": "Chinese",
+    "ja": "Japanese",
+}
+
+def get_system_prompt(language: str = "en") -> str:
+    lang_name = LANGUAGE_LABELS.get(language, "English")
     now = datetime.utcnow()
     date_str = now.strftime("%A %d %B %Y")
     iso_date = now.strftime("%Y-%m-%d")
-    return f"""Tu es un assistant IA pour centre d'appels téléphoniques.
-Aujourd'hui nous sommes le {date_str} (Date ISO: {iso_date}).
+    return f"""You are an advanced AI assistant for enterprise telephony call intelligence.
+Today is {date_str} (ISO Date: {iso_date}).
 
-Tu DOIS analyser la transcription et répondre UNIQUEMENT en JSON valide, sans texte additionnel :
+You MUST analyze the call transcript and respond ONLY with valid JSON in {lang_name} language, with NO surrounding markdown or extra text:
 {{
-  "resume": "Résumé clair et professionnel de l'appel en 2-3 phrases.",
-  "sentiment": "POSITIF" | "NEUTRE" | "NEGATIF",
+  "resume": "Clear, objective, and professional call summary in 2-3 sentences written in {lang_name}.",
+  "sentiment": "POSITIVE" | "NEUTRAL" | "NEGATIVE",
   "rendez_vous": [
     {{
-      "titre": "Titre explicite du rendez-vous (ex: Point commercial avec Marc)",
-      "date": "YYYY-MM-DD (Calcule la date exacte selon la date d'aujourd'hui {iso_date})",
-      "heure": "HH:MM (ex: 14:00, 09:30, 16:00)",
+      "titre": "Explicit title/subject of the appointment or follow-up (in {lang_name})",
+      "date": "YYYY-MM-DD (Calculate exact date based on today's reference date {iso_date})",
+      "heure": "HH:MM (24h format, e.g. 14:00, 09:30, 16:00)",
       "confiance": 0.95
     }}
   ],
   "actions": [
-    "Action concrète à réaliser"
+    "Concrete action item to perform (in {lang_name})"
   ]
 }}
 
-Règles pour la détection de rendez-vous :
-- Si un rendez-vous, une réunion, un rappel, un appel de suivi ou une entrevue est convenu ou proposé, EXTRAIS-LE dans "rendez_vous".
-- Si l'interlocuteur mentionne "demain", "mardi", "vendredi prochain", calcule la date exacte YYYY-MM-DD.
-- Si une heure est mentionnée (ex: "14h", "14h30", "à 10 heures"), formate en HH:MM.
-- Mets "rendez_vous": [] uniquement si aucun rendez-vous/réunion/rappel n'est mentionné.
+Rules for appointment detection:
+- If an appointment, meeting, callback, client check-in, or follow-up is agreed upon or proposed, extract it under "rendez_vous".
+- If relative dates are mentioned ("tomorrow", "next Tuesday", "in 3 days", "après-demain", "غداً", "mañana", "morgen", "明天", "明日"), calculate the exact YYYY-MM-DD date.
+- Format all times in standard 24-hour HH:MM format.
+- Set "rendez_vous": [] ONLY if no appointment or follow-up is mentioned.
 """
 
 
 def _build_transcript_text(speaker_segments: list) -> str:
     """Formats speaker segments into a readable transcript for the AI."""
     if not speaker_segments:
-        return "(transcription vide)"
+        return "(empty transcript)"
     lines = []
     for seg in speaker_segments:
         speaker_label = "Agent" if seg.get("speaker") == "agent" else "Contact"
@@ -77,18 +88,13 @@ def _build_transcript_text(speaker_segments: list) -> str:
 # Core summarization
 # ─────────────────────────────────────────────
 
-def summarize_transcript(raw_text: str, speaker_segments: list) -> dict:
+def summarize_transcript(raw_text: str, speaker_segments: list, language: Optional[str] = None) -> dict:
     """
-    Calls GPT-4o-mini to summarize a call transcript.
+    Calls Groq LLMs to summarize a call transcript in the specified language.
+    Supported: 'en', 'fr', 'ar', 'es', 'de', 'zh', 'ja'.
+    """
+    target_lang = language if language and language != "auto" else "en"
 
-    Returns:
-    {
-        "resume": "...",
-        "sentiment": "POSITIF",
-        "rendez_vous": [...],
-        "actions": [...]
-    }
-    """
     try:
         from openai import OpenAI
     except ImportError:
@@ -101,20 +107,18 @@ def summarize_transcript(raw_text: str, speaker_segments: list) -> dict:
         return _fallback_summary(raw_text)
 
     base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
-    model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if api_key.startswith("gsk_") else OPENAI_MODEL
-
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=OPENAI_TIMEOUT)
 
     # Format transcript for the model
     transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
 
-    user_message = f"""Voici la transcription d'un appel téléphonique :
+    user_message = f"""Here is the transcription of a phone call:
 
 ---
 {transcript_text}
 ---
 
-Analyse cet appel et retourne le JSON demandé."""
+Analyze this call carefully and return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
 
     active_key = api_key
     primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
@@ -126,7 +130,7 @@ Analyse cet appel et retourne le JSON demandé."""
                 model=model,
                 response_format={"type": "json_object"},
                 messages=[
-                    {"role": "system", "content": get_system_prompt()},
+                    {"role": "system", "content": get_system_prompt(target_lang)},
                     {"role": "user", "content": user_message},
                 ],
                 temperature=0.2,
@@ -134,7 +138,7 @@ Analyse cet appel et retourne le JSON demandé."""
             )
             content = response.choices[0].message.content
             result = json.loads(content)
-            logger.info(f"AI summary generated with {model}: sentiment={result.get('sentiment')}, "
+            logger.info(f"AI summary generated with {model} (lang={target_lang}): sentiment={result.get('sentiment')}, "
                         f"rendez_vous={len(result.get('rendez_vous', []))}")
             return result
         except json.JSONDecodeError as e:
@@ -162,17 +166,16 @@ def _fallback_summary(raw_text: str) -> dict:
 # High-level entry point (called by worker.py)
 # ─────────────────────────────────────────────
 
-def summarize_call(call_id: str, db) -> "CallSummary":
+def summarize_call(call_id: str, db, language: Optional[str] = None) -> Optional["CallSummary"]:
     """
-    Reads the transcript for call_id, runs GPT summarization,
-    creates/updates CallSummary and Appointment rows in the DB.
+    High-level function: finds the transcript for call_id, runs summarize_transcript,
+    creates Appointment and CallSummary rows, commits to DB.
     """
-    from ..database import Transcript, CallSummary, Appointment, Call, Contact, AgendaModel
+    from ..database import CallSummary, Appointment, Transcript, Call, Contact, AgendaModel
 
-    # Load transcript
     transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
-    if not transcript:
-        logger.warning(f"No transcript found for call_id={call_id}, cannot summarize.")
+    if not transcript or not transcript.raw_text:
+        logger.warning(f"No transcript found for call_id={call_id}")
         return None
 
     speaker_segments = []
@@ -182,8 +185,8 @@ def summarize_call(call_id: str, db) -> "CallSummary":
         except json.JSONDecodeError:
             pass
 
-    # Run AI
-    result = summarize_transcript(transcript.raw_text, speaker_segments)
+    target_lang = language or transcript.language or "en"
+    result = summarize_transcript(transcript.raw_text, speaker_segments, language=target_lang)
 
     # Resolve contact_id and user_id from the Call row
     call = db.query(Call).filter(Call.id == call_id).first()

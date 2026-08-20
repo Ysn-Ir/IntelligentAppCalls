@@ -1,7 +1,7 @@
 import json as _json
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from ..database import Contact, ChatbotSession, get_db
 from ..ai.chatbot import chat as ai_chat, clear_session
@@ -41,11 +41,13 @@ def chat_with_contact(
         contact_id=contact_id,
         db=db,
         session_id=body.session_id,
+        language=x_app_language,
     )
 
 @router.post("/api/v1/chat")
 def global_chat(
     body: schemas.ChatRequest,
+    x_app_language: Optional[str] = Header(None),
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
@@ -55,6 +57,7 @@ def global_chat(
         contact_id=None,
         db=db,
         session_id=body.session_id,
+        language=x_app_language,
     )
 
 @router.get("/api/v1/contacts/{contact_id}/chat/history")

@@ -554,6 +554,7 @@ async def upload_audio(
     file: UploadFile = FastAPIFile(...),
     x_contact_name: Optional[str] = Header(None),
     x_phone_number: Optional[str] = Header(None),
+    x_app_language: Optional[str] = Header(None),
     token: str = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
@@ -631,9 +632,9 @@ async def upload_audio(
     def _run_pipeline():
         _db = SessionLocal()
         try:
-            logger.info(f"Starting AI pipeline for call_id={id}, path={local_path}")
-            t = transcribe_call(id, local_path, _db)
-            summarize_call(id, _db)
+            logger.info(f"Starting AI pipeline for call_id={id}, path={local_path}, lang={x_app_language or 'auto'}")
+            t = transcribe_call(id, local_path, _db, language=x_app_language)
+            summarize_call(id, _db, language=x_app_language)
             call_row = _db.query(Call).filter(Call.id == id).first()
             if call_row and call_row.contact_id and t:
                 try:

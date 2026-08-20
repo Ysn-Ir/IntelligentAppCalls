@@ -81,7 +81,18 @@ def _get_diarization():
     return _diarization_pipeline
 
 
-def _transcribe_groq(audio_path: str) -> Optional[dict]:
+SUPPORTED_LANGUAGES = {
+    "en": "en",
+    "fr": "fr",
+    "ar": "ar",
+    "es": "es",
+    "de": "de",
+    "zh": "zh",
+    "ja": "ja",
+    "auto": None
+}
+
+def _transcribe_groq(audio_path: str, language: Optional[str] = None) -> Optional[dict]:
     groq_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not groq_key or not groq_key.startswith("gsk_"):
         return None
@@ -90,15 +101,22 @@ def _transcribe_groq(audio_path: str) -> Optional[dict]:
         base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
         client = OpenAI(api_key=groq_key, base_url=base_url)
         model = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
-        logger.info(f"Transcribing with Groq {model}: {audio_path}")
+        
+        target_lang = SUPPORTED_LANGUAGES.get(language, language) if language and language != "auto" else None
+        logger.info(f"Transcribing with Groq {model} (language={target_lang or 'auto-detect'}): {audio_path}")
+        
         with open(audio_path, "rb") as f:
-            transcription = client.audio.transcriptions.create(
-                model=model,
-                file=f,
-                language=WHISPER_LANGUAGE,
-                response_format="verbose_json"
-            )
+            kwargs = {
+                "model": model,
+                "file": f,
+                "response_format": "verbose_json"
+            }
+            if target_lang:
+                kwargs["language"] = target_lang
+            transcription = client.audio.transcriptions.create(**kwargs)
+
         raw_text = getattr(transcription, "text", str(transcription)).strip()
+        detected_lang = getattr(transcription, "language", target_lang or WHISPER_LANGUAGE)
         segments_raw = getattr(transcription, "segments", None)
         segments = []
         if segments_raw:
@@ -128,7 +146,7 @@ def _transcribe_groq(audio_path: str) -> Optional[dict]:
 
         return {
             "raw_text": raw_text,
-            "language": WHISPER_LANGUAGE,
+            "language": detected_lang,
             "confidence_score": 98.5,
             "speaker_segments": speaker_segments,
         }
@@ -140,23 +158,24 @@ def _transcribe_groq(audio_path: str) -> Optional[dict]:
 # Core transcription function
 # ─────────────────────────────────────────────
 
-def transcribe(audio_path: str) -> dict:
+def transcribe(audio_path: str, language: Optional[str] = None) -> dict:
     """
     Transcribes an audio file using Groq Whisper (ultra fast) or local faster-whisper.
     """
     # 1. Try Groq Whisper Cloud
-    groq_res = _transcribe_groq(audio_path)
+    groq_res = _transcribe_groq(audio_path, language=language)
     if groq_res is not None and groq_res.get("raw_text"):
         return groq_res
 
     # 2. Fallback to local faster-whisper
     try:
         model = _get_whisper()
-        logger.info(f"Transcribing locally with faster-whisper: {audio_path}")
+        target_lang = SUPPORTED_LANGUAGES.get(language, language) if language and language != "auto" else None
+        logger.info(f"Transcribing locally with faster-whisper (lang={target_lang or WHISPER_LANGUAGE}): {audio_path}")
 
         segments_iter, info = model.transcribe(
             audio_path,
-            language=WHISPER_LANGUAGE,
+            language=target_lang or WHISPER_LANGUAGE,
             beam_size=5,
             vad_filter=True,
         )
@@ -263,7 +282,7 @@ def _diarize(audio_path: str, whisper_segments: list, pipeline) -> list:
 # High-level entry point (called by worker.py)
 # ─────────────────────────────────────────────
 
-def transcribe_call(call_id: str, audio_path: str, db) -> "Transcript":
+def transcribe_call(call_id: str, audio_path: str, db, language: Optional[str] = None) -> "Transcript":
     """
     Transcribes a call and saves the result to the database.
     Creates or updates the Transcript row for the given call_id.
@@ -271,7 +290,7 @@ def transcribe_call(call_id: str, audio_path: str, db) -> "Transcript":
     from ..database import Transcript
     import uuid
 
-    result = transcribe(audio_path)
+    result = transcribe(audio_path, language=language)
 
     transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
     if transcript:
@@ -293,5 +312,5 @@ def transcribe_call(call_id: str, audio_path: str, db) -> "Transcript":
 
     db.commit()
     db.refresh(transcript)
-    logger.info(f"Transcript saved for call_id={call_id}")
+    logger.info(f"Transcript saved for call_id={call_id} (language={result['language']})")
     return transcript
