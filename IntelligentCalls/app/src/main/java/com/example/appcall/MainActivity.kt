@@ -1093,6 +1093,7 @@ fun SettingsSection(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var selectedTab by remember { mutableStateOf(0) } // 0: Profil & Préférences, 1: Paramètres Avancés
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showDeleteVoiceDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -1133,437 +1134,450 @@ fun SettingsSection(
             Text("Profil, Thème, IA, VoIP, Réseau & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
         }
 
-        // ── 1. USER PROFILE CARD ────────────────────────────────────────────────
+        // ── TOP SEGMENTED TAB SELECTOR (PROFIL VS ADVANCED) ─────────────────────
         item {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
+                    .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("MON PROFIL & IDENTIFIANTS", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(AccentDim)
-                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
-                        ) {
-                            Text("Compte Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
+                // Tab 0: Profil & Préférences
+                val isTab0 = selectedTab == 0
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isTab0) Surface2 else Color.Transparent)
+                        .border(1.dp, if (isTab0) BorderStrong else Color.Transparent, RoundedCornerShape(8.dp))
+                        .clickable { selectedTab = 0 }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val initials = "${profileFirstName.take(1)}${profileLastName.take(1)}".uppercase().ifBlank { "U" }
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Surface2)
-                                .border(1.dp, AccentColor.copy(alpha = 0.4f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = initials, color = Text1, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            val displayName = if (profileFirstName.isNotBlank() || profileLastName.isNotBlank()) {
-                                "$profileFirstName $profileLastName".trim()
-                            } else "Utilisateur"
-                            Text(text = displayName, color = Text1, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
-                            Text(text = profileEmail.ifBlank { "Non renseigné" }, color = Text2, fontSize = 12.sp)
-                            if (profileNumber.isNotBlank()) {
-                                Text(text = profileNumber, color = Text3, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                            }
-                        }
+                        Icon(
+                            Icons.Default.Face,
+                            contentDescription = null,
+                            tint = if (isTab0) Text1 else Text3,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Profil & Préférences",
+                            color = if (isTab0) Text1 else Text3,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isTab0) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { showEditProfileDialog = true },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                        ) {
-                            Text("Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-
-                        Button(
-                            onClick = { 
-                                oldPassword = ""
-                                newPassword = ""
-                                confirmPassword = ""
-                                showChangePasswordDialog = true 
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                        ) {
-                            Text("Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                // Tab 1: Paramètres Avancés
+                val isTab1 = selectedTab == 1
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isTab1) Surface2 else Color.Transparent)
+                        .border(1.dp, if (isTab1) BorderStrong else Color.Transparent, RoundedCornerShape(8.dp))
+                        .clickable { selectedTab = 1 }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = if (isTab1) Text1 else Text3,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Paramètres Avancés",
+                            color = if (isTab1) Text1 else Text3,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isTab1) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
         }
 
-        // ── 2. APPARENCE & THÈME ───────────────────────────────────────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("APPARENCE & THÈME", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                            Text("Personnalisez l'affichage visuel", color = Text2, fontSize = 11.5.sp)
-                        }
-                    }
+        if (selectedTab == 0) {
+            // ═════════════════════════════════════════════════════════════════════
+            // TAB 1: PROFIL & PRÉFÉRENCES GÉNÉRALES
+            // ═════════════════════════════════════════════════════════════════════
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val themeOptions = listOf(
-                        Triple(AppThemeMode.DARK, "🌙 Sombre", "Obscur"),
-                        Triple(AppThemeMode.LIGHT, "☀️ Clair", "Lumineux"),
-                        Triple(AppThemeMode.SYSTEM, "📱 Système", "Auto")
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        themeOptions.forEach { (mode, title, sub) ->
-                            val isSelected = currentThemeMode == mode
+            // ── 1. USER PROFILE CARD ────────────────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("MON PROFIL & IDENTIFIANTS", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) AccentColor else Surface2)
-                                    .border(1.dp, if (isSelected) AccentColor else BorderColor, RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        onThemeChange(mode)
-                                        context.getSharedPreferences("app_theme", android.content.Context.MODE_PRIVATE)
-                                            .edit()
-                                            .putString("selected_theme", mode.name)
-                                            .apply()
-                                    }
-                                    .padding(vertical = 10.dp),
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(AccentDim)
+                                    .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                            ) {
+                                Text("Compte Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val initials = "${profileFirstName.take(1)}${profileLastName.take(1)}".uppercase().ifBlank { "U" }
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Surface2)
+                                    .border(1.dp, AccentColor.copy(alpha = 0.4f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = title,
-                                        color = if (isSelected) Text1 else Text2,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = sub,
-                                        color = if (isSelected) Text1.copy(alpha = 0.8f) else Text3,
-                                        fontSize = 9.sp
-                                    )
+                                Text(text = initials, color = Text1, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                val displayName = if (profileFirstName.isNotBlank() || profileLastName.isNotBlank()) {
+                                    "$profileFirstName $profileLastName".trim()
+                                } else "Utilisateur"
+                                Text(text = displayName, color = Text1, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                                Text(text = profileEmail.ifBlank { "Non renseigné" }, color = Text2, fontSize = 12.sp)
+                                if (profileNumber.isNotBlank()) {
+                                    Text(text = profileNumber, color = Text3, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showEditProfileDialog = true },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                            ) {
+                                Text("Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+
+                            Button(
+                                onClick = { 
+                                    oldPassword = ""
+                                    newPassword = ""
+                                    confirmPassword = ""
+                                    showChangePasswordDialog = true 
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                            ) {
+                                Text("Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 2. APPARENCE & THÈME ───────────────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("APPARENCE & THÈME", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text("Personnalisez l'affichage visuel", color = Text2, fontSize = 11.5.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val themeOptions = listOf(
+                            Triple(AppThemeMode.DARK, "Sombre", "Obscur"),
+                            Triple(AppThemeMode.LIGHT, "Clair", "Lumineux"),
+                            Triple(AppThemeMode.SYSTEM, "Système", "Auto")
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            themeOptions.forEach { (mode, title, sub) ->
+                                val isSelected = currentThemeMode == mode
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) AccentColor else Surface2)
+                                        .border(1.dp, if (isSelected) AccentColor else BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            onThemeChange(mode)
+                                            context.getSharedPreferences("app_theme", android.content.Context.MODE_PRIVATE)
+                                                .edit()
+                                                .putString("selected_theme", mode.name)
+                                                .apply()
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = title,
+                                            color = if (isSelected) Text1 else Text2,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = sub,
+                                            color = if (isSelected) Text1.copy(alpha = 0.8f) else Text3,
+                                            fontSize = 9.sp
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // ── 2. AI & LLM PROVIDER API KEYS & ENGINE CONFIGURATION ────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    val aiPrefs = remember { context.getSharedPreferences("ai_settings", android.content.Context.MODE_PRIVATE) }
-                    var groqApiKey by remember { mutableStateOf(aiPrefs.getString("groq_api_key", "") ?: "") }
-                    var deepgramApiKey by remember { mutableStateOf(aiPrefs.getString("deepgram_api_key", "") ?: "") }
-                    var openAiApiKey by remember { mutableStateOf(aiPrefs.getString("openai_api_key", "") ?: "") }
-                    var selectedWhisperModel by remember { mutableStateOf(aiPrefs.getString("whisper_model", "faster-whisper-small") ?: "faster-whisper-small") }
-                    var selectedLlmModel by remember { mutableStateOf(aiPrefs.getString("llm_model", "llama-3.3-70b-versatile") ?: "llama-3.3-70b-versatile") }
+            // ── 3. PRÉFÉRENCES D'APPLICATION ────────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text("PRÉFÉRENCES D'ENREGISTREMENT & APPELS", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("MOTEURS IA & CLÉS D'ACCÈS API", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                            Text("Groq, Deepgram STT, OpenAI & Whisper", color = Text2, fontSize = 11.5.sp)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(AccentDim)
-                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        val callPrefs = remember { context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE) }
+                        var autoRecord by remember { mutableStateOf(callPrefs.getBoolean("auto_record_calls", true)) }
+                        var highQualityAudio by remember { mutableStateOf(callPrefs.getBoolean("hq_audio", true)) }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Pipeline Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Renseignez vos clés d'API personnelles pour activer la transcription vocale haute fidélité et les résumés automatiques :",
-                        color = Text3,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = groqApiKey,
-                        onValueChange = { groqApiKey = it },
-                        label = { Text("Clé API Groq (gsk_...)", color = Text3, fontSize = 11.5.sp) },
-                        placeholder = { Text("gsk_...", color = Text3) },
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BorderStrong,
-                            unfocusedBorderColor = BorderColor,
-                            focusedTextColor = Text1,
-                            unfocusedTextColor = Text1
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = deepgramApiKey,
-                        onValueChange = { deepgramApiKey = it },
-                        label = { Text("Clé API Deepgram (Nova-2 Speech-to-Text)", color = Text3, fontSize = 11.5.sp) },
-                        placeholder = { Text("Token Deepgram streaming audio", color = Text3) },
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BorderStrong,
-                            unfocusedBorderColor = BorderColor,
-                            focusedTextColor = Text1,
-                            unfocusedTextColor = Text1
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = openAiApiKey,
-                        onValueChange = { openAiApiKey = it },
-                        label = { Text("Clé API OpenAI / Claude / Gemini", color = Text3, fontSize = 11.5.sp) },
-                        placeholder = { Text("sk-...", color = Text3) },
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BorderStrong,
-                            unfocusedBorderColor = BorderColor,
-                            focusedTextColor = Text1,
-                            unfocusedTextColor = Text1
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Modèle Transcription Vocale (STT) :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val whisperModels = listOf(
-                        "faster-whisper-small" to "Whisper Small",
-                        "faster-whisper-medium" to "Whisper Med",
-                        "faster-whisper-large-v3" to "Large-v3 HD"
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        whisperModels.forEach { (mId, mLabel) ->
-                            val isSelected = selectedWhisperModel == mId
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) Text1 else Surface2)
-                                    .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
-                                    .clickable { selectedWhisperModel = mId }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = mLabel,
-                                    color = if (isSelected) BgColor else Text2,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Enregistrement automatique des appels", color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Interception native lors du décrochage", color = Text3, fontSize = 10.5.sp)
                             }
+                            Switch(
+                                checked = autoRecord,
+                                onCheckedChange = {
+                                    autoRecord = it
+                                    callPrefs.edit().putBoolean("auto_record_calls", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
+                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Moteur LLM Synthèse & RDV :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    val llmModels = listOf(
-                        "llama-3.3-70b-versatile" to "Llama 3.3",
-                        "mixtral-8x7b-32768" to "Mixtral",
-                        "gpt-4o" to "GPT-4o"
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        llmModels.forEach { (mId, mLabel) ->
-                            val isSelected = selectedLlmModel == mId
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) Text1 else Surface2)
-                                    .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
-                                    .clickable { selectedLlmModel = mId }
-                                    .padding(vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = mLabel,
-                                    color = if (isSelected) BgColor else Text2,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Divider(color = BorderColor, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Format Audio HD (16kHz WAV)", color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Précision optimale pour Whisper & Deepgram", color = Text3, fontSize = 10.5.sp)
                             }
+                            Switch(
+                                checked = highQualityAudio,
+                                onCheckedChange = {
+                                    highQualityAudio = it
+                                    callPrefs.edit().putBoolean("hq_audio", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
+                            )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            aiPrefs.edit()
-                                .putString("groq_api_key", groqApiKey.trim())
-                                .putString("deepgram_api_key", deepgramApiKey.trim())
-                                .putString("openai_api_key", openAiApiKey.trim())
-                                .putString("whisper_model", selectedWhisperModel)
-                                .putString("llm_model", selectedLlmModel)
-                                .apply()
-                            Toast.makeText(context, "Clés API IA enregistrées avec succès", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(vertical = 11.dp)
-                    ) {
-                        Text("Enregistrer les Clés API IA", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-        }
 
-        // ── 3. CLOUD TELEPHONY & VOIP PROVIDERS (MULTI-FOURNISSEUR) ────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    val voipPrefs = remember { context.getSharedPreferences("twilio_settings", android.content.Context.MODE_PRIVATE) }
-                    var voipEnabled by remember { mutableStateOf(voipPrefs.getBoolean("twilio_enabled", false)) }
-                    var selectedProvider by remember { mutableStateOf(voipPrefs.getString("voip_provider", "TWILIO") ?: "TWILIO") }
-                    var accountSid by remember { mutableStateOf(voipPrefs.getString("twilio_account_sid", "") ?: "") }
-                    var authToken by remember { mutableStateOf(voipPrefs.getString("twilio_auth_token", "") ?: "") }
-                    var voipNumber by remember { mutableStateOf(voipPrefs.getString("twilio_phone_number", "") ?: "") }
-                    var twimlAppSid by remember { mutableStateOf(voipPrefs.getString("twilio_twiml_app_sid", "") ?: "") }
+            // ── 4. LOGOUT BUTTON ────────────────────────────────────────────────
+            item {
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("DÉCONNEXION", color = DangerColor, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(60.dp))
+            }
+        } else {
+            // ═════════════════════════════════════════════════════════════════════
+            // TAB 2: PARAMÈTRES AVANCÉS (IA, VOIP, ADB, RÉSEAU & RGPD)
+            // ═════════════════════════════════════════════════════════════════════
 
-                    val providers = listOf(
-                        "TWILIO" to "Twilio",
-                        "TELNYX" to "Telnyx",
-                        "PLIVO" to "Plivo",
-                        "VONAGE" to "Vonage",
-                        "SIP_PBX" to "SIP Trunk / PBX"
-                    )
+            // ── 1. AI & LLM PROVIDER API KEYS & ENGINE CONFIGURATION ────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        val aiPrefs = remember { context.getSharedPreferences("ai_settings", android.content.Context.MODE_PRIVATE) }
+                        var groqApiKey by remember { mutableStateOf(aiPrefs.getString("groq_api_key", "") ?: "") }
+                        var deepgramApiKey by remember { mutableStateOf(aiPrefs.getString("deepgram_api_key", "") ?: "") }
+                        var openAiApiKey by remember { mutableStateOf(aiPrefs.getString("openai_api_key", "") ?: "") }
+                        var selectedWhisperModel by remember { mutableStateOf(aiPrefs.getString("whisper_model", "faster-whisper-small") ?: "faster-whisper-small") }
+                        var selectedLlmModel by remember { mutableStateOf(aiPrefs.getString("llm_model", "llama-3.3-70b-versatile") ?: "llama-3.3-70b-versatile") }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("CLOUD TELEPHONY & MULTI-VOIP", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                            Text("Twilio, Telnyx, Plivo, Vonage & SIP Trunk", color = Text2, fontSize = 11.5.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("MOTEURS IA & CLÉS D'ACCÈS API", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text("Groq, Deepgram STT, OpenAI & Whisper", color = Text2, fontSize = 11.5.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(AccentDim)
+                                    .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                            ) {
+                                Text("Pipeline Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
-                        Switch(
-                            checked = voipEnabled,
-                            onCheckedChange = {
-                                voipEnabled = it
-                                voipPrefs.edit().putBoolean("twilio_enabled", it).apply()
-                            },
-                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
-                        )
-                    }
 
-                    if (voipEnabled) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Sélectionnez votre opérateur VoIP Cloud pour l'enregistrement 2-Way HD et la transcription automatique :",
+                            text = "Renseignez vos clés d'API personnelles pour activer la transcription vocale haute fidélité et les résumés automatiques :",
                             color = Text3,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
 
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = groqApiKey,
+                            onValueChange = { groqApiKey = it },
+                            label = { Text("Clé API Groq (gsk_...)", color = Text3, fontSize = 11.5.sp) },
+                            placeholder = { Text("gsk_...", color = Text3) },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        // Provider selector chips
+                        OutlinedTextField(
+                            value = deepgramApiKey,
+                            onValueChange = { deepgramApiKey = it },
+                            label = { Text("Clé API Deepgram (Nova-2 Speech-to-Text)", color = Text3, fontSize = 11.5.sp) },
+                            placeholder = { Text("Token Deepgram streaming audio", color = Text3) },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = openAiApiKey,
+                            onValueChange = { openAiApiKey = it },
+                            label = { Text("Clé API OpenAI / Claude / Gemini", color = Text3, fontSize = 11.5.sp) },
+                            placeholder = { Text("sk-...", color = Text3) },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Modèle Transcription Vocale (STT) :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val whisperModels = listOf(
+                            "faster-whisper-small" to "Whisper Small",
+                            "faster-whisper-medium" to "Whisper Med",
+                            "faster-whisper-large-v3" to "Large-v3 HD"
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            providers.take(3).forEach { (id, label) ->
-                                val isSelected = selectedProvider == id
+                            whisperModels.forEach { (mId, mLabel) ->
+                                val isSelected = selectedWhisperModel == mId
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isSelected) Text1 else Surface2)
                                         .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedProvider = id
-                                            voipPrefs.edit().putString("voip_provider", id).apply()
-                                        }
+                                        .clickable { selectedWhisperModel = mId }
                                         .padding(vertical = 7.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = label,
+                                        text = mLabel,
                                         color = if (isSelected) BgColor else Text2,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1571,30 +1585,35 @@ fun SettingsSection(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Moteur LLM Synthèse & RDV :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(6.dp))
+                        val llmModels = listOf(
+                            "llama-3.3-70b-versatile" to "Llama 3.3",
+                            "mixtral-8x7b-32768" to "Mixtral",
+                            "gpt-4o" to "GPT-4o"
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            providers.drop(3).forEach { (id, label) ->
-                                val isSelected = selectedProvider == id
+                            llmModels.forEach { (mId, mLabel) ->
+                                val isSelected = selectedLlmModel == mId
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isSelected) Text1 else Surface2)
                                         .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            selectedProvider = id
-                                            voipPrefs.edit().putString("voip_provider", id).apply()
-                                        }
+                                        .clickable { selectedLlmModel = mId }
                                         .padding(vertical = 7.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = label,
+                                        text = mLabel,
                                         color = if (isSelected) BgColor else Text2,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1604,78 +1623,164 @@ fun SettingsSection(
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = accountSid,
-                            onValueChange = { accountSid = it },
-                            label = {
-                                Text(
-                                    when (selectedProvider) {
-                                        "TELNYX" -> "API Key / Connection ID"
-                                        "PLIVO" -> "Auth ID"
-                                        "VONAGE" -> "API Key / Application ID"
-                                        "SIP_PBX" -> "SIP Server Host (sip.company.com)"
-                                        else -> "Account SID (ACxxxxxxxx...)"
-                                    },
-                                    color = Text3,
-                                    fontSize = 11.5.sp
-                                )
+                        Button(
+                            onClick = {
+                                aiPrefs.edit()
+                                    .putString("groq_api_key", groqApiKey.trim())
+                                    .putString("deepgram_api_key", deepgramApiKey.trim())
+                                    .putString("openai_api_key", openAiApiKey.trim())
+                                    .putString("whisper_model", selectedWhisperModel)
+                                    .putString("llm_model", selectedLlmModel)
+                                    .apply()
+                                Toast.makeText(context, "Clés API IA enregistrées avec succès", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
-                            )
+                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 11.dp)
+                        ) {
+                            Text("Enregistrer les Clés API IA", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+
+            // ── 2. CLOUD TELEPHONY & VOIP PROVIDERS (MULTI-FOURNISSEUR) ────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        val voipPrefs = remember { context.getSharedPreferences("twilio_settings", android.content.Context.MODE_PRIVATE) }
+                        var voipEnabled by remember { mutableStateOf(voipPrefs.getBoolean("twilio_enabled", false)) }
+                        var selectedProvider by remember { mutableStateOf(voipPrefs.getString("voip_provider", "TWILIO") ?: "TWILIO") }
+                        var accountSid by remember { mutableStateOf(voipPrefs.getString("twilio_account_sid", "") ?: "") }
+                        var authToken by remember { mutableStateOf(voipPrefs.getString("twilio_auth_token", "") ?: "") }
+                        var voipNumber by remember { mutableStateOf(voipPrefs.getString("twilio_phone_number", "") ?: "") }
+                        var twimlAppSid by remember { mutableStateOf(voipPrefs.getString("twilio_twiml_app_sid", "") ?: "") }
+
+                        val providers = listOf(
+                            "TWILIO" to "Twilio",
+                            "TELNYX" to "Telnyx",
+                            "PLIVO" to "Plivo",
+                            "VONAGE" to "Vonage",
+                            "SIP_PBX" to "SIP Trunk / PBX"
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = authToken,
-                            onValueChange = { authToken = it },
-                            label = {
-                                Text(
-                                    when (selectedProvider) {
-                                        "TELNYX" -> "Telnyx Secret Key"
-                                        "PLIVO" -> "Auth Token"
-                                        "VONAGE" -> "API Secret / Private Key"
-                                        "SIP_PBX" -> "SIP Password / Secret"
-                                        else -> "Auth Token"
-                                    },
-                                    color = Text3,
-                                    fontSize = 11.5.sp
-                                )
-                            },
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("CLOUD TELEPHONY & MULTI-VOIP", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text("Twilio, Telnyx, Plivo, Vonage & SIP Trunk", color = Text2, fontSize = 11.5.sp)
+                            }
+                            Switch(
+                                checked = voipEnabled,
+                                onCheckedChange = {
+                                    voipEnabled = it
+                                    voipPrefs.edit().putBoolean("twilio_enabled", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
                             )
-                        )
+                        }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = voipNumber,
-                            onValueChange = { voipNumber = it },
-                            label = { Text("Numéro Virtuel / Passerelle (+33...)", color = Text3, fontSize = 11.5.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
+                        if (voipEnabled) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Sélectionnez votre opérateur VoIP Cloud pour l'enregistrement 2-Way HD et la transcription automatique :",
+                                color = Text3,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
                             )
-                        )
 
-                        if (selectedProvider == "TWILIO" || selectedProvider == "TELNYX") {
                             Spacer(modifier = Modifier.height(8.dp))
+                            // Provider selector chips
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                providers.take(3).forEach { (id, label) ->
+                                    val isSelected = selectedProvider == id
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Text1 else Surface2)
+                                        .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedProvider = id
+                                            voipPrefs.edit().putString("voip_provider", id).apply()
+                                        }
+                                        .padding(vertical = 7.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) BgColor else Text2,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                providers.drop(3).forEach { (id, label) ->
+                                    val isSelected = selectedProvider == id
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Text1 else Surface2)
+                                            .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedProvider = id
+                                                voipPrefs.edit().putString("voip_provider", id).apply()
+                                            }
+                                            .padding(vertical = 7.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) BgColor else Text2,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(
-                                value = twimlAppSid,
-                                onValueChange = { twimlAppSid = it },
-                                label = { Text("App SID / TeXML App ID", color = Text3, fontSize = 11.5.sp) },
+                                value = accountSid,
+                                onValueChange = { accountSid = it },
+                                label = {
+                                    Text(
+                                        when (selectedProvider) {
+                                            "TELNYX" -> "API Key / Connection ID"
+                                            "PLIVO" -> "Auth ID"
+                                            "VONAGE" -> "API Key / Application ID"
+                                            "SIP_PBX" -> "SIP Server Host (sip.company.com)"
+                                            else -> "Account SID (ACxxxxxxxx...)"
+                                        },
+                                        color = Text3,
+                                        fontSize = 11.5.sp
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = BorderStrong,
@@ -1684,321 +1789,378 @@ fun SettingsSection(
                                     unfocusedTextColor = Text1
                                 )
                             )
-                        }
 
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = authToken,
+                                onValueChange = { authToken = it },
+                                label = {
+                                    Text(
+                                        when (selectedProvider) {
+                                            "TELNYX" -> "Telnyx Secret Key"
+                                            "PLIVO" -> "Auth Token"
+                                            "VONAGE" -> "API Secret / Private Key"
+                                            "SIP_PBX" -> "SIP Password / Secret"
+                                            else -> "Auth Token"
+                                        },
+                                        color = Text3,
+                                        fontSize = 11.5.sp
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = BorderStrong,
+                                    unfocusedBorderColor = BorderColor,
+                                    focusedTextColor = Text1,
+                                    unfocusedTextColor = Text1
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = voipNumber,
+                                onValueChange = { voipNumber = it },
+                                label = { Text("Numéro Virtuel / Passerelle (+33...)", color = Text3, fontSize = 11.5.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = BorderStrong,
+                                    unfocusedBorderColor = BorderColor,
+                                    focusedTextColor = Text1,
+                                    unfocusedTextColor = Text1
+                                )
+                            )
+
+                            if (selectedProvider == "TWILIO" || selectedProvider == "TELNYX") {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = twimlAppSid,
+                                    onValueChange = { twimlAppSid = it },
+                                    label = { Text("App SID / TeXML App ID", color = Text3, fontSize = 11.5.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = BorderStrong,
+                                        unfocusedBorderColor = BorderColor,
+                                        focusedTextColor = Text1,
+                                        unfocusedTextColor = Text1
+                                    )
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    voipPrefs.edit()
+                                        .putBoolean("twilio_enabled", true)
+                                        .putString("voip_provider", selectedProvider)
+                                        .putString("twilio_account_sid", accountSid.trim())
+                                        .putString("twilio_auth_token", authToken.trim())
+                                        .putString("twilio_phone_number", voipNumber.trim())
+                                        .putString("twilio_twiml_app_sid", twimlAppSid.trim())
+                                        .apply()
+                                    Toast.makeText(context, "Configuration $selectedProvider enregistrée", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(vertical = 11.dp)
+                            ) {
+                                Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 3. SHIZUKU STATUS CARD ──────────────────────────────────────────
+            item {
+                val isShizukuAvailable = remember { shizukuManager?.isShizukuAvailable() == true }
+                val hasShizukuPerm = remember { shizukuManager?.hasShizukuPermission() == true }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text("SHIZUKU API — PERMISSIONS ÉLEVÉES ADB", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                         Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                voipPrefs.edit()
-                                    .putBoolean("twilio_enabled", true)
-                                    .putString("voip_provider", selectedProvider)
-                                    .putString("twilio_account_sid", accountSid.trim())
-                                    .putString("twilio_auth_token", authToken.trim())
-                                    .putString("twilio_phone_number", voipNumber.trim())
-                                    .putString("twilio_twiml_app_sid", twimlAppSid.trim())
-                                    .apply()
-                                Toast.makeText(context, "Configuration $selectedProvider enregistrée", Toast.LENGTH_SHORT).show()
-                            },
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(if (isShizukuAvailable && hasShizukuPerm) SuccessColor else DangerColor, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = when {
+                                    isShizukuAvailable && hasShizukuPerm -> "Shizuku Connecté (Permissions ADB Actives)"
+                                    isShizukuAvailable -> "Shizuku Détecté (Permission requise)"
+                                    else -> "Shizuku Non Détecté / Service arrêté"
+                                },
+                                color = Text1,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (isShizukuAvailable && !hasShizukuPerm) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { shizukuManager?.requestShizukuPermission() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text("Autoriser Shizuku", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 4. SERVER CONFIG CARD ───────────────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text("CONFIGURATION SERVEUR BACKEND", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        var customUrlText by remember { 
+                            mutableStateOf(
+                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                    .getString("custom_base_url", "http://127.0.0.1:8000") ?: "http://127.0.0.1:8000"
+                            ) 
+                        }
+                        OutlinedTextField(
+                            value = customUrlText,
+                            onValueChange = { customUrlText = it },
+                            label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Text3, fontSize = 12.sp) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(vertical = 11.dp)
-                        ) {
-                            Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── 4. SHIZUKU STATUS CARD ──────────────────────────────────────────────
-        item {
-            val isShizukuAvailable = remember { shizukuManager?.isShizukuAvailable() == true }
-            val hasShizukuPerm = remember { shizukuManager?.hasShizukuPermission() == true }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Text("SHIZUKU API — PERMISSIONS ÉLEVÉES ADB", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(if (isShizukuAvailable && hasShizukuPerm) SuccessColor else DangerColor, CircleShape)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = when {
-                                isShizukuAvailable && hasShizukuPerm -> "Shizuku Connecté (Permissions ADB Actives)"
-                                isShizukuAvailable -> "Shizuku Détecté (Permission requise)"
-                                else -> "Shizuku Non Détecté / Service arrêté"
-                            },
-                            color = Text1,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (isShizukuAvailable && !hasShizukuPerm) {
                         Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = { shizukuManager?.requestShizukuPermission() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Autoriser Shizuku", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Button(
+                                onClick = {
+                                    customUrlText = "http://127.0.0.1:8000"
+                                    context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString("custom_base_url", "http://127.0.0.1:8000")
+                                        .apply()
+                                    Toast.makeText(context, "Mode USB sélectionné (127.0.0.1:8000)", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Text("USB Local", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Button(
+                                onClick = {
+                                    customUrlText = "http://192.168.1.12:8000"
+                                    context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString("custom_base_url", "http://192.168.1.12:8000")
+                                        .apply()
+                                    Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.12:8000)", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Text("Wi-Fi Réseau", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
-                    }
-                }
-            }
-        }
-
-        // ── 5. SERVER CONFIG CARD ───────────────────────────────────────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Text("CONFIGURATION SERVEUR BACKEND", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    var customUrlText by remember { 
-                        mutableStateOf(
-                            context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                .getString("custom_base_url", "http://127.0.0.1:8000") ?: "http://127.0.0.1:8000"
-                        ) 
-                    }
-                    OutlinedTextField(
-                        value = customUrlText,
-                        onValueChange = { customUrlText = it },
-                        label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Text3, fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BorderStrong,
-                            unfocusedBorderColor = BorderColor,
-                            focusedTextColor = Text1,
-                            unfocusedTextColor = Text1
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                customUrlText = "http://127.0.0.1:8000"
-                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString("custom_base_url", "http://127.0.0.1:8000")
-                                    .apply()
-                                Toast.makeText(context, "Mode USB sélectionné (127.0.0.1:8000)", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("USB Local", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Button(
-                            onClick = {
-                                customUrlText = "http://192.168.1.12:8000"
-                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString("custom_base_url", "http://192.168.1.12:8000")
-                                    .apply()
-                                Toast.makeText(context, "Mode Wi-Fi sélectionné (192.168.1.12:8000)", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                        ) {
-                            Text("Wi-Fi Réseau", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val trimmed = customUrlText.trim()
-                                context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString("custom_base_url", trimmed)
-                                    .apply()
-                                Toast.makeText(context, "URL enregistrée", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                        ) {
-                            Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Button(
-                            onClick = {
-                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                                    try {
-                                        var testUrl = customUrlText.trim()
-                                        if (!testUrl.startsWith("http://") && !testUrl.startsWith("https://")) {
-                                            testUrl = "http://$testUrl"
-                                        }
-                                        if (!testUrl.endsWith("/")) testUrl += "/"
-                                        val url = java.net.URL("${testUrl}api/v1/calls")
-                                        val conn = url.openConnection() as java.net.HttpURLConnection
-                                        conn.connectTimeout = 3000
-                                        conn.readTimeout = 3000
-                                        conn.requestMethod = "GET"
-                                        val code = conn.responseCode
-                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                            if (code in 200..499) {
-                                                Toast.makeText(context, "Backend connecté (HTTP $code)", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "Réponse inattendue: HTTP $code", Toast.LENGTH_SHORT).show()
+                            Button(
+                                onClick = {
+                                    val trimmed = customUrlText.trim()
+                                    context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString("custom_base_url", trimmed)
+                                        .apply()
+                                    Toast.makeText(context, "URL enregistrée", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Button(
+                                onClick = {
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                        try {
+                                            var testUrl = customUrlText.trim()
+                                            if (!testUrl.startsWith("http://") && !testUrl.startsWith("https://")) {
+                                                testUrl = "http://$testUrl"
+                                            }
+                                            if (!testUrl.endsWith("/")) testUrl += "/"
+                                            val url = java.net.URL("${testUrl}api/v1/calls")
+                                            val conn = url.openConnection() as java.net.HttpURLConnection
+                                            conn.connectTimeout = 3000
+                                            conn.readTimeout = 3000
+                                            conn.requestMethod = "GET"
+                                            val code = conn.responseCode
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                if (code in 200..499) {
+                                                    Toast.makeText(context, "Backend connecté (HTTP $code)", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Réponse inattendue: HTTP $code", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                Toast.makeText(context, "Impossible de joindre le serveur: ${e.message}", Toast.LENGTH_LONG).show()
                                             }
                                         }
-                                    } catch (e: Exception) {
-                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                            Toast.makeText(context, "Impossible de joindre le serveur: ${e.message}", Toast.LENGTH_LONG).show()
-                                        }
                                     }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 5. RGPD & GESTION DES DONNÉES ──────────────────────────────────
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text("RGPD & PROTECTION DES DONNÉES", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Conformément au RGPD (Règlement Général sur la Protection des Données), vous disposez d'un droit d'accès, d'export et d'effacement complet de vos données.",
+                            color = Text2, fontSize = 11.5.sp, lineHeight = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Button 1: Export all data (Art. 15 / 20)
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    voipRepository.exportAllData()
+                                        .onSuccess { jsonContent ->
+                                            try {
+                                                val exportFile = java.io.File(context.cacheDir, "appcall_gdpr_export.json")
+                                                exportFile.writeText(jsonContent)
+                                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    exportFile
+                                                )
+                                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                    type = "application/json"
+                                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "Export Données RGPD AppCall")
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Exporter mes données (JSON)"))
+                                                Toast.makeText(context, "Export généré avec succès", Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                        .onFailure {
+                                            Toast.makeText(context, "Export échoué : ${it.message}", Toast.LENGTH_SHORT).show()
+                                        }
                                 }
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Icon(Icons.Default.Share, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Button 2: Delete voice recordings
+                        OutlinedButton(
+                            onClick = { showDeleteVoiceDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = WarnColor),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = WarnColor, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Button 3: Delete full account (Art. 17)
+                        Button(
+                            onClick = { showDeleteAccountDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = DangerColor),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
-        }
 
-        // ── 6. RGPD & GESTION DES DONNÉES ──────────────────────────────────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Text("RGPD & PROTECTION DES DONNÉES", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Conformément au RGPD (Règlement Général sur la Protection des Données), vous disposez d'un droit d'accès, d'export et d'effacement complet de vos données.",
-                        color = Text2, fontSize = 11.5.sp, lineHeight = 17.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Button 1: Export all data (Art. 15 / 20)
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                voipRepository.exportAllData()
-                                    .onSuccess { jsonContent ->
-                                        try {
-                                            val exportFile = java.io.File(context.cacheDir, "appcall_gdpr_export.json")
-                                            exportFile.writeText(jsonContent)
-                                            val uri = androidx.core.content.FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                exportFile
-                                            )
-                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                type = "application/json"
-                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Export Données RGPD AppCall")
-                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Exporter mes données (JSON)"))
-                                            Toast.makeText(context, "Export généré avec succès", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    .onFailure {
-                                        Toast.makeText(context, "Export échoué : ${it.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Button 2: Delete voice recordings
-                    OutlinedButton(
-                        onClick = { showDeleteVoiceDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = WarnColor),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = WarnColor, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Button 3: Delete full account (Art. 17)
-                    Button(
-                        onClick = { showDeleteAccountDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = DangerColor),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+            // ── 6. LOGOUT BUTTON IN ADVANCED TAB ────────────────────────────────
+            item {
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("DÉCONNEXION", color = DangerColor, fontWeight = FontWeight.Bold)
                 }
+                Spacer(modifier = Modifier.height(60.dp))
             }
-        }
-
-        // ── LOGOUT BUTTON ───────────────────────────────────────────────────────
-        item {
-            Button(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("DÉCONNEXION", color = DangerColor, fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = Modifier.height(60.dp))
         }
     }
 
@@ -2036,7 +2198,13 @@ fun SettingsSection(
     if (showDeleteAccountDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
-            title = { Text("⚠️ Suppression définitive du compte", color = DangerColor, fontWeight = FontWeight.Bold) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = DangerColor, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Suppression définitive du compte", color = DangerColor, fontWeight = FontWeight.Bold)
+                }
+            },
             text = {
                 Text(
                     "Conformément à l'Art. 17 du RGPD (Droit à l'oubli), votre compte, tous vos contacts, appels, enregistrements et résumés seront définitivement effacés. Cette action est irréversible.",

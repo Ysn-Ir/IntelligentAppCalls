@@ -131,6 +131,12 @@ interface ApiService {
         @Body task: TaskDto
     ): Response<TaskDto>
 
+    @DELETE("tasks/{id}")
+    suspend fun deleteTask(
+        @Header("Authorization") token: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
     @GET("agenda")
     suspend fun getAgenda(
         @Header("Authorization") token: String

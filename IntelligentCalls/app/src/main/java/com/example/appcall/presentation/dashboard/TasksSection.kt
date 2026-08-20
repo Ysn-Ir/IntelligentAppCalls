@@ -9,6 +9,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.local.AppLocalDatabase
@@ -27,6 +37,7 @@ import kotlinx.coroutines.launch
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -35,14 +46,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import java.io.File
 
+enum class TaskFilter {
+    ALL,
+    PENDING,
+    COMPLETED
+}
+
 @Composable
 fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(localDatabase.getTasks()) }
-    var gdprConsentEnabled by remember { mutableStateOf(true) }
+    var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
+    var selectedPriority by remember { mutableStateOf("NORMAL") }
+    var gdprConsentEnabled by remember { mutableStateOf(true) }
 
     fun getRecordingsList(): List<File> {
         val targetDirs = listOf(
@@ -84,6 +103,12 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
         audioFiles = getRecordingsList()
     }
 
+    val filteredTasks = when (selectedFilter) {
+        TaskFilter.ALL -> tasks
+        TaskFilter.PENDING -> tasks.filter { !it.completed }
+        TaskFilter.COMPLETED -> tasks.filter { it.completed }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -96,17 +121,24 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp, bottom = 9.dp),
+                    .padding(top = 2.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "TÂCHES DÉTECTÉES PAR L'IA",
-                    color = Text3,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
-                )
+                Column {
+                    Text(
+                        text = "TÂCHES DÉTECTÉES PAR L'IA",
+                        color = Text3,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "${tasks.count { !it.completed }} tâche(s) en attente",
+                        color = Text2,
+                        fontSize = 11.sp
+                    )
+                }
 
                 Box(
                     modifier = Modifier
@@ -114,14 +146,54 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                         .background(Surface1)
                         .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
                         .clickable { showAddTaskDialog = true }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "＋ Ajouter",
-                        color = Text1,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Text1, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Ajouter",
+                            color = Text1,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            // ── FILTER TABS ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val filters = listOf(
+                    TaskFilter.ALL to "Toutes (${tasks.size})",
+                    TaskFilter.PENDING to "En cours (${tasks.count { !it.completed }})",
+                    TaskFilter.COMPLETED to "Terminées (${tasks.count { it.completed }})"
+                )
+                filters.forEach { (filter, label) ->
+                    val isSelected = selectedFilter == filter
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (isSelected) Surface2 else Surface1)
+                            .border(1.dp, if (isSelected) BorderStrong else BorderColor, RoundedCornerShape(7.dp))
+                            .clickable { selectedFilter = filter }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Text1 else Text3,
+                            fontSize = 10.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -131,25 +203,59 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                     containerColor = Surface1,
                     title = { Text("Nouvelle tâche", color = Text1, fontWeight = FontWeight.Bold) },
                     text = {
-                        OutlinedTextField(
-                            value = newTaskTitle,
-                            onValueChange = { newTaskTitle = it },
-                            placeholder = { Text("Ex: Rappeler le client demain...", color = Text3, fontSize = 13.sp) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = newTaskTitle,
+                                onValueChange = { newTaskTitle = it },
+                                placeholder = { Text("Ex: Rappeler Marc au 0612345678...", color = Text3, fontSize = 13.sp) },
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = BorderStrong,
+                                    unfocusedBorderColor = BorderColor,
+                                    focusedTextColor = Text1,
+                                    unfocusedTextColor = Text1
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Priorité :", color = Text3, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val priorities = listOf("URGENT" to DangerColor, "IMPORTANT" to WarnColor, "NORMAL" to AccentColor)
+                                priorities.forEach { (p, color) ->
+                                    val isPSelected = selectedPriority == p
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isPSelected) color.copy(alpha = 0.2f) else Surface2)
+                                            .border(1.dp, if (isPSelected) color else BorderColor, RoundedCornerShape(6.dp))
+                                            .clickable { selectedPriority = p }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = p,
+                                            color = if (isPSelected) color else Text3,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
                                 if (newTaskTitle.isNotBlank()) {
-                                    val title = newTaskTitle.trim()
+                                    val prefix = if (selectedPriority != "NORMAL") "[$selectedPriority] " else ""
+                                    val title = "$prefix${newTaskTitle.trim()}"
                                     val taskId = "task-${System.currentTimeMillis()}"
                                     newTaskTitle = ""
                                     showAddTaskDialog = false
@@ -175,76 +281,142 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             }
         }
 
-        if (tasks.isEmpty()) {
+        if (filteredTasks.isEmpty()) {
             item {
-                Text(
-                    text = "Aucune tâche détectée",
-                    color = Text3,
-                    fontSize = 12.5.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (selectedFilter == TaskFilter.ALL) "Aucune tâche enregistrée" else "Aucune tâche dans cette vue",
+                        color = Text3,
+                        fontSize = 12.5.sp
+                    )
+                }
             }
         } else {
-            items(tasks) { task ->
-                val category = if (task.title.startsWith("[")) task.title.substringAfter("[").substringBefore("]") else null
-                val cleanTitle = if (task.title.startsWith("[")) task.title.substringAfter("] ").trim() else task.title
+            items(filteredTasks) { task ->
+                val priority = when {
+                    task.title.contains("[URGENT]", ignoreCase = true) -> "URGENT"
+                    task.title.contains("[IMPORTANT]", ignoreCase = true) -> "IMPORTANT"
+                    else -> null
+                }
+                val cleanTitle = task.title
+                    .replace("[URGENT]", "", ignoreCase = true)
+                    .replace("[IMPORTANT]", "", ignoreCase = true)
+                    .replace("[NORMAL]", "", ignoreCase = true)
+                    .trim()
+
+                // Extract detected phone number if present
+                val phoneRegex = Regex("""(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}""")
+                val detectedPhone = phoneRegex.find(cleanTitle)?.value?.replace(" ", "")
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 11.dp, horizontal = 4.dp)
+                        .padding(vertical = 9.dp, horizontal = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Top,
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         // Custom Checkbox Box
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
-                                .clip(RoundedCornerShape(4.dp))
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(5.dp))
                                 .background(if (task.completed) Text1 else Color.Transparent)
-                                .border(1.5.dp, if (task.completed) Text1 else Text3, RoundedCornerShape(4.dp))
-                                .clickable {
-                                    coroutineScope.launch {
-                                        voipRepository.toggleTask(task.id, !task.completed)
-                                        tasks = localDatabase.getTasks()
-                                    }
-                                },
+                                .border(1.5.dp, if (task.completed) Text1 else Text3, RoundedCornerShape(5.dp))
+                            .clickable {
+                                coroutineScope.launch {
+                                    voipRepository.toggleTask(task.id, !task.completed)
+                                    tasks = localDatabase.getTasks()
+                                }
+                            },
                             contentAlignment = Alignment.Center
                         ) {
                             if (task.completed) {
-                                Text(
-                                    text = "✓",
-                                    color = BgColor,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black
-                                )
+                                Icon(Icons.Default.Check, contentDescription = null, tint = BgColor, modifier = Modifier.size(12.dp))
                             }
                         }
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = cleanTitle,
-                                color = if (task.completed) Text3 else Text1,
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                style = androidx.compose.ui.text.TextStyle(
-                                    textDecoration = if (task.completed) TextDecoration.LineThrough else null
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (priority != null) {
+                                    val badgeColor = if (priority == "URGENT") DangerColor else WarnColor
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(badgeColor.copy(alpha = 0.2f))
+                                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                    ) {
+                                        Text(
+                                            text = priority,
+                                            color = badgeColor,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = cleanTitle,
+                                    color = if (task.completed) Text3 else Text1,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp,
+                                    style = androidx.compose.ui.text.TextStyle(
+                                        textDecoration = if (task.completed) TextDecoration.LineThrough else null
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            )
+                            }
+
                             Text(
-                                text = "Appel enregistré · IA",
+                                text = "Détecté par IA · Intelligent Calls",
                                 color = Text3,
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(top = 3.dp)
+                                modifier = Modifier.padding(top = 2.dp)
                             )
+                        }
+
+                        // Direct Dial Action if phone detected
+                        if (detectedPhone != null) {
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$detectedPhone"))
+                                        context.startActivity(dialIntent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Impossible de composer le numéro", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(Icons.Default.Call, contentDescription = "Appeler", tint = AccentColor, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        // Delete Task Button
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    voipRepository.deleteTask(task.id)
+                                    tasks = localDatabase.getTasks()
+                                    Toast.makeText(context, "Tâche supprimée", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = DangerColor, modifier = Modifier.size(15.dp))
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(11.dp))
+                    Spacer(modifier = Modifier.height(9.dp))
                     Divider(color = BorderColor, thickness = 1.dp)
                 }
             }
@@ -335,9 +507,9 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isPlayingThis) "❚❚" else "▶",
+                                text = if (isPlayingThis) "PAUSE" else "PLAY",
                                 color = if (isPlayingThis) AccentText else Text2,
-                                fontSize = 10.5.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -361,7 +533,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
 
                         Box(
                             modifier = Modifier
-                                .size(27.dp)
+                                .size(28.dp)
                                 .clip(RoundedCornerShape(7.dp))
                                 .background(Surface2)
                                 .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
@@ -384,7 +556,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "⬇", color = Text2, fontSize = 11.sp)
+                            Icon(Icons.Default.Share, contentDescription = "Partager", tint = Text2, modifier = Modifier.size(14.dp))
                         }
                     }
 
@@ -487,7 +659,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = "Exporter mes données audio",
+                    text = "Exporter mes données audio (JSON)",
                     color = Text2,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -508,7 +680,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = "Effacer mes enregistrements — droit à l'oubli",
+                    text = "Effacer mes enregistrements (Droit à l'oubli)",
                     color = DangerColor,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -556,5 +728,3 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
         }
     }
 }
-
-

@@ -252,7 +252,7 @@ class PhoneCallRecorderService : Service() {
                         AppNotificationManager.showCallProcessedNotification(
                             this@PhoneCallRecorderService,
                             callId,
-                            contactName,
+                                contactName,
                             "Enregistrement transféré. Résumé et transcription IA en cours."
                         )
                     }

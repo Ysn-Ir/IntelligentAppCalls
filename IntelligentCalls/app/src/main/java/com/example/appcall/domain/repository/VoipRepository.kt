@@ -36,6 +36,7 @@ interface VoipRepository {
     suspend fun fetchTasks(): Result<List<com.example.appcall.data.local.LocalTask>>
     suspend fun createTask(id: String, title: String, completed: Boolean): Result<Unit>
     suspend fun toggleTask(id: String, completed: Boolean): Result<Unit>
+    suspend fun deleteTask(id: String): Result<Unit>
 
     suspend fun fetchAgenda(): Result<List<com.example.appcall.data.local.LocalAgendaItem>>
     suspend fun createAgenda(id: String, title: String, time: String): Result<Unit>

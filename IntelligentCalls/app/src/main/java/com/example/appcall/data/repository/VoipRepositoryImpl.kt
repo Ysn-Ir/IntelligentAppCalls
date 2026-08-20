@@ -545,6 +545,21 @@ class VoipRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteTask(id: String): Result<Unit> {
+        localDatabase.deleteTask(id)
+        val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        return try {
+            val response = apiService.deleteTask(auth, id)
+            if (!response.isSuccessful) {
+                localDatabase.addToSyncQueue(id, "DELETE_TASK")
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            localDatabase.addToSyncQueue(id, "DELETE_TASK")
+            Result.success(Unit)
+        }
+    }
+
     override suspend fun fetchAgenda(): Result<List<com.example.appcall.data.local.LocalAgendaItem>> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
         return try {

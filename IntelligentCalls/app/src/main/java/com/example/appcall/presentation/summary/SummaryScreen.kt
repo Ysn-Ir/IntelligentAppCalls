@@ -13,6 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -182,7 +188,11 @@ fun SummaryScreen(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🔄 Actualiser", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Actualiser", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 
@@ -239,7 +249,7 @@ fun SummaryScreen(
                                         .padding(12.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "⚠️", fontSize = 16.sp)
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = WarnColor, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(text = "Score de confiance IA faible (< 60%)", color = WarnColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -250,11 +260,11 @@ fun SummaryScreen(
                             }
                         }
 
-                        // 1. Caller Card with AI Sentiment Stickers & Topic Tags
+                        // 1. Contact Card Header
                         item {
                             val contactName = summary.appointment?.contactName?.takeIf { it.isNotBlank() } ?: "Appel Enregistré"
                             val phoneNumber = summary.appointment?.phoneNumber?.takeIf { it.isNotBlank() } ?: ""
-                            val initials = contactName.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("").uppercase()
+                            val initials = contactName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").uppercase()
                             val confidencePercent = (summary.confidenceScore ?: 94.0).toInt()
 
                             Box(
@@ -263,7 +273,7 @@ fun SummaryScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(Surface1)
                                     .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                                    .padding(15.dp)
+                                    .padding(14.dp)
                             ) {
                                 Column {
                                     Row(
@@ -277,12 +287,16 @@ fun SummaryScreen(
                                                 .background(AvatarBgA),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(
-                                                text = if (initials.isNotBlank()) initials else "📞",
-                                                color = Text1,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
+                                            if (initials.isNotBlank()) {
+                                                Text(
+                                                    text = initials,
+                                                    color = Text1,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                            } else {
+                                                Icon(Icons.Default.Call, contentDescription = null, tint = Text1, modifier = Modifier.size(18.dp))
+                                            }
                                         }
 
                                         Spacer(modifier = Modifier.width(12.dp))
@@ -326,7 +340,7 @@ fun SummaryScreen(
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "📞", fontSize = 13.sp)
+                                            Icon(Icons.Default.Call, contentDescription = "Composer", tint = Text2, modifier = Modifier.size(14.dp))
                                         }
                                     }
 
@@ -867,7 +881,7 @@ fun SummaryScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("📅 Aucun rendez-vous détecté", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            Text("Aucun rendez-vous détecté", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                             Text("Créer un RDV associé à cet appel", color = Text3, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
                                         }
                                         Box(
@@ -878,7 +892,11 @@ fun SummaryScreen(
                                                 .clickable { showVoiceDialog = true }
                                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
-                                            Text("＋ Ajouter RDV", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Add, contentDescription = null, tint = Text1, modifier = Modifier.size(13.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Ajouter RDV", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -897,12 +915,18 @@ fun SummaryScreen(
                                     .padding(vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = if (isValidated) "Résumé validé et archivé ✓" else "Valider et approuver le résumé",
-                                    color = if (isValidated) SuccessColor else BgColor,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.5.sp
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (isValidated) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = SuccessColor, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        text = if (isValidated) "Résumé validé et archivé" else "Valider et approuver le résumé",
+                                        color = if (isValidated) SuccessColor else BgColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.5.sp
+                                    )
+                                }
                             }
                         }
 
