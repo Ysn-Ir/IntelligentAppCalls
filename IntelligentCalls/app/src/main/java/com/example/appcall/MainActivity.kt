@@ -37,6 +37,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.text.style.TextOverflow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -237,25 +241,33 @@ class MainActivity : ComponentActivity() {
                                     tonalElevation = 0.dp
                                 ) {
                                     val sections = listOf(
-                                        "Appels" to "📞",
-                                        "Assistant IA" to "🤖",
-                                        "Agenda" to "📅",
-                                        "Tâches" to "📋",
-                                        "Paramètres" to "⚙️"
+                                        Triple("Appels", Icons.Default.Call, 0),
+                                        Triple("Assistant IA", Icons.Default.Face, 1),
+                                        Triple("Agenda", Icons.Default.Menu, 2),
+                                        Triple("Tâches", Icons.Default.Check, 3),
+                                        Triple("Paramètres", Icons.Default.Settings, 4)
                                     )
-                                    sections.forEachIndexed { index, (title, iconEmoji) ->
+                                    sections.forEach { (title, iconVector, index) ->
                                         val isSelected = selectedSection == index
                                         NavigationBarItem(
                                             selected = isSelected,
                                             onClick = { selectedSection = index },
-                                            icon = { Text(text = iconEmoji, fontSize = 15.sp) },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = iconVector,
+                                                    contentDescription = title,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = if (isSelected) Text1 else Text3
+                                                )
+                                            },
                                             label = {
                                                 Text(
                                                     text = title,
-                                                    fontSize = 8.5.sp,
+                                                    fontSize = 9.sp,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                     color = if (isSelected) Text1 else Text3,
-                                                    maxLines = 1
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             },
                                             colors = NavigationBarItemDefaults.colors(
@@ -469,13 +481,19 @@ fun AiAssistantSection(
             title = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        Icons.Default.Menu,
+                        contentDescription = null,
+                        tint = Text1,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "📜 Historique des Conversations",
-                        color = Color.White,
-                        fontSize = 16.sp,
+                        text = "Historique des Conversations",
+                        color = Text1,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -488,12 +506,13 @@ fun AiAssistantSection(
                             showHistoryDialog = false
                         },
                         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F172A), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = BgColor, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("+ Nouvelle Conversation", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Nouvelle Conversation", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     if (sessionList.isEmpty()) {
@@ -1044,9 +1063,10 @@ fun SettingsSection(
                             onClick = { showEditProfileDialog = true },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
-                            Text("✏️ Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            Text("Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
 
                         Button(
@@ -1058,16 +1078,205 @@ fun SettingsSection(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
-                            Text("🔒 Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            Text("Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
         }
 
-        // ── 2. CLOUD TELEPHONY & VOIP PROVIDERS (MULTI-FOURNISSEUR) ────────────
+        // ── 2. AI & LLM PROVIDER API KEYS & ENGINE CONFIGURATION ────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Column {
+                    val aiPrefs = remember { context.getSharedPreferences("ai_settings", android.content.Context.MODE_PRIVATE) }
+                    var groqApiKey by remember { mutableStateOf(aiPrefs.getString("groq_api_key", "") ?: "") }
+                    var deepgramApiKey by remember { mutableStateOf(aiPrefs.getString("deepgram_api_key", "") ?: "") }
+                    var openAiApiKey by remember { mutableStateOf(aiPrefs.getString("openai_api_key", "") ?: "") }
+                    var selectedWhisperModel by remember { mutableStateOf(aiPrefs.getString("whisper_model", "faster-whisper-small") ?: "faster-whisper-small") }
+                    var selectedLlmModel by remember { mutableStateOf(aiPrefs.getString("llm_model", "llama-3.3-70b-versatile") ?: "llama-3.3-70b-versatile") }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("MOTEURS IA & CLÉS D'ACCÈS API", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                            Text("Groq, Deepgram STT, OpenAI & Whisper", color = Text2, fontSize = 11.5.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(AccentDim)
+                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        ) {
+                            Text("Pipeline Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Renseignez vos clés d'API personnelles pour activer la transcription vocale haute fidélité et les résumés automatiques :",
+                        color = Text3,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = groqApiKey,
+                        onValueChange = { groqApiKey = it },
+                        label = { Text("Clé API Groq (gsk_...)", color = Text3, fontSize = 11.5.sp) },
+                        placeholder = { Text("gsk_...", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = deepgramApiKey,
+                        onValueChange = { deepgramApiKey = it },
+                        label = { Text("Clé API Deepgram (Nova-2 Speech-to-Text)", color = Text3, fontSize = 11.5.sp) },
+                        placeholder = { Text("Token Deepgram streaming audio", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = openAiApiKey,
+                        onValueChange = { openAiApiKey = it },
+                        label = { Text("Clé API OpenAI / Claude / Gemini", color = Text3, fontSize = 11.5.sp) },
+                        placeholder = { Text("sk-...", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Modèle Transcription Vocale (STT) :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val whisperModels = listOf(
+                        "faster-whisper-small" to "Whisper Small",
+                        "faster-whisper-medium" to "Whisper Med",
+                        "faster-whisper-large-v3" to "Large-v3 HD"
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        whisperModels.forEach { (mId, mLabel) ->
+                            val isSelected = selectedWhisperModel == mId
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Text1 else Surface2)
+                                    .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                    .clickable { selectedWhisperModel = mId }
+                                    .padding(vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = mLabel,
+                                    color = if (isSelected) BgColor else Text2,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Moteur LLM Synthèse & RDV :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val llmModels = listOf(
+                        "llama-3.3-70b-versatile" to "Llama 3.3",
+                        "mixtral-8x7b-32768" to "Mixtral",
+                        "gpt-4o" to "GPT-4o"
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        llmModels.forEach { (mId, mLabel) ->
+                            val isSelected = selectedLlmModel == mId
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) Text1 else Surface2)
+                                    .border(1.dp, if (isSelected) Text1 else BorderColor, RoundedCornerShape(8.dp))
+                                    .clickable { selectedLlmModel = mId }
+                                    .padding(vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = mLabel,
+                                    color = if (isSelected) BgColor else Text2,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            aiPrefs.edit()
+                                .putString("groq_api_key", groqApiKey.trim())
+                                .putString("deepgram_api_key", deepgramApiKey.trim())
+                                .putString("openai_api_key", openAiApiKey.trim())
+                                .putString("whisper_model", selectedWhisperModel)
+                                .putString("llm_model", selectedLlmModel)
+                                .apply()
+                            Toast.makeText(context, "Clés API IA enregistrées avec succès", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(vertical = 11.dp)
+                    ) {
+                        Text("Enregistrer les Clés API IA", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+
+        // ── 3. CLOUD TELEPHONY & VOIP PROVIDERS (MULTI-FOURNISSEUR) ────────────
         item {
             Box(
                 modifier = Modifier
@@ -1147,7 +1356,9 @@ fun SettingsSection(
                                         text = label,
                                         color = if (isSelected) BgColor else Text2,
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -1176,7 +1387,9 @@ fun SettingsSection(
                                         text = label,
                                         color = if (isSelected) BgColor else Text2,
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -1280,16 +1493,17 @@ fun SettingsSection(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 11.dp)
                         ) {
-                            Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
         }
 
-        // ── 3. SHIZUKU STATUS CARD ──────────────────────────────────────────────
+        // ── 4. SHIZUKU STATUS CARD ──────────────────────────────────────────────
         item {
             val isShizukuAvailable = remember { shizukuManager?.isShizukuAvailable() == true }
             val hasShizukuPerm = remember { shizukuManager?.hasShizukuPermission() == true }
@@ -1320,7 +1534,9 @@ fun SettingsSection(
                             },
                             color = Text1,
                             fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     if (isShizukuAvailable && !hasShizukuPerm) {
@@ -1328,7 +1544,8 @@ fun SettingsSection(
                         Button(
                             onClick = { shizukuManager?.requestShizukuPermission() },
                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                         ) {
                             Text("Autoriser Shizuku", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
@@ -1337,7 +1554,7 @@ fun SettingsSection(
             }
         }
 
-        // ── 4. SERVER CONFIG CARD ───────────────────────────────────────────────
+        // ── 5. SERVER CONFIG CARD ───────────────────────────────────────────────
         item {
             Box(
                 modifier = Modifier
@@ -1348,7 +1565,7 @@ fun SettingsSection(
                     .padding(14.dp)
             ) {
                 Column {
-                    Text("CONFIGURATION SERVEUR & IA", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                    Text("CONFIGURATION SERVEUR BACKEND", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                     Spacer(modifier = Modifier.height(10.dp))
                     var customUrlText by remember { 
                         mutableStateOf(
@@ -1384,9 +1601,10 @@ fun SettingsSection(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
-                            Text("🔌 Mode USB", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("USB Local", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Button(
                             onClick = {
@@ -1399,9 +1617,10 @@ fun SettingsSection(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
-                            Text("📶 Mode Wi-Fi", color = AccentText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Wi-Fi Réseau", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1420,9 +1639,10 @@ fun SettingsSection(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
-                            Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Button(
                             onClick = {
@@ -1441,30 +1661,33 @@ fun SettingsSection(
                                         val code = conn.responseCode
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                             if (code in 200..499) {
-                                                Toast.makeText(context, "✅ Backend connecté (HTTP $code)", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Backend connecté (HTTP $code)", Toast.LENGTH_SHORT).show()
                                             } else {
-                                                Toast.makeText(context, "⚠️ Réponse inattendue: HTTP $code", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Réponse inattendue: HTTP $code", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     } catch (e: Exception) {
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                            Toast.makeText(context, "❌ Impossible de joindre le serveur: ${e.message}", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Impossible de joindre le serveur: ${e.message}", Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 }
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
-                            Text("🔄 Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             }
         }
 
-        // ── RGPD & GESTION DES DONNÉES ──────────────────────────────────────────
+        // ── 6. RGPD & GESTION DES DONNÉES ──────────────────────────────────────────
         item {
             Box(
                 modifier = Modifier
@@ -1516,9 +1739,12 @@ fun SettingsSection(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Surface2),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        Text("📥 Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.5.sp)
+                        Icon(Icons.Default.Share, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1528,9 +1754,12 @@ fun SettingsSection(
                         onClick = { showDeleteVoiceDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = WarnColor),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.5.sp)
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = WarnColor, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1540,9 +1769,12 @@ fun SettingsSection(
                         onClick = { showDeleteAccountDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = DangerColor),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        Text("🗑️ Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
