@@ -195,7 +195,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = if (isAddingAgenda) "✕ Fermer" else "＋ Nouveau RDV",
+                        text = if (isAddingAgenda) "✕ ${strings.close}" else "＋ ${strings.addAppointment}",
                         color = if (isAddingAgenda) DangerColor else Text1,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
@@ -225,7 +225,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "TOUS (${appointments.size})",
+                        text = strings.allTasksFilter.uppercase(),
                         color = if (isAllSelected) BgColor else Text2,
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold
@@ -290,7 +290,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
             ) {
                 Column {
                     Text(
-                        text = "PLANIFIER UN RENDEZ-VOUS",
+                        text = strings.planAppointment,
                         color = Text3,
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -305,7 +305,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                         OutlinedTextField(
                             value = newTitle,
                             onValueChange = { newTitle = it },
-                            placeholder = { Text("Titre du RDV...", color = Text3, fontSize = 12.sp) },
+                            placeholder = { Text(strings.appointmentTitlePlaceholder, color = Text3, fontSize = 12.sp) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
@@ -348,7 +348,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Ajouter", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(strings.validate, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
 
@@ -362,12 +362,12 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("JOUR :", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.dayLabel, color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         listOf(
-                            0 to "Aujourd'hui",
-                            1 to "Demain",
-                            2 to "Après-demain",
-                            7 to "+1 sem"
+                            0 to strings.today,
+                            1 to strings.tomorrow,
+                            2 to strings.afterTomorrow,
+                            7 to strings.oneWeek
                         ).forEach { (offset, label) ->
                             val isSel = customSelectedDateStr == null && selectedDayOffset == offset
                             Box(
@@ -396,7 +396,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = customSelectedDateStr?.let { "📅 $it" } ?: "📅 Date...",
+                                text = customSelectedDateStr?.let { "📅 $it" } ?: strings.calendarPicker,
                                 color = if (customSelectedDateStr != null) BgColor else Text2,
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -414,7 +414,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("HEURE :", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.hourLabel, color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         listOf("09:00", "11:00", "14:00", "16:30", "18:00").forEach { time ->
                             val isSel = selectedTime == time
                             Box(

@@ -205,13 +205,13 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 AlertDialog(
                     onDismissRequest = { showAddTaskDialog = false },
                     containerColor = Surface1,
-                    title = { Text("Nouvelle tâche", color = Text1, fontWeight = FontWeight.Bold) },
+                    title = { Text(strings.addTask, color = Text1, fontWeight = FontWeight.Bold) },
                     text = {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = newTaskTitle,
                                 onValueChange = { newTaskTitle = it },
-                                placeholder = { Text("Ex: Rappeler Marc au 0612345678...", color = Text3, fontSize = 13.sp) },
+                                placeholder = { Text(strings.taskTitlePlaceholder, color = Text3, fontSize = 13.sp) },
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = BorderStrong,
@@ -223,28 +223,33 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Priorité :", color = Text3, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                            Text(strings.priorityLabel, color = Text3, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                val priorities = listOf("URGENT" to DangerColor, "IMPORTANT" to WarnColor, "NORMAL" to AccentColor)
-                                priorities.forEach { (p, color) ->
-                                    val isPSelected = selectedPriority == p
+                                val priorities = listOf(
+                                    ("URGENT" to strings.priorityUrgent) to DangerColor,
+                                    ("IMPORTANT" to strings.priorityImportant) to WarnColor,
+                                    ("NORMAL" to strings.priorityNormal) to AccentColor
+                                )
+                                priorities.forEach { (pPair, color) ->
+                                    val (pId, pLabel) = pPair
+                                    val isPSelected = selectedPriority == pId
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(6.dp))
                                             .background(if (isPSelected) color.copy(alpha = 0.2f) else Surface2)
                                             .border(1.dp, if (isPSelected) color else BorderColor, RoundedCornerShape(6.dp))
-                                            .clickable { selectedPriority = p }
+                                            .clickable { selectedPriority = pId }
                                             .padding(vertical = 6.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = p,
+                                            text = pLabel,
                                             color = if (isPSelected) color else Text3,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold
@@ -276,10 +281,10 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Text1)
-                        ) { Text("Ajouter", color = BgColor, fontWeight = FontWeight.Bold) }
+                        ) { Text(strings.addTask, color = BgColor, fontWeight = FontWeight.Bold) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showAddTaskDialog = false }) { Text("Annuler", color = Text3) }
+                        TextButton(onClick = { showAddTaskDialog = false }) { Text(strings.close, color = Text3) }
                     }
                 )
             }
@@ -294,7 +299,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (selectedFilter == TaskFilter.ALL) "Aucune tâche enregistrée" else "Aucune tâche dans cette vue",
+                        text = strings.noTasks,
                         color = Text3,
                         fontSize = 12.5.sp
                     )
@@ -380,7 +385,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             }
 
                             Text(
-                                text = "Détecté par IA · Intelligent Calls",
+                                text = strings.detectedByAi,
                                 color = Text3,
                                 fontSize = 9.5.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -401,7 +406,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                 },
                                 modifier = Modifier.size(30.dp)
                             ) {
-                                Icon(Icons.Default.Call, contentDescription = "Appeler", tint = AccentColor, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Call, contentDescription = strings.startCall, tint = AccentColor, modifier = Modifier.size(16.dp))
                             }
                         }
 
@@ -416,12 +421,12 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             },
                             modifier = Modifier.size(30.dp)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = DangerColor, modifier = Modifier.size(15.dp))
+                            Icon(Icons.Default.Delete, contentDescription = strings.delete, tint = DangerColor, modifier = Modifier.size(15.dp))
                         }
                     }
 
                     Spacer(modifier = Modifier.height(9.dp))
-                    Divider(color = BorderColor, thickness = 1.dp)
+                    HorizontalDivider(color = BorderColor, thickness = 1.dp)
                 }
             }
         }
@@ -429,7 +434,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
         // ── SECTION 2: COFFRE-FORT AUDIO ──
         item {
             Text(
-                text = "COFFRE-FORT AUDIO",
+                text = strings.audioVault,
                 color = Text3,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -441,7 +446,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
         if (audioFiles.isEmpty()) {
             item {
                 Text(
-                    text = "Aucun enregistrement audio pour le moment",
+                    text = strings.noAudioRecordings,
                     color = Text3,
                     fontSize = 12.5.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -527,7 +532,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             )
                             val sizeMb = String.format("%.1f MB", file.length().toDouble() / (1024 * 1024))
                             Text(
-                                text = if (isPlayingThis) "En cours de lecture..." else sizeMb,
+                                text = if (isPlayingThis) strings.playingAudio else sizeMb,
                                 color = if (isPlayingThis) SuccessColor else Text3,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -553,19 +558,19 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                             putExtra(Intent.EXTRA_STREAM, uri)
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Partager l'enregistrement"))
+                                        context.startActivity(Intent.createChooser(shareIntent, strings.shareRecording))
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "Erreur partage: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = "Partager", tint = Text2, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Share, contentDescription = strings.shareRecording, tint = Text2, modifier = Modifier.size(14.dp))
                         }
                     }
 
                     Spacer(modifier = Modifier.height(11.dp))
-                    Divider(color = BorderColor, thickness = 1.dp)
+                    HorizontalDivider(color = BorderColor, thickness = 1.dp)
                 }
             }
         }
@@ -573,7 +578,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
         // ── SECTION 3: CONFIDENTIALITÉ RGPD ──
         item {
             Text(
-                text = "CONFIDENTIALITÉ RGPD",
+                text = strings.gdprSection,
                 color = Text3,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -593,13 +598,13 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Consentement données vocales",
+                        text = strings.gdprVoiceConsentDesc,
                         color = Text1,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Autoriser l'enregistrement et l'analyse IA",
+                        text = strings.aiConsentActive,
                         color = Text3,
                         fontSize = 10.5.sp,
                         modifier = Modifier.padding(top = 2.dp)
@@ -618,7 +623,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 )
             }
 
-            Divider(color = BorderColor, thickness = 1.dp)
+            HorizontalDivider(color = BorderColor, thickness = 1.dp)
             Spacer(modifier = Modifier.height(14.dp))
 
             var showDeleteVoiceDialog by remember { mutableStateOf(false) }
@@ -648,7 +653,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                             putExtra(Intent.EXTRA_SUBJECT, "Export Données RGPD AppCall")
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Exporter mes données (JSON)"))
+                                        context.startActivity(Intent.createChooser(shareIntent, strings.exportGdpr))
                                         Toast.makeText(context, "Export généré avec succès", Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -663,7 +668,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = "Exporter mes données audio (JSON)",
+                    text = strings.gdprVoiceExport,
                     color = Text2,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -684,7 +689,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = "Effacer mes enregistrements (Droit à l'oubli)",
+                    text = strings.gdprDeleteVoice,
                     color = DangerColor,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -695,7 +700,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 AlertDialog(
                     onDismissRequest = { showDeleteVoiceDialog = false },
                     containerColor = Surface1,
-                    title = { Text("Supprimer les enregistrements vocaux", color = Text1, fontWeight = FontWeight.Bold) },
+                    title = { Text(strings.gdprDeleteVoice, color = Text1, fontWeight = FontWeight.Bold) },
                     text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fichiers locaux et distants seront effacés.", color = Text2, fontSize = 12.sp) },
                     confirmButton = {
                         Button(
@@ -720,10 +725,10 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                 showDeleteVoiceDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
-                        ) { Text("Confirmer", color = Text1) }
+                        ) { Text(strings.validate, color = Text1) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteVoiceDialog = false }) { Text("Annuler", color = Text3) }
+                        TextButton(onClick = { showDeleteVoiceDialog = false }) { Text(strings.close, color = Text3) }
                     }
                 )
             }

@@ -27,6 +27,11 @@ fun CallHistoryScreen(
     onCallClick: (String) -> Unit,
     onFabClick: (() -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterIndex by remember { mutableIntStateOf(0) } // 0 = Tous, 1 = Manqués, 2 = Avec résumé
 
@@ -66,7 +71,7 @@ fun CallHistoryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Appels",
+                        text = strings.navCalls,
                         color = Text1,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -83,7 +88,7 @@ fun CallHistoryScreen(
                                 .background(SuccessColor)
                         )
                         Text(
-                            text = "Synchronisé",
+                            text = strings.callHistorySynchronized,
                             color = Text3,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
@@ -117,7 +122,7 @@ fun CallHistoryScreen(
                         decorationBox = { innerTextField ->
                             if (searchQuery.isEmpty()) {
                                 Text(
-                                    text = "Rechercher un contact...",
+                                    text = strings.searchContactPlaceholder,
                                     color = Text3,
                                     fontSize = 13.5.sp
                                 )
@@ -139,7 +144,7 @@ fun CallHistoryScreen(
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val tabs = listOf("Tous", "Manqués", "Avec résumé")
+                    val tabs = listOf(strings.callHistoryAll, strings.callHistoryMissed, strings.callHistoryWithSummary)
                     tabs.forEachIndexed { index, tabTitle ->
                         val isSelected = selectedFilterIndex == index
                         Box(
@@ -171,7 +176,7 @@ fun CallHistoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Aucun appel dans l'historique",
+                        text = strings.callHistoryEmpty,
                         color = Text3,
                         fontSize = 14.sp
                     )

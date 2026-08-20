@@ -260,103 +260,105 @@ class MainActivity : ComponentActivity() {
                         var appLanguageCode by remember { mutableStateOf(netPrefs.getString("app_language", "en") ?: "en") }
                         val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
 
-                        Scaffold(
-                            bottomBar = {
-                                NavigationBar(
-                                    containerColor = BgColor,
-                                    contentColor = Text1,
-                                    tonalElevation = 0.dp
-                                ) {
-                                    val sections = listOf(
-                                        Triple(strings.navCalls, Icons.Default.Call, 0),
-                                        Triple(strings.navAssistant, Icons.Default.Face, 1),
-                                        Triple(strings.navAgenda, Icons.Default.Menu, 2),
-                                        Triple(strings.navTasks, Icons.Default.Check, 3),
-                                        Triple(strings.navSettings, Icons.Default.Settings, 4)
-                                    )
-                                    sections.forEach { (title, iconVector, index) ->
-                                        val isSelected = selectedSection == index
-                                        NavigationBarItem(
-                                            selected = isSelected,
-                                            onClick = { selectedSection = index },
-                                            icon = {
-                                                Icon(
-                                                    imageVector = iconVector,
-                                                    contentDescription = title,
-                                                    modifier = Modifier.size(24.dp),
-                                                    tint = if (isSelected) Text1 else Text3
-                                                )
-                                            },
-                                            label = {
-                                                Text(
-                                                    text = title,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (isSelected) Text1 else Text3,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                selectedIconColor = Text1,
-                                                unselectedIconColor = Text3,
-                                                selectedTextColor = Text1,
-                                                unselectedTextColor = Text3,
-                                                indicatorColor = Surface2
-                                            )
+                        androidx.compose.runtime.key(appLanguageCode) {
+                            Scaffold(
+                                bottomBar = {
+                                    NavigationBar(
+                                        containerColor = BgColor,
+                                        contentColor = Text1,
+                                        tonalElevation = 0.dp
+                                    ) {
+                                        val sections = listOf(
+                                            Triple(strings.navCalls, Icons.Default.Call, 0),
+                                            Triple(strings.navAssistant, Icons.Default.Face, 1),
+                                            Triple(strings.navAgenda, Icons.Default.Menu, 2),
+                                            Triple(strings.navTasks, Icons.Default.Check, 3),
+                                            Triple(strings.navSettings, Icons.Default.Settings, 4)
                                         )
+                                        sections.forEach { (title, iconVector, index) ->
+                                            val isSelected = selectedSection == index
+                                            NavigationBarItem(
+                                                selected = isSelected,
+                                                onClick = { selectedSection = index },
+                                                icon = {
+                                                    Icon(
+                                                        imageVector = iconVector,
+                                                        contentDescription = title,
+                                                        modifier = Modifier.size(24.dp),
+                                                        tint = if (isSelected) Text1 else Text3
+                                                    )
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = title,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isSelected) Text1 else Text3,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                },
+                                                colors = NavigationBarItemDefaults.colors(
+                                                    selectedIconColor = Text1,
+                                                    unselectedIconColor = Text3,
+                                                    selectedTextColor = Text1,
+                                                    unselectedTextColor = Text3,
+                                                    indicatorColor = Surface2
+                                                )
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        ) { paddingValues ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(paddingValues)
-                            ) {
-                                when (selectedSection) {
-                                    0 -> {
-                                        CallScreen(
-                                            viewModel = callViewModel,
-                                            onLogout = {
-                                                tokenStorage.clear()
-                                                loginViewModel.resetState()
-                                                selectedSection = 0
-                                                currentScreen = AppScreen.LOGIN
-                                            },
-                                            onNavigateToSummary = { callId ->
-                                                activeCallIdForSummary = callId
-                                                currentScreen = AppScreen.SUMMARY
-                                            }
-                                        )
-                                    }
-                                    1 -> {
-                                        AiAssistantSection(localDatabase, voipRepository)
-                                    }
-                                    2 -> {
-                                        AgendaSection(localDatabase, voipRepository)
-                                    }
-                                    3 -> {
-                                        TasksSection(localDatabase, voipRepository)
-                                    }
-                                    4 -> {
-                                        SettingsSection(
-                                            voipRepository = voipRepository,
-                                            shizukuManager = shizukuManager,
-                                            currentThemeMode = currentThemeMode,
-                                            currentLanguage = appLanguageCode,
-                                            onLanguageChange = { newLang ->
-                                                appLanguageCode = newLang
-                                                netPrefs.edit().putString("app_language", newLang).apply()
-                                            },
-                                            onThemeChange = { newMode -> currentThemeMode = newMode },
-                                            onLogout = {
-                                                tokenStorage.clear()
-                                                loginViewModel.resetState()
-                                                selectedSection = 0
-                                                currentScreen = AppScreen.LOGIN
-                                            }
-                                        )
+                            ) { paddingValues ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                ) {
+                                    when (selectedSection) {
+                                        0 -> {
+                                            CallScreen(
+                                                viewModel = callViewModel,
+                                                onLogout = {
+                                                    tokenStorage.clear()
+                                                    loginViewModel.resetState()
+                                                    selectedSection = 0
+                                                    currentScreen = AppScreen.LOGIN
+                                                },
+                                                onNavigateToSummary = { callId ->
+                                                    activeCallIdForSummary = callId
+                                                    currentScreen = AppScreen.SUMMARY
+                                                }
+                                            )
+                                        }
+                                        1 -> {
+                                            AiAssistantSection(localDatabase, voipRepository)
+                                        }
+                                        2 -> {
+                                            AgendaSection(localDatabase, voipRepository)
+                                        }
+                                        3 -> {
+                                            TasksSection(localDatabase, voipRepository)
+                                        }
+                                        4 -> {
+                                            SettingsSection(
+                                                voipRepository = voipRepository,
+                                                shizukuManager = shizukuManager,
+                                                currentThemeMode = currentThemeMode,
+                                                currentLanguage = appLanguageCode,
+                                                onLanguageChange = { newLang ->
+                                                    appLanguageCode = newLang
+                                                    netPrefs.edit().putString("app_language", newLang).apply()
+                                                },
+                                                onThemeChange = { newMode -> currentThemeMode = newMode },
+                                                onLogout = {
+                                                    tokenStorage.clear()
+                                                    loginViewModel.resetState()
+                                                    selectedSection = 0
+                                                    currentScreen = AppScreen.LOGIN
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -560,21 +562,22 @@ fun AiAssistantSection(
             title = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.Menu,
-                        contentDescription = null,
-                        tint = Text1,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Historique des Conversations",
-                        color = Text1,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Menu,
+                            contentDescription = null,
+                            tint = Text1,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(strings.chatHistory, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    }
+                    IconButton(onClick = { showHistoryDialog = false }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = strings.close, tint = Text3)
+                    }
                 }
             },
             text = {
@@ -591,7 +594,7 @@ fun AiAssistantSection(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = BgColor, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Nouvelle Conversation", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(strings.newChat, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     if (sessionList.isEmpty()) {
@@ -599,7 +602,7 @@ fun AiAssistantSection(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Aucune conversation enregistrée.", color = Text3, fontSize = 13.sp)
+                            Text(strings.noChatRecorded, color = Text3, fontSize = 13.sp)
                         }
                     } else {
                         LazyColumn(
@@ -607,7 +610,7 @@ fun AiAssistantSection(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             items(sessionList) { session ->
-                                val dateStr = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRENCH).format(Date(session.lastTimestamp))
+                                val dateStr = SimpleDateFormat("dd/MM/yyyy HH:mm", com.example.appcall.presentation.theme.getAppLocale(appLanguageCode)).format(Date(session.lastTimestamp))
                                 val isCurrent = session.sessionId == currentSessionId
 
                                 Box(
@@ -637,7 +640,7 @@ fun AiAssistantSection(
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = if (isCurrent) "Session Active" else "${session.messageCount} msg",
+                                                    text = if (isCurrent) strings.active else "${session.messageCount} msg",
                                                     color = if (isCurrent) AccentText else Text3,
                                                     fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold
@@ -667,7 +670,7 @@ fun AiAssistantSection(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Delete,
-                                                    contentDescription = "Supprimer",
+                                                    contentDescription = strings.delete,
                                                     tint = DangerColor,
                                                     modifier = Modifier.size(15.dp)
                                                 )
@@ -682,7 +685,7 @@ fun AiAssistantSection(
                                                 shape = RoundedCornerShape(6.dp)
                                             ) {
                                                 Text(
-                                                    text = if (isCurrent) "Actif" else "Ouvrir",
+                                                    text = if (isCurrent) strings.active else strings.open,
                                                     color = if (isCurrent) Text1 else Text2,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold
@@ -698,7 +701,7 @@ fun AiAssistantSection(
             },
             confirmButton = {
                 TextButton(onClick = { showHistoryDialog = false }) {
-                    Text("Fermer", color = Text1, fontWeight = FontWeight.Bold)
+                    Text(strings.close, color = Text1, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -885,7 +888,7 @@ fun AiAssistantSection(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(color = AccentColor, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("L'assistant analyse vos appels...", color = Text3, fontSize = 12.sp)
+                                Text(strings.chatAnalyzing, color = Text3, fontSize = 12.sp)
                             }
                         }
                     }
@@ -975,7 +978,7 @@ fun AiAssistantSection(
                     modifier = Modifier.fillMaxWidth(),
                     decorationBox = { innerTextField ->
                         if (promptText.isEmpty()) {
-                            Text("Posez une question sur vos appels...", color = Text3, fontSize = 13.sp)
+                            Text(strings.chatPlaceholder, color = Text3, fontSize = 13.sp)
                         }
                         innerTextField()
                     }
@@ -993,12 +996,12 @@ fun AiAssistantSection(
                         try {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Parlez à votre assistant AppCall...")
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, appLanguageCode)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, strings.chatPlaceholder)
                             }
                             speechLauncher.launch(intent)
                         } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, "Dictée vocale non disponible sur ce terminal", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, strings.voiceDictationNotAvailable, android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -1308,7 +1311,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                             ) {
-                                Text("Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.editProfile, color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
 
                             Button(
@@ -1323,7 +1326,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                             ) {
-                                Text("Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.changePassword, color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -1490,7 +1493,7 @@ fun SettingsSection(
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text("PRÉFÉRENCES D'ENREGISTREMENT & APPELS", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Text(strings.recordPrefsSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val callPrefs = remember { context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE) }
@@ -1503,8 +1506,8 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Enregistrement automatique des appels", color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Interception native lors du décrochage", color = Text3, fontSize = 10.5.sp)
+                                Text(strings.autoRecordCalls, color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                Text(strings.autoRecordDesc, color = Text3, fontSize = 10.5.sp)
                             }
                             Switch(
                                 checked = autoRecord,
@@ -1526,8 +1529,8 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Format Audio HD (16kHz WAV)", color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Précision optimale pour Whisper & Deepgram", color = Text3, fontSize = 10.5.sp)
+                                Text(strings.hdAudioWav, color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                Text(strings.hqAudioDesc, color = Text3, fontSize = 10.5.sp)
                             }
                             Switch(
                                 checked = highQualityAudio,
@@ -1550,7 +1553,7 @@ fun SettingsSection(
                     colors = ButtonDefaults.buttonColors(containerColor = Surface2),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("DÉCONNEXION", color = DangerColor, fontWeight = FontWeight.Bold)
+                    Text(strings.logout.uppercase(), color = DangerColor, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(60.dp))
             }
@@ -1583,8 +1586,8 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("MOTEURS IA & CLÉS D'ACCÈS API", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                                Text("Groq, Deepgram STT, OpenAI & Whisper", color = Text2, fontSize = 11.5.sp)
+                                Text(strings.aiEnginesSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text(strings.aiEnginesSubtitle, color = Text2, fontSize = 11.5.sp)
                             }
                             Box(
                                 modifier = Modifier
@@ -1592,13 +1595,13 @@ fun SettingsSection(
                                     .background(AccentDim)
                                     .padding(horizontal = 7.dp, vertical = 2.5.dp)
                             ) {
-                                Text("Pipeline Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                                Text(strings.activePipeline, color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Renseignez vos clés d'API personnelles pour activer la transcription vocale haute fidélité et les résumés automatiques :",
+                            text = strings.aiSettingsDescription,
                             color = Text3,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
@@ -1608,7 +1611,7 @@ fun SettingsSection(
                         OutlinedTextField(
                             value = groqApiKey,
                             onValueChange = { groqApiKey = it },
-                            label = { Text("Clé API Groq (gsk_...)", color = Text3, fontSize = 11.5.sp) },
+                            label = { Text(strings.groqApiKeyLabel, color = Text3, fontSize = 11.5.sp) },
                             placeholder = { Text("gsk_...", color = Text3) },
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -1624,7 +1627,7 @@ fun SettingsSection(
                         OutlinedTextField(
                             value = deepgramApiKey,
                             onValueChange = { deepgramApiKey = it },
-                            label = { Text("Clé API Deepgram (Nova-2 Speech-to-Text)", color = Text3, fontSize = 11.5.sp) },
+                            label = { Text(strings.deepgramApiKeyLabel, color = Text3, fontSize = 11.5.sp) },
                             placeholder = { Text("Token Deepgram streaming audio", color = Text3) },
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -1640,7 +1643,7 @@ fun SettingsSection(
                         OutlinedTextField(
                             value = openAiApiKey,
                             onValueChange = { openAiApiKey = it },
-                            label = { Text("Clé API OpenAI / Claude / Gemini", color = Text3, fontSize = 11.5.sp) },
+                            label = { Text(strings.openAiApiKeyLabel, color = Text3, fontSize = 11.5.sp) },
                             placeholder = { Text("sk-...", color = Text3) },
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -1653,7 +1656,7 @@ fun SettingsSection(
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Modèle Transcription Vocale (STT) :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(strings.sttModelLabel, color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(6.dp))
                         val whisperModels = listOf(
                             "faster-whisper-small" to "Whisper Small",
@@ -1689,7 +1692,7 @@ fun SettingsSection(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Moteur LLM Synthèse & RDV :", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(strings.llmModelLabel, color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(6.dp))
                         val llmModels = listOf(
                             "llama-3.3-70b-versatile" to "Llama 3.3",
@@ -1741,7 +1744,7 @@ fun SettingsSection(
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(vertical = 11.dp)
                         ) {
-                            Text("Enregistrer les Clés API IA", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(strings.saveAiApiKeys, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -1780,8 +1783,8 @@ fun SettingsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("CLOUD TELEPHONY & MULTI-VOIP", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                                Text("Twilio, Telnyx, Plivo, Vonage & SIP Trunk", color = Text2, fontSize = 11.5.sp)
+                                Text(strings.cloudTelephonySection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                                Text(strings.cloudTelephonySubtitle, color = Text2, fontSize = 11.5.sp)
                             }
                             Switch(
                                 checked = voipEnabled,
@@ -1796,7 +1799,7 @@ fun SettingsSection(
                         if (voipEnabled) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Sélectionnez votre opérateur VoIP Cloud pour l'enregistrement 2-Way HD et la transcription automatique :",
+                                text = strings.voipSelectProviderLabel,
                                 color = Text3,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
@@ -1923,7 +1926,7 @@ fun SettingsSection(
                             OutlinedTextField(
                                 value = voipNumber,
                                 onValueChange = { voipNumber = it },
-                                label = { Text("Numéro Virtuel / Passerelle (+33...)", color = Text3, fontSize = 11.5.sp) },
+                                label = { Text(strings.virtualNumberLabel, color = Text3, fontSize = 11.5.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = BorderStrong,
@@ -1967,7 +1970,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(vertical = 11.dp)
                             ) {
-                                Text("Enregistrer les identifiants $selectedProvider", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${strings.saveVoipCredentials} ($selectedProvider)", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -1988,7 +1991,7 @@ fun SettingsSection(
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text("SHIZUKU API — PERMISSIONS ÉLEVÉES ADB", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Text(strings.shizukuSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -1999,9 +2002,9 @@ fun SettingsSection(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = when {
-                                    isShizukuAvailable && hasShizukuPerm -> "Shizuku Connecté (Permissions ADB Actives)"
-                                    isShizukuAvailable -> "Shizuku Détecté (Permission requise)"
-                                    else -> "Shizuku Non Détecté / Service arrêté"
+                                    isShizukuAvailable && hasShizukuPerm -> strings.shizukuStatusConnected
+                                    isShizukuAvailable -> strings.shizukuStatusRequired
+                                    else -> strings.shizukuStatusStopped
                                 },
                                 color = Text1,
                                 fontSize = 12.5.sp,
@@ -2018,7 +2021,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                             ) {
-                                Text("Autoriser Shizuku", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(strings.authorizeShizuku, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -2036,7 +2039,7 @@ fun SettingsSection(
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text("CONFIGURATION SERVEUR BACKEND", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Text(strings.serverConfigSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                         Spacer(modifier = Modifier.height(10.dp))
                         var customUrlText by remember { 
                             mutableStateOf(
@@ -2047,7 +2050,7 @@ fun SettingsSection(
                         OutlinedTextField(
                             value = customUrlText,
                             onValueChange = { customUrlText = it },
-                            label = { Text("URL du serveur (ex: http://127.0.0.1:8000)", color = Text3, fontSize = 12.sp) },
+                            label = { Text(strings.serverUrlLabel, color = Text3, fontSize = 12.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = BorderStrong,
@@ -2075,7 +2078,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                             ) {
-                                Text("USB Local", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.usbLocalMode, color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Button(
                                 onClick = {
@@ -2091,7 +2094,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                             ) {
-                                Text("Wi-Fi Réseau", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.wifiNetworkMode, color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -2113,7 +2116,7 @@ fun SettingsSection(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                             ) {
-                                Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.saveServer, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Button(
                                 onClick = {
@@ -2151,7 +2154,7 @@ fun SettingsSection(
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(strings.testServer, color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -2169,10 +2172,10 @@ fun SettingsSection(
                         .padding(14.dp)
                 ) {
                     Column {
-                        Text("RGPD & PROTECTION DES DONNÉES", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Text(strings.gdprSection, color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Conformément au RGPD (Règlement Général sur la Protection des Données), vous disposez d'un droit d'accès, d'export et d'effacement complet de vos données.",
+                            strings.gdprNoticeText,
                             color = Text2, fontSize = 11.5.sp, lineHeight = 17.sp
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -2215,7 +2218,7 @@ fun SettingsSection(
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Exporter mes données (Art. 15 RGPD)", color = Text1, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(strings.exportGdpr, color = Text1, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -2230,7 +2233,7 @@ fun SettingsSection(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = WarnColor, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Effacer uniquement les enregistrements", color = WarnColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(strings.deleteVoiceOnly, color = WarnColor, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -2245,7 +2248,7 @@ fun SettingsSection(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = Text1, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Supprimer mon compte & mes données", color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(strings.deleteAccount, color = Text1, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -2287,10 +2290,10 @@ fun SettingsSection(
                         showDeleteVoiceDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnColor)
-                ) { Text("Confirmer", color = BgColor, fontWeight = FontWeight.Bold) }
+                ) { Text(strings.validate, color = BgColor, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteVoiceDialog = false }) { Text("Annuler", color = Text3) }
+                TextButton(onClick = { showDeleteVoiceDialog = false }) { Text(strings.close, color = Text3) }
             },
             containerColor = Surface1
         )
@@ -2304,12 +2307,12 @@ fun SettingsSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Warning, contentDescription = null, tint = DangerColor, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Suppression définitive du compte", color = DangerColor, fontWeight = FontWeight.Bold)
+                    Text(strings.deleteAccount, color = DangerColor, fontWeight = FontWeight.Bold)
                 }
             },
             text = {
                 Text(
-                    "Conformément à l'Art. 17 du RGPD (Droit à l'oubli), votre compte, tous vos contacts, appels, enregistrements et résumés seront définitivement effacés. Cette action est irréversible.",
+                    strings.deleteAccountWarning,
                     color = Text2
                 )
             },
@@ -2330,10 +2333,10 @@ fun SettingsSection(
                         showDeleteAccountDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
-                ) { Text("Supprimer Définitivement", color = Text1, fontWeight = FontWeight.Bold) }
+                ) { Text(strings.delete, color = Text1, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler", color = Text3) }
+                TextButton(onClick = { showDeleteAccountDialog = false }) { Text(strings.close, color = Text3) }
             },
             containerColor = Surface1
         )
@@ -2348,7 +2351,7 @@ fun SettingsSection(
 
         AlertDialog(
             onDismissRequest = { showEditProfileDialog = false },
-            title = { Text("Modifier mes informations", color = Text1, fontWeight = FontWeight.Bold) },
+            title = { Text(strings.editProfile, color = Text1, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
@@ -2419,10 +2422,10 @@ fun SettingsSection(
                         showEditProfileDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Text1)
-                ) { Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold) }
+                ) { Text(strings.saveServer, color = BgColor, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showEditProfileDialog = false }) { Text("Annuler", color = Text3) }
+                TextButton(onClick = { showEditProfileDialog = false }) { Text(strings.close, color = Text3) }
             },
             containerColor = Surface1
         )
@@ -2436,7 +2439,7 @@ fun SettingsSection(
 
         AlertDialog(
             onDismissRequest = { showChangePasswordDialog = false },
-            title = { Text("Changer mon mot de passe", color = Text1, fontWeight = FontWeight.Bold) },
+            title = { Text(strings.changePassword, color = Text1, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
@@ -2500,10 +2503,10 @@ fun SettingsSection(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Text1)
-                ) { Text("Changer", color = BgColor, fontWeight = FontWeight.Bold) }
+                ) { Text(strings.validate, color = BgColor, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showChangePasswordDialog = false }) { Text("Annuler", color = Text3) }
+                TextButton(onClick = { showChangePasswordDialog = false }) { Text(strings.close, color = Text3) }
             },
             containerColor = Surface1
         )

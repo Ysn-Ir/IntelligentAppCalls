@@ -242,7 +242,7 @@ fun CallScreen(
                 containerColor = Surface1,
                 title = {
                     Text(
-                        text = "Composer un appel",
+                        text = strings.dialCallTitle,
                         color = Text1,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
@@ -255,7 +255,7 @@ fun CallScreen(
                             .heightIn(max = 350.dp)
                     ) {
                         Text(
-                            text = "Sélectionnez un contact pour lancer l'appel :",
+                            text = strings.selectContactToCall,
                             color = Text3,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 10.dp)
@@ -263,7 +263,7 @@ fun CallScreen(
 
                         if (contacts.isEmpty()) {
                             Text(
-                                text = "Aucun contact enregistré",
+                                text = strings.noContactsFound,
                                 color = Text3,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(vertical = 16.dp)
@@ -314,7 +314,7 @@ fun CallScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showContactDialer = false }) {
-                        Text("Fermer", color = Text2, fontWeight = FontWeight.SemiBold)
+                        Text(strings.close, color = Text2, fontWeight = FontWeight.SemiBold)
                     }
                 }
             )
@@ -331,6 +331,7 @@ fun CallScreen(
                 consentGiven = consentGiven,
                 transcript = transcript,
                 audioManager = audioManager,
+                strings = strings,
                 onMuteClick = { viewModel.toggleMute() },
                 onSpeakerClick = { viewModel.toggleSpeaker(audioManager) },
                 onHangUpClick = { viewModel.hangUp() },
@@ -352,6 +353,11 @@ fun ContactRow(
     onCallClick: () -> Unit,
     onDirectDial: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+
     val initial = contact.fullName.trim().take(1).uppercase().ifEmpty { "C" }
     val avatarBg = remember(contact.fullName) {
         val colors = listOf(AvatarBgA, AvatarBgB, AvatarBgC, AvatarBgD, AvatarBgE)
@@ -424,7 +430,7 @@ fun ContactRow(
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Appeler", color = BgColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(strings.startCall, color = BgColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -437,6 +443,7 @@ fun ActiveCallOverlay(
     consentGiven: Boolean,
     transcript: String,
     audioManager: AudioManager,
+    strings: TranslationStrings,
     onMuteClick: () -> Unit,
     onSpeakerClick: () -> Unit,
     onHangUpClick: () -> Unit,
@@ -456,7 +463,7 @@ fun ActiveCallOverlay(
         ) {
             when (callState) {
                 is CallState.Connecting -> {
-                    Text("Connecting...", color = Color.Gray, fontSize = 16.sp)
+                    Text(strings.connectingStatus, color = Color.Gray, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                     CircularProgressIndicator(color = NeonTeal)
                 }
@@ -469,7 +476,7 @@ fun ActiveCallOverlay(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = if (consentGiven) "ON CALL - AI TRANSCRIPTION ACTIVE" else "ON CALL (PLAIN VoIP)",
+                        text = if (consentGiven) strings.onCallAiActive else strings.onCallPlain,
                         color = if (consentGiven) NeonTeal else Color.LightGray,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
@@ -488,7 +495,7 @@ fun ActiveCallOverlay(
                                 .clip(CircleShape)
                                 .background(if (callState.isMuted) ElectricViolet else Color(0x33FFFFFF))
                         ) {
-                            Text(if (callState.isMuted) "Unmute" else "Mute", color = Color.White, fontSize = 11.sp)
+                            Text(if (callState.isMuted) strings.unmuteLabel else strings.muteLabel, color = Color.White, fontSize = 11.sp)
                         }
 
                         IconButton(
@@ -498,7 +505,7 @@ fun ActiveCallOverlay(
                                 .clip(CircleShape)
                                 .background(if (callState.isSpeakerOn) NeonTeal else Color(0x33FFFFFF))
                         ) {
-                            Text(if (callState.isSpeakerOn) "Receiver" else "Speaker", color = Color.White, fontSize = 11.sp)
+                            Text(if (callState.isSpeakerOn) strings.receiverLabel else strings.speakerLabel, color = Color.White, fontSize = 11.sp)
                         }
                     }
 
@@ -527,13 +534,13 @@ fun ActiveCallOverlay(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "LIVE TRANSCRIPT",
+                                        text = strings.audioTranscript.uppercase(),
                                         fontSize = 11.sp,
                                         color = NeonTeal,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "Listening...",
+                                        text = strings.listeningStatus,
                                         fontSize = 10.sp,
                                         color = Color.Green,
                                         fontWeight = FontWeight.Light
@@ -550,7 +557,7 @@ fun ActiveCallOverlay(
                                         scrollState.animateScrollTo(scrollState.maxValue)
                                     }
                                     Text(
-                                        text = if (transcript.isEmpty()) "Waiting for speech..." else transcript,
+                                        text = if (transcript.isEmpty()) strings.waitingForSpeech else transcript,
                                         color = if (transcript.isEmpty()) Color.Gray else Color.White,
                                         fontSize = 13.sp,
                                         modifier = Modifier.verticalScroll(scrollState)
@@ -568,23 +575,23 @@ fun ActiveCallOverlay(
                         shape = CircleShape,
                         modifier = Modifier.size(72.dp)
                     ) {
-                        Text("End", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(strings.endCallLabel, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
                 is CallState.Disconnected -> {
-                    Text("Call Disconnected", color = Color.White, fontSize = 20.sp)
+                    Text(strings.callDisconnected, color = Color.White, fontSize = 20.sp)
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = ElectricViolet)) {
-                        Text("Close", color = Color.White)
+                        Text(strings.close, color = Color.White)
                     }
                 }
                 is CallState.Error -> {
-                    Text("Call Error", color = Color.Red, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(strings.callError, color = Color.Red, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(callState.message, color = Color.LightGray, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = ElectricViolet)) {
-                        Text("Close", color = Color.White)
+                        Text(strings.close, color = Color.White)
                     }
                 }
                 else -> {}
@@ -592,3 +599,4 @@ fun ActiveCallOverlay(
         }
     }
 }
+

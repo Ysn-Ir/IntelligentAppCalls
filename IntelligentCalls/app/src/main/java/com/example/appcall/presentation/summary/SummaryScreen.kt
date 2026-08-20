@@ -177,7 +177,7 @@ fun SummaryScreen(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Appels",
+                    text = strings.navCalls,
                     color = Text2,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -195,7 +195,7 @@ fun SummaryScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = Text2, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Actualiser", color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(text = strings.retry, color = Text2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

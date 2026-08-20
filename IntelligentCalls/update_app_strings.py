@@ -1,4 +1,7 @@
-package com.example.appcall.presentation.theme
+# Python script to update AppStrings.kt with exhaustive localization dictionary
+import os
+
+app_strings_content = '''package com.example.appcall.presentation.theme
 
 import java.util.Locale
 
@@ -1353,3 +1356,9 @@ fun getAppLocale(languageCode: String?): Locale {
         else -> Locale.ENGLISH
     }
 }
+'''
+
+target_path = r"c:\Users\khali\OneDrive\Bureau\intelligentCall\IntelligentCalls\app\src\main\java\com\example\appcall\presentation\theme\AppStrings.kt"
+with open(target_path, "w", encoding="utf-8") as f:
+    f.write(app_strings_content)
+print("Updated AppStrings.kt successfully!")
