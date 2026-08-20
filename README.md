@@ -207,35 +207,40 @@ To ensure crystal-clear 2-way call audio on Samsung Galaxy devices running Andro
 
 ## 📱 Features Overview
 
-### 1. 📞 Appels & Contacts (Screen 1)
+### 1. 📞 Appels & Contacts
 - **Top Tab Switcher**: Seamlessly switch between `📞 Historique` and `👥 Contacts`.
 - **Search & Filter**: Live contact search and call filter tabs (`Tous`, `Manqués`, `Avec résumé`).
-- **AI Transcription Consent Toggle**: Instant per-user switch to enable or disable AI voice analysis.
-- **Direct Calling**: One-tap native SIM call (`📱`) or VoIP call (`Appeler`).
-- **AI Badges**: Waveform indicators, audio HD tags, and sentiment pills (`😃 Positif`).
+- **100% Automatic Background Recording**: Intercepts PSTN calls automatically in the background without blocking modal dialogs.
+- **Sleek UI Badges**: Clean typographic pills with status dots (`● Audio HD`, `● Positif`, `#RDV`, `#IA`).
+- **Direct Calling**: One-tap native SIM call (`📱`) or VoIP call.
 
-### 2. 📝 Call Analysis & Summary (Screen 2)
-- **Interactive Audio Scrubber**: Dynamic waveform visualization, duration tracking, and playback speed pills (`1×`, `1.5×`, `2×`).
-- **AI Summary Card**: Formatted bullet points extracted from conversation context.
+### 2. 📝 Call Analysis & Summary
+- **Interactive Audio Engine**: Real `MediaPlayer` with dynamic waveform progress, seek-on-tap, elapsed/total timers, speed adjustment (`1×`, `1.5×`, `2×`), and native audio export (`⬇`).
+- **Live AI Summary Card**: Formatted bullet points extracted from conversation context.
 - **Appointment Extraction**: 2x2 grid displaying Date, Time, Title, and Contact with `Valider RDV` and `Modifier` options.
-- **Dual-Speaker Transcript**: Left bubble for Caller, right bubble for You with timestamps and confidence scores.
+- **Dual-Speaker Transcript**: Live speaker bubbles with timestamps, confidence scores, and real-time backend updates.
 
-### 3. 🤖 AI Assistant RAG Chat (Screen 3)
+### 3. 🔔 Native Notifications Engine (`AppNotificationManager`)
+- **Agenda Reminders**: Native high-priority Android notifications for confirmed & upcoming appointments (`📅 Rappel RDV: [Titre] à [Heure] avec [Contact]`).
+- **Task Alerts**: Instant notifications when new action items or tasks are created.
+- **Post-Call AI Summary Notification**: One-tap notification arriving as soon as a call is recorded and transcribed, opening directly into the call's AI summary screen.
+
+### 4. 📅 Smart Agenda with Dynamic Day-Filtering
+- **Dynamic Weekday Calculator**: Automatically generates current week cards (`LUN 18`, `MAR 19`, `MER 20`...) with live appointment counters.
+- **Day-by-Day Filter**: Filter appointments by clicking any day card or select `"TOUS"` to view everything.
+- **`＋ Nouveau RDV` Creator**: Collapsible drawer with quick day chips (`Aujourd'hui`, `Demain`, `+1 sem`), native DatePicker, quick time chips (`09:00`, `14:00`, `18:00`), and native TimePicker with instant notification dispatch.
+
+### 5. 📋 Tasks & Audio Vault
+- **Tâches IA & Création Manuelle**: Extracted action items with checkboxes, source call tags, and `＋ Ajouter` button with local notification alerts.
+- **Coffre-fort Audio**: Local voice recordings list with in-app play/pause (`▶ / ❚❚`) and direct file sharing (`⬇`).
+- **RGPD Privacy**: Live JSON data export (`Article 15`) and local storage voice data purge with confirmation (`Droit à l'oubli`).
+
+### 6. 🤖 AI Assistant RAG Chat
 - Query all call transcripts and CRM data using Groq LLaMA / GPT-4o.
 - Filter chat context by specific contact or search across all calls.
 - Sources citation badge indicating which call the answer was derived from.
 
-### 4. 📅 Smart Agenda (Screen 4)
-- Real-time digital clock (`HH:mm:ss`) and Monday-to-Sunday day strip picker.
-- **`＋ Nouveau RDV` Creator**: Collapsible drawer with quick day chips (`Aujourd'hui`, `Demain`, `+1 sem`), native DatePicker, quick time chips (`09:00`, `14:00`, `18:00`), and native TimePicker.
-- Direct `Rappeler` dialer button and `Valider` sync button.
-
-### 5. 📋 Tasks & Audio Vault (Screen 5)
-- **Tâches IA**: Extracted action items with checkboxes and source call tags.
-- **Coffre-fort Audio**: Local voice recordings scanner with in-app audio playback and download.
-- **RGPD Privacy**: Data export and right-to-be-forgotten deletion.
-
-### 6. ⚙️ Settings (Screen 6)
+### 7. ⚙️ Settings
 - Shizuku API elevation manager.
 - Server URL configuration & connectivity tester.
 - Recording engine selector (Bluetooth SCO / PBX bridge).
