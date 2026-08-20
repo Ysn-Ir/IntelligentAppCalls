@@ -89,7 +89,7 @@ class PhoneStateBroadcastReceiver : BroadcastReceiver() {
                 }
 
                 Log.d(TAG, "OFFHOOK → starting recorder for callId=$callId (Contact: $finalContactName, Phone: $finalPhoneNumber)")
-                PhoneCallRecorderService.start(context, callId)
+                PhoneCallRecorderService.start(context, callId, finalContactName, finalPhoneNumber)
             }
 
             TelephonyManager.EXTRA_STATE_IDLE -> {

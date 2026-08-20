@@ -49,10 +49,14 @@ class PhoneCallRecorderService : Service() {
         private const val CHANNEL_ID = "call_recording"
 
         const val EXTRA_CALL_ID = "extra_call_id"
+        const val EXTRA_CONTACT_NAME = "extra_contact_name"
+        const val EXTRA_PHONE_NUMBER = "extra_phone_number"
 
-        fun start(context: Context, callId: String) {
+        fun start(context: Context, callId: String, contactName: String? = null, phoneNumber: String? = null) {
             val intent = Intent(context, PhoneCallRecorderService::class.java)
                 .putExtra(EXTRA_CALL_ID, callId)
+                .putExtra(EXTRA_CONTACT_NAME, contactName)
+                .putExtra(EXTRA_PHONE_NUMBER, phoneNumber)
             ContextCompat.startForegroundService(context, intent)
         }
 
@@ -70,6 +74,8 @@ class PhoneCallRecorderService : Service() {
     private var mediaRecorder: MediaRecorder? = null
     private var recordingFile: File? = null
     private var activeCallId: String? = null
+    private var activeContactName: String? = null
+    private var activePhoneNumber: String? = null
     private var monitorJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -95,6 +101,8 @@ class PhoneCallRecorderService : Service() {
         }
 
         activeCallId = incomingCallId
+        activeContactName = intent?.getStringExtra(EXTRA_CONTACT_NAME)
+        activePhoneNumber = intent?.getStringExtra(EXTRA_PHONE_NUMBER)
         startForeground(NOTIF_ID, buildNotification())
         startRecording()
         return START_NOT_STICKY
@@ -122,8 +130,12 @@ class PhoneCallRecorderService : Service() {
 
             val dir = File(filesDir, "recordings").also { it.mkdirs() }
             val callId = activeCallId ?: System.currentTimeMillis().toString()
-            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
-            val file = File(dir, "Appel_${timestamp}_${callId.take(8)}.mp4")
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.getDefault()).format(java.util.Date())
+            val rawName = activeContactName?.takeIf { it.isNotBlank() && !it.startsWith("Appel") }
+                ?: activePhoneNumber?.takeIf { it.isNotBlank() }
+                ?: "Appel"
+            val cleanName = rawName.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").take(24)
+            val file = File(dir, "Appel_${cleanName}_${timestamp}_${callId.take(6)}.mp4")
             recordingFile = file
 
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

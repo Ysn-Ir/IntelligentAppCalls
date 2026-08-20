@@ -61,6 +61,7 @@ class CallingManager @Inject constructor(
     private var activeCallId: String? = null
     val currentActiveCallId: String? get() = activeCallId
     private var activeContactName: String = "Appel Téléphonique"
+    private var activePhoneNumber: String? = null
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private var collectionJob: kotlinx.coroutines.Job? = null
@@ -160,7 +161,7 @@ class CallingManager @Inject constructor(
         Log.d(TAG, "TelephonyCallback OFFHOOK — call active callId=$callId")
         _callState.value = CallState.Active(callId = callId, contactName = activeContactName)
         // BroadcastReceiver also starts the service — guard inside service prevents double-start
-        PhoneCallRecorderService.start(context, callId)
+        PhoneCallRecorderService.start(context, callId, activeContactName, activePhoneNumber)
 
         // Start live transcript collection if available
         collectionJob?.cancel()
@@ -214,6 +215,7 @@ class CallingManager @Inject constructor(
             val callResult = voipRepository.initiateCall(contact.id)
             val callId = callResult.getOrNull()?.id ?: "native-${System.currentTimeMillis()}"
             activeCallId = callId
+            activePhoneNumber = contact.phoneNumber
             Log.d(TAG, "Created call row $callId for ${contact.fullName} (${contact.phoneNumber})")
 
             // Persist callId & caller info for BroadcastReceiver and summary screens
@@ -239,7 +241,7 @@ class CallingManager @Inject constructor(
 
                 // Start local recorder service
                 Log.d(TAG, "Starting recorder early for callId=$callId")
-                PhoneCallRecorderService.start(context, callId)
+                PhoneCallRecorderService.start(context, callId, activeContactName, activePhoneNumber)
 
             } catch (se: SecurityException) {
                 Log.w(TAG, "CALL_PHONE permission missing, falling back to ACTION_DIAL: ${se.message}")
@@ -247,7 +249,7 @@ class CallingManager @Inject constructor(
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(fallbackIntent)
                 _callState.value = CallState.Active(callId = callId, contactName = activeContactName)
-                PhoneCallRecorderService.start(context, callId)
+                PhoneCallRecorderService.start(context, callId, activeContactName, activePhoneNumber)
 
             } catch (e: Exception) {
                 Log.e(TAG, "Could not launch dialer: ${e.message}")

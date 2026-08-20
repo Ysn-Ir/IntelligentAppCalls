@@ -38,13 +38,16 @@ import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
-import java.io.File
 
 enum class TaskFilter {
     ALL,
@@ -523,18 +526,49 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             )
                         }
 
+                        val history = remember { localDatabase.getCallHistory() }
+                        val (displayTitle, displaySubtitle) = remember(file.name, file.lastModified()) {
+                            val rawName = file.name
+                            val matched = history.firstOrNull { h ->
+                                rawName.contains(h.id, ignoreCase = true) ||
+                                (h.id.length >= 6 && rawName.contains(h.id.take(6), ignoreCase = true)) ||
+                                (h.id.startsWith("native-") && rawName.contains(h.id.removePrefix("native-"), ignoreCase = true))
+                            }
+
+                            val title = when {
+                                matched?.contactName != null && matched.contactName.isNotBlank() && !matched.contactName.startsWith("Appel") ->
+                                    "Appel avec ${matched.contactName}"
+                                matched?.contactName != null && matched.contactName.isNotBlank() ->
+                                    matched.contactName
+                                rawName.startsWith("Appel_") -> {
+                                    val clean = rawName.removePrefix("Appel_").removeSuffix(".mp4").removeSuffix(".wav").removeSuffix(".m4a")
+                                    val parts = clean.split("_")
+                                    if (parts.isNotEmpty() && parts[0].isNotBlank() && !parts[0].all { it.isDigit() }) {
+                                        "Appel avec ${parts[0].replace("-", " ")}"
+                                    } else {
+                                        "Appel Enregistré"
+                                    }
+                                }
+                                else -> "Appel Enregistré"
+                            }
+
+                            val locale = com.example.appcall.presentation.theme.getAppLocale(appLanguageCode)
+                            val dateFormatted = SimpleDateFormat("d MMMM yyyy 'à' HH:mm", locale).format(Date(file.lastModified()))
+                            val sizeMb = String.format(Locale.getDefault(), "%.1f MB", file.length().toDouble() / (1024 * 1024))
+                            Pair(title, "$dateFormatted · $sizeMb")
+                        }
+
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = file.name,
+                                text = displayTitle,
                                 color = if (isPlayingThis) AccentText else Text1,
-                                fontSize = 12.5.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            val sizeMb = String.format("%.1f MB", file.length().toDouble() / (1024 * 1024))
                             Text(
-                                text = if (isPlayingThis) strings.playingAudio else sizeMb,
+                                text = if (isPlayingThis) strings.playingAudio else displaySubtitle,
                                 color = if (isPlayingThis) SuccessColor else Text3,
-                                fontSize = 10.sp,
+                                fontSize = 10.5.sp,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.padding(top = 2.dp)
                             )

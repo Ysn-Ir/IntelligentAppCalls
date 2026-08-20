@@ -237,8 +237,37 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                 items(recordingFiles) { file ->
                     val isPlaying = currentlyPlayingPath == file.absolutePath
                     val fileSizeKb = file.length() / 1024
-                    val dateFormatted = SimpleDateFormat("dd/MM/yyyy HH:mm", com.example.appcall.presentation.theme.getAppLocale(appLanguageCode))
-                        .format(Date(file.lastModified()))
+                    val history = remember { localDatabase.getCallHistory() }
+                    val (displayTitle, displaySubtitle) = remember(file.name, file.lastModified()) {
+                        val rawName = file.name
+                        val matched = history.firstOrNull { h ->
+                            rawName.contains(h.id, ignoreCase = true) ||
+                            (h.id.length >= 6 && rawName.contains(h.id.take(6), ignoreCase = true)) ||
+                            (h.id.startsWith("native-") && rawName.contains(h.id.removePrefix("native-"), ignoreCase = true))
+                        }
+
+                        val title = when {
+                            matched?.contactName != null && matched.contactName.isNotBlank() && !matched.contactName.startsWith("Appel") ->
+                                "Appel avec ${matched.contactName}"
+                            matched?.contactName != null && matched.contactName.isNotBlank() ->
+                                matched.contactName
+                            rawName.startsWith("Appel_") -> {
+                                val clean = rawName.removePrefix("Appel_").removeSuffix(".mp4").removeSuffix(".wav").removeSuffix(".m4a")
+                                val parts = clean.split("_")
+                                if (parts.isNotEmpty() && parts[0].isNotBlank() && !parts[0].all { it.isDigit() }) {
+                                    "Appel avec ${parts[0].replace("-", " ")}"
+                                } else {
+                                    "Appel Enregistré"
+                                }
+                            }
+                            else -> "Appel Enregistré"
+                        }
+
+                        val locale = com.example.appcall.presentation.theme.getAppLocale(appLanguageCode)
+                        val dateFormatted = SimpleDateFormat("d MMMM yyyy 'à' HH:mm", locale).format(Date(file.lastModified()))
+                        val sizeMb = String.format(Locale.getDefault(), "%.1f MB", file.length().toDouble() / (1024 * 1024))
+                        Pair(title, "$dateFormatted · $sizeMb")
+                    }
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -252,17 +281,16 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                val displayTitle = "🎙️ ${file.name}"
                                 Text(
-                                    text = displayTitle,
+                                    text = "🎙️ $displayTitle",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
+                                    fontSize = 13.5.sp
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "$dateFormatted • ${fileSizeKb} KB",
-                                    color = Color.Gray,
+                                    text = displaySubtitle,
+                                    color = Color.LightGray,
                                     fontSize = 11.sp
                                 )
                             }
