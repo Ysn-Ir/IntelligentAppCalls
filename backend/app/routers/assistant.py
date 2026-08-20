@@ -35,13 +35,18 @@ def chat_with_contact(
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact:
-        raise HTTPException(status_code=404, detail="Contact introuvable")
+    # Lookup contact by ID, phone number or email gracefully
+    contact = db.query(Contact).filter(
+        (Contact.id == contact_id) | 
+        (Contact.phone_number == contact_id) |
+        (Contact.email == contact_id)
+    ).first()
+
+    real_contact_id = contact.id if contact else contact_id
     return ai_chat(
         user_id=user_id,
         message=body.message,
-        contact_id=contact_id,
+        contact_id=real_contact_id,
         db=db,
         session_id=body.session_id,
         language=x_app_language,
@@ -69,9 +74,15 @@ def get_contact_chat_history(
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    contact = db.query(Contact).filter(
+        (Contact.id == contact_id) | 
+        (Contact.phone_number == contact_id)
+    ).first()
+    real_contact_id = contact.id if contact else contact_id
+
     session = db.query(ChatbotSession).filter(
         ChatbotSession.user_id == user_id,
-        ChatbotSession.contact_id == contact_id,
+        (ChatbotSession.contact_id == real_contact_id) | (ChatbotSession.contact_id == contact_id),
     ).order_by(ChatbotSession.updated_at.desc()).first()
     if not session:
         return {"session_id": None, "messages": []}
@@ -86,9 +97,15 @@ def clear_contact_chat(
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    contact = db.query(Contact).filter(
+        (Contact.id == contact_id) | 
+        (Contact.phone_number == contact_id)
+    ).first()
+    real_contact_id = contact.id if contact else contact_id
+
     session = db.query(ChatbotSession).filter(
         ChatbotSession.user_id == user_id,
-        ChatbotSession.contact_id == contact_id,
+        (ChatbotSession.contact_id == real_contact_id) | (ChatbotSession.contact_id == contact_id),
     ).first()
     if session:
         clear_session(session.id, db)

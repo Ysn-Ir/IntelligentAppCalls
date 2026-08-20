@@ -1,5 +1,13 @@
 import os
 import logging
+import bcrypt
+
+# Fix passlib compatibility with bcrypt >= 4.0.0 on Python 3.12
+if not hasattr(bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.1")
+    bcrypt.__about__ = _BcryptAbout()
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
