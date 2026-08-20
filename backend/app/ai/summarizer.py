@@ -172,10 +172,10 @@ Analyze this call transcript carefully. Detect the true sentiment, intent, key a
 
 
 def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "en") -> dict:
-    """Enforces strict multi-lingual sentiment & intent rules across English, French, and Arabic."""
+    """Enforces strict multi-lingual sentiment & domain intent rules across English, French, and Arabic."""
     text_lower = (raw_text or "").lower()
     
-    # 1. Hostility, violence, threats, extreme aggression in EN, FR, AR (Standard & Dialects)
+    # 1. Hostility, violence, threats, extreme aggression
     hostile_patterns = [
         "kill", "beat", "murder", "threat", "die", "destroy", "attack", "assault", "punch", 
         "choke", "stab", "shoot", "hate", "sue", "lawyer", "police", "court", "scam", "fraud",
@@ -188,16 +188,52 @@ def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "e
         "شفار", "غدار", "قضية", "نربيك", "ندفنك"
     ]
     
-    # 2. Complaints, dissatisfaction, dispute
+    # 2. Appointment & Scheduling
+    appointment_patterns = [
+        "rendez-vous", "rdv", "meeting", "meet", "revoir", "demain", "horaire", "date", 
+        "dispo", "disponible", "schedule", "appointment", "tomorrow", "calendar", "9am", "10am", "11am", "2pm", "3pm", "4pm", "5pm",
+        "matin", "soir", "après-midi", "apres-midi", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
+        "موعد", "لقاء", "نتلاقاو", "غدا", "صباح"
+    ]
+
+    # 3. Logistics & Delivery / Vehicle
+    logistics_patterns = [
+        "livraison", "livrer", "colis", "transport", "voiture", "véhicule", "camion", "adresse", 
+        "car", "vehicle", "delivery", "deliver", "package", "shipping", "tracking", "pickup", "location", "bring a car",
+        "سيارة", "توصيل", "شحن", "عنوان"
+    ]
+
+    # 4. Sales & Quote / Pricing
+    sales_patterns = [
+        "prix", "tarif", "devis", "achat", "acheter", "offre", "commercial", "combien", "coût", 
+        "price", "cost", "quote", "buy", "purchase", "deal", "discount", "promo", "pricing",
+        "سعر", "ثمن", "شراء", "عرض", "تخفيض"
+    ]
+
+    # 5. Technical Support & Repair
+    support_patterns = [
+        "support", "panne", "bug", "erreur", "réparation", "marche pas", "fonctionne pas", "problème technique", "aide", "technicien",
+        "error", "broken", "repair", "fix", "help", "technical", "crash",
+        "عطب", "مشكل تقني", "إصلاح", "مساعدة"
+    ]
+
+    # 6. Billing & Invoicing
+    billing_patterns = [
+        "facture", "facturation", "paiement", "payer", "remboursement", "rembourser", "carte", "prélèvement",
+        "invoice", "billing", "payment", "pay", "refund", "charge",
+        "فاتورة", "أداء", "دفع", "استرجاع"
+    ]
+
+    # 7. Complaints & Dissatisfaction
     negative_patterns = [
         "angry", "furious", "annoyed", "problem", "cancel", "bad", "worst", "disappointed", 
-        "refund", "broken", "failed", "scam", "waste of time",
+        "waste of time", "terrible", "awful",
         "colère", "furieux", "énervé", "problème", "annuler", "mauvais", "pire", "déçu", 
-        "remboursement", "cassé", "échoué", "incompétent", "perte de temps",
-        "مشكل", "غاضب", "عصبني", "إلغاء", "سيء", "خايب", "كارثة", "استرجاع", "تعويض", "ضياع وقت"
+        "incompétent", "perte de temps", "scandale",
+        "مشكل", "غاضب", "عصبني", "إلغاء", "سيء", "خايب", "كارثة", "ضياع وقت"
     ]
     
-    # 3. Satisfied, collaboration, positive agreement
+    # 8. Satisfied & Agreement
     positive_patterns = [
         "thank", "thanks", "great", "excellent", "perfect", "super", "agree", "deal", "awesome", "pleasure",
         "merci", "parfait", "excellent", "super", "d'accord", "accord", "génial", "formidable", "validé",
@@ -205,6 +241,11 @@ def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "e
     ]
 
     is_hostile = any(pat in text_lower for pat in hostile_patterns)
+    is_appointment = any(pat in text_lower for pat in appointment_patterns)
+    is_logistics = any(pat in text_lower for pat in logistics_patterns)
+    is_sales = any(pat in text_lower for pat in sales_patterns)
+    is_support = any(pat in text_lower for pat in support_patterns)
+    is_billing = any(pat in text_lower for pat in billing_patterns)
     is_negative = any(pat in text_lower for pat in negative_patterns)
     is_positive = any(pat in text_lower for pat in positive_patterns)
 
@@ -219,39 +260,102 @@ def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "e
             result["intent"] = "Menace / Conflit Urgent & Agressivité"
             result["tags"] = ["#AlerteSecurite", "#Menace", "#ConflitUrgent"]
         else:
-            result["intent"] = "Threat / Violent Conflict & Hostility"
+            result["intent"] = "Threat / Severe Dispute & Hostility"
             result["tags"] = ["#Threat", "#SecurityAlert", "#UrgentEscalation"]
     elif is_negative and curr_sentiment not in ["HOSTILE"]:
         result["sentiment"] = "NEGATIVE"
-        if result.get("intent") in [None, "", "General Call", "General Follow-up"]:
-            if language == "ar":
-                result["intent"] = "شكوى / عدم رضا العميل"
-                result["tags"] = ["#شكوى", "#نزاع_عميل"]
-            elif language == "fr":
-                result["intent"] = "Réclamation / Insatisfaction Client"
-                result["tags"] = ["#Reclamation", "#LitigeClient"]
-            else:
-                result["intent"] = "Customer Complaint / Dissatisfaction"
-                result["tags"] = ["#Complaint", "#CustomerIssue"]
-    elif is_positive and curr_sentiment not in ["HOSTILE", "NEGATIVE"]:
+        if language == "ar":
+            result["intent"] = "شكوى / عدم رضا العميل"
+            result["tags"] = ["#شكوى", "#نزاع_عميل", "#أولوية"]
+        elif language == "fr":
+            result["intent"] = "Réclamation / Insatisfaction Client"
+            result["tags"] = ["#Reclamation", "#LitigeClient", "#Prioritaire"]
+        else:
+            result["intent"] = "Customer Complaint & Dispute"
+            result["tags"] = ["#Complaint", "#CustomerIssue", "#Escalation"]
+    elif is_appointment:
+        result["sentiment"] = "POSITIVE" if is_positive else (result.get("sentiment") or "NEUTRAL")
+        if language == "ar":
+            result["intent"] = "تحديد وبرمجة موعد"
+            result["tags"] = ["#موعد", "#أجندة", "#متابعة"]
+        elif language == "fr":
+            result["intent"] = "Planification de Rendez-vous"
+            result["tags"] = ["#RendezVous", "#Planning", "#Agenda"]
+        else:
+            result["intent"] = "Appointment Scheduling"
+            result["tags"] = ["#Appointment", "#Meeting", "#Schedule"]
+    elif is_logistics:
+        result["sentiment"] = "POSITIVE" if is_positive else (result.get("sentiment") or "NEUTRAL")
+        if language == "ar":
+            result["intent"] = "توصيل ولوجستيات"
+            result["tags"] = ["#توصيل", "#لوجستيات", "#سيارة"]
+        elif language == "fr":
+            result["intent"] = "Livraison & Logistique"
+            result["tags"] = ["#Livraison", "#Logistique", "#Transport"]
+        else:
+            result["intent"] = "Delivery & Logistics"
+            result["tags"] = ["#Delivery", "#Logistics", "#Transport"]
+    elif is_sales:
+        result["sentiment"] = "POSITIVE" if is_positive else (result.get("sentiment") or "NEUTRAL")
+        if language == "ar":
+            result["intent"] = "طلب عرض أسعار ومبيعات"
+            result["tags"] = ["#مبيعات", "#أسعار", "#عرض_تجاري"]
+        elif language == "fr":
+            result["intent"] = "Demande de Devis & Vente"
+            result["tags"] = ["#Devis", "#Tarif", "#Vente"]
+        else:
+            result["intent"] = "Sales & Pricing Inquiry"
+            result["tags"] = ["#Sales", "#Pricing", "#Commercial"]
+    elif is_support:
+        result["sentiment"] = "NEGATIVE" if is_negative else (result.get("sentiment") or "NEUTRAL")
+        if language == "ar":
+            result["intent"] = "دعم فني وإصلاح أعطال"
+            result["tags"] = ["#دعم_فني", "#عطل", "#مساعدة"]
+        elif language == "fr":
+            result["intent"] = "Support Technique & Dépannage"
+            result["tags"] = ["#SupportTechnique", "#Depannage", "#Assistance"]
+        else:
+            result["intent"] = "Technical Support & Troubleshooting"
+            result["tags"] = ["#TechSupport", "#Troubleshooting", "#Assistance"]
+    elif is_billing:
+        result["sentiment"] = result.get("sentiment") or "NEUTRAL"
+        if language == "ar":
+            result["intent"] = "فوترة ومدفوعات"
+            result["tags"] = ["#فاتورة", "#أداء", "#محاسبة"]
+        elif language == "fr":
+            result["intent"] = "Facturation & Paiement"
+            result["tags"] = ["#Facturation", "#Paiement", "#Comptabilite"]
+        else:
+            result["intent"] = "Billing & Payment Inquiry"
+            result["tags"] = ["#Billing", "#Payment", "#Invoicing"]
+    elif is_positive:
         result["sentiment"] = "POSITIVE"
-        if result.get("intent") in [None, "", "General Call", "General Follow-up"]:
+        if language == "ar":
+            result["intent"] = "اتفاق وتعاون إيجابي"
+            result["tags"] = ["#اتفاق", "#عميل_راضٍ", "#نجاح"]
+        elif language == "fr":
+            result["intent"] = "Accord & Collaboration Positive"
+            result["tags"] = ["#Accord", "#ClientSatisfait", "#Collaboration"]
+        else:
+            result["intent"] = "Positive Agreement & Collaboration"
+            result["tags"] = ["#Agreement", "#SatisfiedClient", "#Collaboration"]
+    else:
+        # General informative call
+        result["sentiment"] = result.get("sentiment") or "NEUTRAL"
+        if not result.get("intent") or result.get("intent") in ["General Call", "Pending AI Analysis"]:
             if language == "ar":
-                result["intent"] = "اتفاق وتعاون إيجابي"
-                result["tags"] = ["#اتفاق", "#عميل_راضٍ"]
+                result["intent"] = "مكالمة هاتفية عامة"
+                result["tags"] = ["#مكالمة", "#معلومات", "#تواصل"]
             elif language == "fr":
-                result["intent"] = "Accord & Collaboration Positive"
-                result["tags"] = ["#Accord", "#ClientSatisfait"]
+                result["intent"] = "Échange & Information Client"
+                result["tags"] = ["#Information", "#Contact", "#Echange"]
             else:
-                result["intent"] = "Positive Agreement & Collaboration"
-                result["tags"] = ["#Agreement", "#SatisfiedClient"]
+                result["intent"] = "General Client Inquiry"
+                result["tags"] = ["#Information", "#Contact", "#Inquiry"]
 
     # Ensure tags are formatted with '#'
     tags = result.get("tags") or []
     result["tags"] = [t if t.startswith("#") else f"#{t}" for t in tags if t]
-    if not result["tags"]:
-        result["tags"] = ["#Threat"] if result["sentiment"] == "HOSTILE" else (["#Positive"] if result["sentiment"] == "POSITIVE" else ["#GeneralCall"])
-
     return result
 
 

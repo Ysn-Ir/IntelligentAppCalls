@@ -514,14 +514,31 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
         except Exception:
             tags_list = [t.strip() for t in summary.tags.split(",") if t.strip()]
 
+    # Dynamic Intent & Tags validation engine
+    raw_content = (transcript_row.raw_text if transcript_row and transcript_row.raw_text else "") or summary.summary_text or ""
+    from ..ai.summarizer import _refine_sentiment_and_intent
+    refined = _refine_sentiment_and_intent(
+        raw_content,
+        {
+            "sentiment": summary.sentiment or "NEUTRAL",
+            "intent": summary.intent or "General Call",
+            "tags": tags_list
+        },
+        language=transcript_row.language if transcript_row and transcript_row.language else "en"
+    )
+
+    final_sentiment = refined["sentiment"]
+    final_intent = refined["intent"]
+    final_tags = refined["tags"]
+
     return schemas.CallSummaryDto(
         id=summary.id,
         call_id=summary.call_id,
         summary_text=summary.summary_text,
         status=summary.status,
-        sentiment=summary.sentiment or "NEUTRAL",
-        intent=summary.intent or "General Call",
-        tags=tags_list if tags_list else ["#CallAnalysis"],
+        sentiment=final_sentiment,
+        intent=final_intent,
+        tags=final_tags,
         confidence_score=confidence,
         detected_appointment_id=summary.detected_appointment_id or (appt.id if appt else None),
         appointment=appt_dto,
