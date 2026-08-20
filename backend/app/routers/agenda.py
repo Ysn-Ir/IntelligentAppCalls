@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import Appointment, Agenda as AgendaModel, Contact, CallSummary, Reminder, get_db
 from .. import schemas
@@ -75,28 +75,37 @@ def create_agenda_item(item: schemas.AgendaDto, user_id: str = Depends(verify_to
     return schemas.AgendaDto(id=new_i.id, title=new_i.title, scheduled_at=new_i.scheduled_at.isoformat() + "Z")
 
 @router.get("/api/v1/reminders", response_model=List[schemas.ReminderDto])
-def get_reminders(token: str = Depends(verify_token), db: Session = Depends(get_db)):
-    reminders = db.query(Reminder).all()
+def get_reminders(upcoming: bool = Query(True), token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    query = db.query(Reminder)
+    if upcoming:
+        query = query.filter(Reminder.scheduled_at > datetime.utcnow())
+    reminders = query.all()
+    
     res = []
     for r in reminders:
         res.append(schemas.ReminderDto(
             id=r.id,
+            appointment_id=r.appointment_id,
             call_id=r.call_id,
-            text=r.text,
-            due_at=r.due_at.isoformat() if r.due_at else None,
-            created_at=r.created_at.isoformat() if r.created_at else None
+            scheduled_at=r.scheduled_at.isoformat() + "Z" if r.scheduled_at else None,
+            type=r.type
         ))
     return res
 
 @router.post("/api/v1/reminders")
-def create_reminder(payload: schemas.ReminderDto, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+def create_reminder(reminder: schemas.ReminderDto, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    try:
+        dt = datetime.fromisoformat(reminder.scheduled_at.replace("Z", "")) if reminder.scheduled_at else datetime.utcnow()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+        
     new_r = Reminder(
         id=str(uuid.uuid4()),
-        call_id=payload.call_id,
-        text=payload.text,
-        due_at=datetime.fromisoformat(payload.due_at) if payload.due_at else None
+        appointment_id=reminder.appointment_id,
+        call_id=reminder.call_id,
+        scheduled_at=dt,
+        type=reminder.type
     )
     db.add(new_r)
     db.commit()
-    db.refresh(new_r)
     return {"status": "ok", "reminder_id": new_r.id}
