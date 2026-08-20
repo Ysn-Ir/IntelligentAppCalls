@@ -25,7 +25,13 @@ import com.example.appcall.presentation.theme.*
 import kotlinx.coroutines.launch
 
 import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import java.io.File
 
 @Composable
@@ -55,6 +61,18 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
     }
 
     var audioFiles by remember { mutableStateOf(getRecordingsList()) }
+    var currentlyPlayingPath by remember { mutableStateOf<String?>(null) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (e: Exception) {}
+        }
+    }
 
     LaunchedEffect(Unit) {
         voipRepository.fetchTasks().onSuccess {
@@ -180,6 +198,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             }
         } else {
             items(audioFiles) { file ->
+                val isPlayingThis = currentlyPlayingPath == file.absolutePath
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -194,24 +213,71 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(RoundedCornerShape(7.dp))
-                                .background(Surface1)
-                                .border(1.dp, BorderColor, RoundedCornerShape(7.dp)),
+                                .background(if (isPlayingThis) AccentDim else Surface1)
+                                .border(1.dp, if (isPlayingThis) AccentColor else BorderColor, RoundedCornerShape(7.dp))
+                                .clickable {
+                                    try {
+                                        if (isPlayingThis) {
+                                            mediaPlayer?.stop()
+                                            mediaPlayer?.release()
+                                            mediaPlayer = null
+                                            currentlyPlayingPath = null
+                                        } else {
+                                            mediaPlayer?.stop()
+                                            mediaPlayer?.release()
+                                            mediaPlayer = null
+
+                                            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                            @Suppress("DEPRECATION")
+                                            audioManager.requestAudioFocus(
+                                                null,
+                                                AudioManager.STREAM_MUSIC,
+                                                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                                            )
+
+                                            val player = MediaPlayer()
+                                            val attrib = AudioAttributes.Builder()
+                                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                                .build()
+                                            player.setAudioAttributes(attrib)
+                                            player.setDataSource(file.absolutePath)
+                                            player.setVolume(1.0f, 1.0f)
+                                            player.prepare()
+                                            player.start()
+                                            player.setOnCompletionListener {
+                                                currentlyPlayingPath = null
+                                                mediaPlayer = null
+                                                it.release()
+                                            }
+                                            mediaPlayer = player
+                                            currentlyPlayingPath = file.absolutePath
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Erreur lecture: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "▶", color = Text2, fontSize = 10.5.sp)
+                            Text(
+                                text = if (isPlayingThis) "❚❚" else "▶",
+                                color = if (isPlayingThis) AccentText else Text2,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = file.name,
-                                color = Text1,
+                                color = if (isPlayingThis) AccentText else Text1,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             val sizeMb = String.format("%.1f MB", file.length().toDouble() / (1024 * 1024))
                             Text(
-                                text = sizeMb,
-                                color = Text3,
+                                text = if (isPlayingThis) "En cours de lecture..." else sizeMb,
+                                color = if (isPlayingThis) SuccessColor else Text3,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -223,7 +289,24 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                 .size(27.dp)
                                 .clip(RoundedCornerShape(7.dp))
                                 .background(Surface2)
-                                .border(1.dp, BorderColor, RoundedCornerShape(7.dp)),
+                                .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                                .clickable {
+                                    try {
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            file
+                                        )
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "audio/*"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Partager l'enregistrement"))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Erreur partage: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(text = "⬇", color = Text2, fontSize = 11.sp)

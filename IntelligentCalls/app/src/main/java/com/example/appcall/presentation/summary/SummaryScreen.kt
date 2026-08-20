@@ -25,6 +25,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.presentation.theme.*
 
+import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
+import java.util.Locale
+import kotlinx.coroutines.delay
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SummaryScreen(
@@ -32,6 +44,7 @@ fun SummaryScreen(
     viewModel: SummaryViewModel,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val summaryText by viewModel.summaryText.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
@@ -39,10 +52,83 @@ fun SummaryScreen(
     val aiStatus by viewModel.aiStatus.collectAsState()
     val transcript by viewModel.transcript.collectAsState()
 
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+    var currentPositionMs by remember { mutableStateOf(0) }
+    var totalDurationMs by remember { mutableStateOf(0) }
     var selectedSpeed by remember { mutableStateOf("1×") }
     var showVoiceDialog by remember { mutableStateOf(false) }
     var voiceCommandText by remember { mutableStateOf("") }
+
+    fun findCallAudioFile(targetCallId: String): File? {
+        val targetDirs = listOf(
+            File(context.filesDir, "recordings"),
+            File(context.filesDir, "recordings_native"),
+            context.getExternalFilesDir(null)?.let { File(it, "recordings") },
+            context.cacheDir
+        ).filterNotNull()
+
+        val allFiles = mutableListOf<File>()
+        targetDirs.forEach { dir ->
+            if (dir.exists() && dir.isDirectory) {
+                dir.listFiles()?.filter {
+                    it.isFile && (it.name.endsWith(".wav") || it.name.endsWith(".mp4") || it.name.endsWith(".m4a")) && it.length() > 0
+                }?.let { allFiles.addAll(it) }
+            }
+        }
+        return allFiles.firstOrNull { it.name.contains(targetCallId, ignoreCase = true) }
+            ?: allFiles.maxByOrNull { it.lastModified() }
+    }
+
+    val matchedAudioFile = remember(callId) { findCallAudioFile(callId) }
+
+    fun formatDuration(ms: Int): String {
+        val totalSec = ms / 1000
+        val m = totalSec / 60
+        val s = totalSec % 60
+        return String.format(Locale.getDefault(), "%d:%02d", m, s)
+    }
+
+    // Live playback tracker
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            mediaPlayer?.let { player ->
+                try {
+                    if (player.isPlaying) {
+                        currentPositionMs = player.currentPosition
+                        if (player.duration > 0) totalDurationMs = player.duration
+                    }
+                } catch (e: Exception) {}
+            }
+            delay(150)
+        }
+    }
+
+    // Speed adjustment
+    LaunchedEffect(selectedSpeed) {
+        mediaPlayer?.let { player ->
+            try {
+                val speedFloat = when (selectedSpeed) {
+                    "1.5×" -> 1.5f
+                    "2×" -> 2.0f
+                    else -> 1.0f
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    player.playbackParams = player.playbackParams.setSpeed(speedFloat)
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (e: Exception) {}
+        }
+    }
 
     // Load summary once when callId changes
     LaunchedEffect(callId) {
@@ -299,14 +385,80 @@ fun SummaryScreen(
                                             modifier = Modifier
                                                 .size(36.dp)
                                                 .clip(CircleShape)
-                                                .background(Text1)
-                                                .clickable { isPlaying = !isPlaying },
+                                                .background(if (isPlaying) AccentColor else Text1)
+                                                .clickable {
+                                                    try {
+                                                        if (isPlaying) {
+                                                            mediaPlayer?.pause()
+                                                            isPlaying = false
+                                                        } else {
+                                                            if (mediaPlayer == null) {
+                                                                if (matchedAudioFile == null || matchedAudioFile.length() <= 512) {
+                                                                    Toast.makeText(context, "Enregistrement audio introuvable ou vide", Toast.LENGTH_SHORT).show()
+                                                                    return@clickable
+                                                                }
+
+                                                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                                                @Suppress("DEPRECATION")
+                                                                audioManager.requestAudioFocus(
+                                                                    null,
+                                                                    AudioManager.STREAM_MUSIC,
+                                                                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                                                                )
+
+                                                                val player = MediaPlayer()
+                                                                val attrib = AudioAttributes.Builder()
+                                                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                                                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                                                    .build()
+                                                                player.setAudioAttributes(attrib)
+                                                                player.setDataSource(matchedAudioFile.absolutePath)
+                                                                player.setVolume(1.0f, 1.0f)
+                                                                player.prepare()
+                                                                totalDurationMs = player.duration
+
+                                                                val speedFloat = when (selectedSpeed) {
+                                                                    "1.5×" -> 1.5f
+                                                                    "2×" -> 2.0f
+                                                                    else -> 1.0f
+                                                                }
+                                                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                                                                    player.playbackParams = player.playbackParams.setSpeed(speedFloat)
+                                                                }
+
+                                                                player.start()
+                                                                player.setOnCompletionListener {
+                                                                    isPlaying = false
+                                                                    currentPositionMs = 0
+                                                                    mediaPlayer?.release()
+                                                                    mediaPlayer = null
+                                                                }
+                                                                mediaPlayer = player
+                                                                isPlaying = true
+                                                            } else {
+                                                                mediaPlayer?.start()
+                                                                isPlaying = true
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "Erreur lecture: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = if (isPlaying) "❚❚" else "▶", color = BgColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = if (isPlaying) "❚❚" else "▶",
+                                                color = if (isPlaying) Text1 else BgColor,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
 
-                                        // Scrub wave
+                                        // Scrub wave with dynamic animated position & tap to seek
+                                        val heights = listOf(7, 12, 5, 15, 9, 13, 6, 10, 8, 13, 5, 9, 7, 11, 8, 14, 6, 10, 9, 12)
+                                        val progress = if (totalDurationMs > 0) currentPositionMs.toFloat() / totalDurationMs else 0f
+                                        val activeBarIndex = (progress * heights.size).toInt()
+
                                         Row(
                                             modifier = Modifier
                                                 .weight(1f)
@@ -314,15 +466,21 @@ fun SummaryScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(1.5.dp)
                                         ) {
-                                            val heights = listOf(7, 12, 5, 15, 9, 13, 6, 10, 8, 13, 5, 9, 7, 11)
                                             heights.forEachIndexed { i, h ->
-                                                val barColor = if (i < 7) Text1 else Surface2
+                                                val barColor = if (i <= activeBarIndex) AccentColor else Surface2
                                                 Box(
                                                     modifier = Modifier
                                                         .width(2.dp)
                                                         .height(h.dp)
                                                         .clip(RoundedCornerShape(1.dp))
                                                         .background(barColor)
+                                                        .clickable {
+                                                            if (totalDurationMs > 0 && mediaPlayer != null) {
+                                                                val seekTarget = ((i.toFloat() / heights.size) * totalDurationMs).toInt()
+                                                                mediaPlayer?.seekTo(seekTarget)
+                                                                currentPositionMs = seekTarget
+                                                            }
+                                                        }
                                                 )
                                             }
                                         }
@@ -334,8 +492,18 @@ fun SummaryScreen(
                                             .padding(top = 6.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "1:24", color = Text3, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                                        Text(text = "3:12", color = Text3, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                        Text(
+                                            text = formatDuration(currentPositionMs),
+                                            color = if (isPlaying) AccentText else Text3,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = if (totalDurationMs > 0) formatDuration(totalDurationMs) else if (matchedAudioFile != null) "Audio prêt" else "Aucun audio",
+                                            color = Text3,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
                                     }
 
                                     Row(
@@ -368,25 +536,37 @@ fun SummaryScreen(
                                         }
 
                                         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            // Share / Export Audio
                                             Box(
                                                 modifier = Modifier
                                                     .size(27.dp)
                                                     .clip(RoundedCornerShape(7.dp))
                                                     .background(Surface2)
-                                                    .border(1.dp, BorderColor, RoundedCornerShape(7.dp)),
+                                                    .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                                                    .clickable {
+                                                        if (matchedAudioFile != null && matchedAudioFile.exists()) {
+                                                            try {
+                                                                val uri = FileProvider.getUriForFile(
+                                                                    context,
+                                                                    "${context.packageName}.fileprovider",
+                                                                    matchedAudioFile
+                                                                )
+                                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                    type = "audio/*"
+                                                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                                }
+                                                                context.startActivity(Intent.createChooser(shareIntent, "Partager l'audio de l'appel"))
+                                                            } catch (e: Exception) {
+                                                                Toast.makeText(context, "Erreur partage: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        } else {
+                                                            Toast.makeText(context, "Fichier audio non disponible", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    },
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(text = "⬇", color = Text2, fontSize = 11.sp)
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(27.dp)
-                                                    .clip(RoundedCornerShape(7.dp))
-                                                    .background(Surface2)
-                                                    .border(1.dp, BorderColor, RoundedCornerShape(7.dp)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(text = "⤴", color = Text2, fontSize = 11.sp)
                                             }
                                         }
                                     }
