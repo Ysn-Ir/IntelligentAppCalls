@@ -48,7 +48,9 @@ data class CallSummary(
     val tags: List<String> = emptyList(),
     val confidenceScore: Double?,
     val detectedAppointmentId: String?,
-    val appointment: Appointment? = null
+    val appointment: Appointment? = null,
+    val contactName: String? = null,
+    val phoneNumber: String? = null
 )
 
 data class Appointment(

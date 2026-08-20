@@ -80,7 +80,9 @@ data class CallSummaryDto(
     @SerializedName("tags") val tags: List<String>? = null,
     @SerializedName("confidence_score") val confidenceScore: Double?,
     @SerializedName("detected_appointment_id") val detectedAppointmentId: String?,
-    @SerializedName("appointment") val appointment: AppointmentDto? = null
+    @SerializedName("appointment") val appointment: AppointmentDto? = null,
+    @SerializedName("contact_name") val contactName: String? = null,
+    @SerializedName("phone_number") val phoneNumber: String? = null
 ) {
     fun toDomain(): com.example.appcall.domain.model.CallSummary {
         val app = appointment?.let {
@@ -105,7 +107,9 @@ data class CallSummaryDto(
             tags = tags ?: emptyList(),
             confidenceScore = confidenceScore,
             detectedAppointmentId = detectedAppointmentId,
-            appointment = app
+            appointment = app,
+            contactName = contactName ?: app?.contactName,
+            phoneNumber = phoneNumber ?: app?.phoneNumber
         )
     }
 }

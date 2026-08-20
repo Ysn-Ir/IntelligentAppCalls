@@ -266,8 +266,24 @@ fun SummaryScreen(
 
                         // 1. Contact Card Header
                         item {
-                            val contactName = summary.appointment?.contactName?.takeIf { it.isNotBlank() } ?: "Appel Enregistré"
-                            val phoneNumber = summary.appointment?.phoneNumber?.takeIf { it.isNotBlank() } ?: ""
+                            val localHistoryItem = remember(callId) {
+                                try {
+                                    val db = com.example.appcall.data.local.AppLocalDatabase(context)
+                                    db.getCallHistory().firstOrNull { it.id == callId }
+                                } catch (_: Exception) { null }
+                            }
+
+                            val contactName = summary.contactName?.takeIf { it.isNotBlank() && it != "Appel Enregistré" }
+                                ?: summary.appointment?.contactName?.takeIf { it.isNotBlank() }
+                                ?: localHistoryItem?.contactName?.takeIf { it.isNotBlank() && !it.startsWith("+") && !it.all { c -> c.isDigit() } }
+                                ?: "Appel Enregistré"
+
+                            val phoneNumber = summary.phoneNumber?.takeIf { it.isNotBlank() }
+                                ?: summary.appointment?.phoneNumber?.takeIf { it.isNotBlank() }
+                                ?: localHistoryItem?.contactName?.takeIf { it.startsWith("+") || it.filter { c -> c.isDigit() }.length >= 6 }
+                                ?: localHistoryItem?.contactId?.takeIf { it.startsWith("+") || it.filter { c -> c.isDigit() }.length >= 6 }
+                                ?: ""
+
                             val initials = contactName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").uppercase()
                             val confidencePercent = ((summary.confidenceScore ?: transcript?.confidenceScore ?: 90.0)).toInt().coerceIn(0, 100)
 
@@ -339,15 +355,21 @@ fun SummaryScreen(
                                                 .clickable {
                                                     if (phoneNumber.isNotBlank()) {
                                                         try {
+                                                            val cleanPhone = phoneNumber.filter { it == '+' || it.isDigit() }
                                                             val dialIntent = Intent(Intent.ACTION_DIAL).apply {
-                                                                data = android.net.Uri.parse("tel:$phoneNumber")
+                                                                data = android.net.Uri.parse("tel:$cleanPhone")
                                                             }
                                                             context.startActivity(dialIntent)
                                                         } catch (e: Exception) {
                                                             Toast.makeText(context, "Impossible de composer le numéro", Toast.LENGTH_SHORT).show()
                                                         }
                                                     } else {
-                                                        Toast.makeText(context, "Numéro de téléphone non disponible", Toast.LENGTH_SHORT).show()
+                                                        try {
+                                                            val dialIntent = Intent(Intent.ACTION_DIAL)
+                                                            context.startActivity(dialIntent)
+                                                        } catch (e: Exception) {
+                                                            Toast.makeText(context, "Numéro de téléphone non disponible", Toast.LENGTH_SHORT).show()
+                                                        }
                                                     }
                                                 },
                                             contentAlignment = Alignment.Center
@@ -1014,6 +1036,9 @@ fun SummaryScreen(
                                  }
 
                                  val segments = transcript?.speakerSegments
+                                 val raw = transcript?.rawText?.trim()
+                                 val summaryRaw = summary.summaryText.takeIf { !it.startsWith("Traitement IA") }?.trim()
+
                                  if (!segments.isNullOrEmpty()) {
                                      Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                                          segments.forEach { seg ->
@@ -1062,29 +1087,40 @@ fun SummaryScreen(
                                              }
                                          }
                                      }
-                                 } else {
-                                     val raw = transcript?.rawText?.trim()
-                                     if (!raw.isNullOrBlank() && raw != "...") {
-                                         Box(
-                                             modifier = Modifier
-                                                 .fillMaxWidth()
-                                                 .clip(RoundedCornerShape(10.dp))
-                                                 .background(Surface1)
-                                                 .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                                                 .padding(14.dp)
-                                         ) {
-                                             Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
+                                 } else if (!raw.isNullOrBlank() && raw != "...") {
+                                     Box(
+                                         modifier = Modifier
+                                             .fillMaxWidth()
+                                             .clip(RoundedCornerShape(10.dp))
+                                             .background(Surface1)
+                                             .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                             .padding(14.dp)
+                                     ) {
+                                         Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
+                                     }
+                                 } else if (!summaryRaw.isNullOrBlank()) {
+                                     Box(
+                                         modifier = Modifier
+                                             .fillMaxWidth()
+                                             .clip(RoundedCornerShape(10.dp))
+                                             .background(Surface1)
+                                             .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                             .padding(14.dp)
+                                     ) {
+                                         Column {
+                                             Text(text = summaryRaw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
+                                             Text(text = "Extrait de transcription issu de l'analyse IA", color = Text3, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
                                          }
-                                     } else {
-                                         Row(
-                                             modifier = Modifier.fillMaxWidth(),
-                                             verticalAlignment = Alignment.CenterVertically,
-                                             horizontalArrangement = Arrangement.SpaceBetween
-                                         ) {
-                                             Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
-                                             TextButton(onClick = { viewModel.refreshTranscript() }) {
-                                                 Text("Recharger", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
-                                             }
+                                     }
+                                 } else {
+                                     Row(
+                                         modifier = Modifier.fillMaxWidth(),
+                                         verticalAlignment = Alignment.CenterVertically,
+                                         horizontalArrangement = Arrangement.SpaceBetween
+                                     ) {
+                                         Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
+                                         TextButton(onClick = { viewModel.refreshTranscript() }) {
+                                             Text("Recharger", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                          }
                                      }
                                  }

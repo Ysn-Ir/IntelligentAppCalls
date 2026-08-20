@@ -77,6 +77,8 @@ class CallSummaryDto(BaseModel):
     confidence_score: Optional[float] = None
     detected_appointment_id: Optional[str] = None
     appointment: Optional[AppointmentDto] = None
+    contact_name: Optional[str] = None
+    phone_number: Optional[str] = None
 
 class SummaryEditRequest(BaseModel):
     new_text: Optional[str] = None
