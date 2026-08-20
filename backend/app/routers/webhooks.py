@@ -4,7 +4,7 @@ import uuid
 import logging
 from fastapi import APIRouter, Request, Response, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
-from ..database import Call, SessionLocal, User, get_db
+from ..database import Call, Contact, SessionLocal, User, get_db
 from .deps import UPLOAD_DIR
 
 router = APIRouter(tags=["Multi-Provider Webhooks"])
@@ -41,12 +41,17 @@ async def universal_voice_webhook(request: Request, provider: str = "universal",
         to_number = data.get("To") or data.get("to") or "+33100000000"
         direction = str(data.get("Direction") or data.get("direction") or "inbound").upper()
 
-        # Ensure Call record exists in DB
+        # Ensure Call record exists in DB with valid foreign key
         call = db.query(Call).filter(Call.id == call_sid).first()
         if not call:
+            contact = db.query(Contact).filter(Contact.phone_number == from_number).first()
+            if not contact:
+                contact = db.query(Contact).first()
+            contact_id = contact.id if contact else None
+
             call = Call(
                 id=call_sid,
-                contact_id="1",
+                contact_id=contact_id,
                 direction="OUTBOUND" if "outbound" in direction.lower() else "INBOUND",
                 status="ONGOING",
                 ai_status="PROCESSING",
@@ -153,22 +158,31 @@ async def universal_recording_complete(request: Request, background_tasks: Backg
             def _download_and_process():
                 try:
                     import requests
-                    auth = None
-                    acc_sid = os.getenv("TWILIO_ACCOUNT_SID")
-                    auth_tok = os.getenv("TWILIO_AUTH_TOKEN")
-                    if "twilio.com" in audio_url and acc_sid and auth_tok:
-                        auth = (acc_sid, auth_tok)
-                    elif "plivo.com" in audio_url:
-                        p_id = os.getenv("PLIVO_AUTH_ID")
-                        p_tok = os.getenv("PLIVO_AUTH_TOKEN")
-                        if p_id and p_tok:
-                            auth = (p_id, p_tok)
+                    import shutil
 
-                    resp = requests.get(audio_url, auth=auth, timeout=30)
-                    if resp.status_code == 200:
-                        with open(local_filepath, "wb") as f:
-                            f.write(resp.content)
-                        logger.info(f"Saved audio ({len(resp.content)} bytes) to {local_filepath}")
+                    # If URL points to our own local server, copy directly from disk
+                    if "127.0.0.1:8000/uploads/" in audio_url or "localhost:8000/uploads/" in audio_url:
+                        src_name = os.path.basename(audio_url.split("?")[0])
+                        src_path = os.path.join(UPLOAD_DIR, src_name)
+                        if os.path.exists(src_path) and src_path != local_filepath:
+                            shutil.copyfile(src_path, local_filepath)
+                    elif not os.path.exists(local_filepath):
+                        auth = None
+                        acc_sid = os.getenv("TWILIO_ACCOUNT_SID")
+                        auth_tok = os.getenv("TWILIO_AUTH_TOKEN")
+                        if "twilio.com" in audio_url and acc_sid and auth_tok:
+                            auth = (acc_sid, auth_tok)
+                        elif "plivo.com" in audio_url:
+                            p_id = os.getenv("PLIVO_AUTH_ID")
+                            p_tok = os.getenv("PLIVO_AUTH_TOKEN")
+                            if p_id and p_tok:
+                                auth = (p_id, p_tok)
+
+                        resp = requests.get(audio_url, auth=auth, timeout=30)
+                        if resp.status_code == 200:
+                            with open(local_filepath, "wb") as f:
+                                f.write(resp.content)
+                            logger.info(f"Saved audio ({len(resp.content)} bytes) to {local_filepath}")
 
                         bg_db = SessionLocal()
                         try:
