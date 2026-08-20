@@ -1143,13 +1143,16 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
             db.add(call)
             db.commit()
 
-        # Build TwiML Response
+        # Build TwiML Response with absolute callback URL for Twilio
+        base_url = str(request.base_url).rstrip('/')
+        callback_url = f"{base_url}/webhooks/twilio/recording-complete"
+
         try:
             from twilio.twiml.voice_response import VoiceResponse, Dial
             vr = VoiceResponse()
             dial = Dial(
                 record="record-from-answer-dual",
-                recording_status_callback="/webhooks/twilio/recording-complete",
+                recording_status_callback=callback_url,
                 recording_status_callback_method="POST"
             )
             if to_number.startswith("client:"):
@@ -1162,7 +1165,7 @@ async def twilio_voice(request: Request, db: Session = Depends(get_db)):
             # Fallback direct TwiML XML string
             twiml_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Dial record="record-from-answer-dual" recordingStatusCallback="/webhooks/twilio/recording-complete" recordingStatusCallbackMethod="POST">
+    <Dial record="record-from-answer-dual" recordingStatusCallback="{callback_url}" recordingStatusCallbackMethod="POST">
         <Number>{to_number}</Number>
     </Dial>
 </Response>"""
