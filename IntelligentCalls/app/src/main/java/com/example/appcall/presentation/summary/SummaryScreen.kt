@@ -1024,14 +1024,14 @@ fun SummaryScreen(
             AlertDialog(
                 onDismissRequest = { showVoiceDialog = false },
                 containerColor = Surface1,
-                title = { Text("Modifier le rendez-vous", color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                title = { Text(strings.editSummary, color = Text1, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
                 text = {
                     Column {
-                        Text("Indiquez la modification (ex: 'Décale à jeudi 15h')", color = Text3, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                        Text(strings.taskTitlePlaceholder, color = Text3, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
                         OutlinedTextField(
                             value = voiceCommandText,
                             onValueChange = { voiceCommandText = it },
-                            placeholder = { Text("e.g. Décale à jeudi 15h", color = Text3) },
+                            placeholder = { Text(strings.taskTitlePlaceholder, color = Text3) },
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = androidx.compose.ui.text.TextStyle(color = Text1),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1052,12 +1052,12 @@ fun SummaryScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Text1)
                     ) {
-                        Text("Valider", color = BgColor, fontWeight = FontWeight.Bold)
+                        Text(strings.validate, color = BgColor, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showVoiceDialog = false }) {
-                        Text("Annuler", color = Text3)
+                        Text(strings.close, color = Text3)
                     }
                 }
             )

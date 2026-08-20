@@ -35,6 +35,9 @@ import java.util.Locale
 @Composable
 fun FilesSection(localDatabase: AppLocalDatabase) {
     val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
 
     fun getRecordingsList(): List<File> {
         val targetDirs = listOf(
@@ -73,7 +76,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
     if (showDeleteAllDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
-            title = { Text("Supprimer tous les fichiers ?", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text(strings.gdprDeleteVoice, color = Color.White, fontWeight = FontWeight.Bold) },
             text = { Text("Tous les enregistrements audio locaux seront définitivement effacés de cet appareil.", color = Color.LightGray) },
             confirmButton = {
                 Button(
@@ -86,16 +89,16 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                         getRecordingsList().forEach { it.delete() }
                         recordingFiles = getRecordingsList()
                         showDeleteAllDialog = false
-                        Toast.makeText(context, "Tous les enregistrements locaux ont été supprimés", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, strings.profileUpdatedSuccess, Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                 ) {
-                    Text("Supprimer", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(strings.delete, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showDeleteAllDialog = false }) {
-                    Text("Annuler", color = Color.Gray)
+                    Text(strings.close, color = Color.Gray)
                 }
             },
             containerColor = Color(0xFF1E293B)
@@ -117,13 +120,13 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
         ) {
             Column {
                 Text(
-                    text = "Enregistrements Audio",
+                    text = strings.audioVault,
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${recordingFiles.size} fichier(s) disponible(s)",
+                    text = "${recordingFiles.size} audio file(s)",
                     color = Color.Gray,
                     fontSize = 12.sp
                 )
@@ -135,7 +138,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text("Vider tout", color = Color(0xFFEF4444), fontSize = 11.sp)
+                        Text(strings.delete, color = Color(0xFFEF4444), fontSize = 11.sp)
                     }
                 }
                 Button(
@@ -143,7 +146,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                     colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Text("Actualiser", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(strings.retry, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -156,7 +159,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun enregistrement d'appel trouvé.\nPassez un appel pour enregistrer l'audio.",
+                    text = strings.noAudioRecordings,
                     color = Color.Gray,
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp
@@ -170,7 +173,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                 items(recordingFiles) { file ->
                     val isPlaying = currentlyPlayingPath == file.absolutePath
                     val fileSizeKb = file.length() / 1024
-                    val dateFormatted = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                    val dateFormatted = SimpleDateFormat("dd/MM/yyyy HH:mm", com.example.appcall.presentation.theme.getAppLocale(appLanguageCode))
                         .format(Date(file.lastModified()))
 
                     Card(
@@ -185,11 +188,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                val displayTitle = if (file.name.startsWith("Appel_")) {
-                                    "🎙️ ${file.name.removeSuffix(".mp4").removeSuffix(".wav").removeSuffix(".m4a")}"
-                                } else {
-                                    "🎙️ Appel du $dateFormatted"
-                                }
+                                val displayTitle = "🎙️ ${file.name}"
                                 Text(
                                     text = displayTitle,
                                     color = Color.White,
@@ -198,7 +197,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${file.name} • ${fileSizeKb} KB",
+                                    text = "$dateFormatted • ${fileSizeKb} KB",
                                     color = Color.Gray,
                                     fontSize = 11.sp
                                 )
@@ -231,7 +230,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                             )
 
                                             if (file.length() <= 512) {
-                                                Toast.makeText(context, "Fichier vide ou trop court", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Audio file is empty or too short", Toast.LENGTH_SHORT).show()
                                                 return@Button
                                             }
 
@@ -256,7 +255,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                             currentlyPlayingPath = file.absolutePath
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Erreur de lecture: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Erreur lecture: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
@@ -265,7 +264,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = if (isPlaying) "Stop" else "Écouter",
+                                    text = if (isPlaying) "STOP" else "PLAY",
                                     color = if (isPlaying) Color.White else Color(0xFF0F172A),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
@@ -288,7 +287,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                             putExtra(Intent.EXTRA_STREAM, uri)
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Exporter l'enregistrement"))
+                                        context.startActivity(Intent.createChooser(shareIntent, strings.shareRecording))
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
@@ -297,7 +296,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
-                                    contentDescription = "Exporter",
+                                    contentDescription = strings.shareRecording,
                                     tint = NeonTeal,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -314,7 +313,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                     }
                                     if (file.delete()) {
                                         recordingFiles = getRecordingsList()
-                                        Toast.makeText(context, "Fichier supprimé", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, strings.profileUpdatedSuccess, Toast.LENGTH_SHORT).show()
                                     } else {
                                         Toast.makeText(context, "Impossible de supprimer", Toast.LENGTH_SHORT).show()
                                     }
@@ -323,7 +322,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Supprimer",
+                                    contentDescription = strings.delete,
                                     tint = Color(0xFFEF4444),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -335,3 +334,4 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
         }
     }
 }
+
