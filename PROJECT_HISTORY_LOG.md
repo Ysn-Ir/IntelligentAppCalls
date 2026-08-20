@@ -165,6 +165,32 @@
 
 ---
 
+### Incident #9: Sentiment Classification Stuck on Neutral & Missing Repository Domain Mapping
+* **Discovery**: Call summaries with hostile threats generated `sentiment=HOSTILE` on backend, but the Android UI remained `Neutre`.
+* **Symptoms**:
+  - UI displayed grey `Neutre` sentiment pill despite backend logs confirming `HOSTILE` sentiment and dynamic security tags.
+* **Root Cause**:
+  - In `VoipRepositoryImpl.kt` (`getCallSummary`), manual constructor instantiation omitted `sentiment`, `intent`, `tags`, `contactName`, and `phoneNumber` when converting DTO to Domain model.
+* **Solution Implemented**:
+  - Replaced manual construction with `dto.toDomain()` across `VoipRepositoryImpl.kt`.
+  - Upgraded local SQLite database to Schema Version 9 with dedicated columns for sentiment, intent, and tags.
+
+---
+
+### Incident #10: Stacked Call History List Displaying Hardcoded "Positif" & SQLite v9 Transcript Preservation
+* **Discovery**: Call rows in `CallHistoryScreen.kt` always displayed a green `"Positif"` badge regardless of the actual call tone.
+* **Symptoms**:
+  - Hostile and negative calls showed `"Positif"` and `"#IA"` in the stacked recording list.
+  - Historical call transcripts occasionally disappeared when opening calls from history.
+* **Root Cause**:
+  - `CallHistoryScreen.kt` had hardcoded `text = "Positif"` and `text = "#IA"`.
+  - SQLite `saveCallSummary` used `CONFLICT_REPLACE`, which deleted rows and cleared `raw_transcript` and `speaker_segments`.
+* **Solution Implemented**:
+  - Updated `schemas.py`, `calls.py`, `NetworkModels.kt`, and `CallHistoryScreen.kt` to dynamically populate and render real sentiment badges (Red "Menace / Conflit", Orange "Négatif", Green "Positif", Grey "Neutre") and dynamic contextual tags.
+  - Replaced destructive `CONFLICT_REPLACE` in `AppLocalDatabase.kt` with `CONFLICT_IGNORE` + `UPDATE`, guaranteeing audio transcripts are permanently preserved in local cache.
+
+---
+
 ## 3. Component Status & Verification Summary
 
 | Feature / Module | Status | Verification Result |
@@ -173,8 +199,10 @@
 | **Contact Name & Phone Resolution** | **OPERATIONAL** | Real address book prioritized, zero stuck numbers |
 | **Speech-to-Text (Whisper Large v3 Turbo)** | **OPERATIONAL** | Latency ~1.1s, confidence score > 96% |
 | **Call Summary & RDV Extraction (Cascade LLM)** | **OPERATIONAL** | Dynamic extraction of date, time, subject, status |
+| **Intent & Dynamic Sentiment Engine** | **OPERATIONAL** | 10 business domains & 4-tier sentiment badges across all screens |
+| **Authentic Diarisation & Audio Fallback** | **OPERATIONAL** | Multi-speaker bubbles with timestamps and resilient context fallback |
 | **Multilingual AI RAG Engine (7 Languages)** | **OPERATIONAL** | Real-time factual answers in EN, FR, AR, ES, DE, ZH, JA |
 | **Full Multilingual Android UI** | **OPERATIONAL** | 100% of screens localized with reactive switching |
-| **Offline-First Engine & Sync Queue** | **OPERATIONAL** | Full SQLite caching, automatic `NetworkCallback` sync |
+| **Offline-First SQLite Schema (v9)** | **OPERATIONAL** | Non-destructive caching of summaries and audio transcripts |
 | **Backend Integration Audit (35 Endpoints)** | **100% PASS** | Score: 35/35 endpoints passing (`audit_routes.py`) |
-| **Android Compilation** | **100% PASS** | `BUILD SUCCESSFUL in 54s` (0 errors) |
+| **Android Compilation** | **100% PASS** | `BUILD SUCCESSFUL` (0 errors) |

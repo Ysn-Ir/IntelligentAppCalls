@@ -49,14 +49,15 @@
 
 | Feature | Description |
 |---|---|
-| VoIP outbound calls | Place calls via Twilio Programmable Voice |
+| VoIP outbound calls | Place calls via Twilio Programmable Voice / WebRTC |
 | Native call interception | Detects native Android phone calls and offers to record them |
 | Live transcription | Real-time speech-to-text streamed via WebSocket |
-| AI call summaries | Claude Sonnet generates a 2–4 sentence summary post-call |
-| Appointment detection | Claude detects whether the conversation contains a scheduled meeting |
-| User validation | Every AI-proposed outcome requires an explicit human validate/dismiss action |
-| Voice-edit corrections | User can correct the detected appointment by voice command |
-| Offline-first | Everything degrades gracefully to local SQLite when the backend is unreachable |
+| AI call summaries | Groq / OpenAI generates structured bullet summaries post-call |
+| Intent & Sentiment Engine | 10-domain intent classification (Threats, Appointments, Quotes, Billing, Support) & 4-tier sentiment (Hostile, Negative, Positive, Neutral) |
+| Appointment detection | AI detects whether the conversation contains a scheduled meeting |
+| User validation | Every AI-proposed outcome requires an explicit human validate/dismiss action (Human-in-the-loop) |
+| Voice-edit corrections | User can correct the detected appointment by voice command ("change le rendez-vous à 16h30") |
+| Offline-first | Everything degrades gracefully to local SQLite (Schema v9) with non-destructive transcript preservation |
 | Reminders | WorkManager-based push notification reminders on validated appointments |
 | GDPR compliance | Voice data export + deletion endpoints |
 

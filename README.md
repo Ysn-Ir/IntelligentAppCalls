@@ -4,10 +4,11 @@
 > 📜 **Read the [Engineering & Incident Resolution Log (PROJECT_HISTORY_LOG.md)](PROJECT_HISTORY_LOG.md) for the complete technology matrix and root-cause solutions.**  
 > 🌐 **Read the [Hosting & Deployment Guide (HOSTING_AND_DEPLOYMENT_GUIDE.md)](HOSTING_AND_DEPLOYMENT_GUIDE.md) for production setup, database schemas, and zero-recompilation server routing.**
 
-**IntelligentAppCalls** is a state-of-the-art, end-to-end AI telephony intelligence platform. It seamlessly combines:
-1. **Android Client (Kotlin + Jetpack Compose)**: Native PSTN SIM-card call recording (with Samsung Knox process elevation), live speech transcription, offline SQLite cache, task manager, and dynamic agenda calendar.
-2. **AI Telephony Backend (FastAPI + Groq / OpenAI)**: Audio processing, Whisper speech-to-text, French temporal reasoning for automatic appointment scheduling, LLM summarization, and vector RAG search.
-3. **Next.js Web Dashboard (React 19 + TypeScript)**: Modern CRM analytics, call history playback, AI conversation inspector, and full GDPR Art. 15–20 compliance portal.
+**IntelligentAppCalls** is a state-of-the-art, voice-first intelligent telephony & productivity platform designed in strict accordance with **Cahier des Charges — Partie 6 (Appels intelligents & architecture technique)**:
+1. **Couche 1 — Application Client (Android Jetpack Compose)**: WhatsApp-style streamlined UI centralizing the 6 core modules: **To do list**, **Agenda**, **Assistant IA**, **Fichiers**, **Nouveau contact**, and **Paramètres**.
+2. **Couche 2 — Couche Vocale & VoIP**: Integrated VoIP (Twilio / WebRTC), automated PSTN call recording with Samsung Knox elevation, planned reminders, and scheduled file sharing.
+3. **Couche 3 — Moteur IA Multi-Lingue (Whisper + Groq / OpenAI)**: Authentic multi-speaker speech diarisation, 10-domain intent classification (Threats, Appointments, Quotes, Logistics, Billing, Complaints, Support), dynamic sentiment analysis (Hostile, Negative, Positive, Neutral), and dynamic date-aware French appointment extraction.
+4. **Couche 4 — Backend & Données (FastAPI + MySQL / SQLite v9 Cache)**: 35/35 fully operational REST endpoints & WebSocket live transcript streaming, offline-first local SQLite schema (v9) with non-destructive caching, and GDPR Art. 15–20 data sovereignty.
 
 ---
 
