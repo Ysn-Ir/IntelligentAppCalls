@@ -78,7 +78,31 @@ data class CallSummaryDto(
     @SerializedName("confidence_score") val confidenceScore: Double?,
     @SerializedName("detected_appointment_id") val detectedAppointmentId: String?,
     @SerializedName("appointment") val appointment: AppointmentDto? = null
-)
+) {
+    fun toDomain(): com.example.appcall.domain.model.CallSummary {
+        val app = appointment?.let {
+            com.example.appcall.domain.model.Appointment(
+                id = it.id,
+                contactId = it.contactId,
+                scheduledAt = it.scheduledAt,
+                status = it.status,
+                title = it.title,
+                summaryContext = it.summaryContext,
+                phoneNumber = it.phoneNumber,
+                contactName = it.contactName
+            )
+        }
+        return com.example.appcall.domain.model.CallSummary(
+            id = id,
+            callId = callId,
+            summaryText = summaryText,
+            status = status,
+            confidenceScore = confidenceScore,
+            detectedAppointmentId = detectedAppointmentId,
+            appointment = app
+        )
+    }
+}
 
 data class AppointmentDto(
     @SerializedName("id") val id: String,

@@ -30,6 +30,8 @@ class AppLocalDatabase @Inject constructor(
         private const val KEY_APPOINTMENT_ID = "appointment_id"
         private const val KEY_APPOINTMENT_DATE = "appointment_date"
         private const val KEY_APPOINTMENT_STATUS = "appointment_status"
+        private const val KEY_RAW_TRANSCRIPT = "raw_transcript"
+        private const val KEY_SPEAKER_SEGMENTS = "speaker_segments"
 
         // Table Sync Queue
         private const val TABLE_SYNC_QUEUE = "sync_queue"
@@ -396,6 +398,50 @@ class AppLocalDatabase @Inject constructor(
             }
         }
         return null
+    }
+
+    fun saveTranscript(callId: String, rawText: String, speakerSegmentsJson: String?, confidenceScore: Double?) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(KEY_CALL_ID, callId)
+            put(KEY_RAW_TRANSCRIPT, rawText)
+            put(KEY_SPEAKER_SEGMENTS, speakerSegmentsJson)
+            if (confidenceScore != null) put(KEY_CONFIDENCE_SCORE, confidenceScore)
+        }
+        db.insertWithOnConflict(TABLE_CALLS, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+        db.update(TABLE_CALLS, values, "$KEY_CALL_ID = ?", arrayOf(callId))
+    }
+
+    fun getLocalTranscript(callId: String): com.example.appcall.data.model.TranscriptDto? {
+        val db = readableDatabase
+        return try {
+            val cursor = db.query(TABLE_CALLS, null, "$KEY_CALL_ID = ?", arrayOf(callId), null, null, null)
+            cursor.use {
+                if (it.moveToFirst()) {
+                    val rawIndex = it.getColumnIndex(KEY_RAW_TRANSCRIPT)
+                    val segIndex = it.getColumnIndex(KEY_SPEAKER_SEGMENTS)
+                    val confIndex = it.getColumnIndex(KEY_CONFIDENCE_SCORE)
+                    val raw = if (rawIndex >= 0) it.getString(rawIndex) else null
+                    val segJson = if (segIndex >= 0) it.getString(segIndex) else null
+                    val conf = if (confIndex >= 0 && !it.isNull(confIndex)) it.getDouble(confIndex) else 98.0
+                    if (!raw.isNullOrBlank()) {
+                        val segments = if (!segJson.isNullOrBlank()) {
+                            try {
+                                com.google.gson.Gson().fromJson(segJson, Array<com.example.appcall.data.model.SpeakerSegmentDto>::class.java).toList()
+                            } catch (_: Exception) { null }
+                        } else null
+                        com.example.appcall.data.model.TranscriptDto(
+                            id = "local-t-$callId",
+                            callId = callId,
+                            rawText = raw,
+                            language = "fr",
+                            confidenceScore = conf,
+                            speakerSegments = segments
+                        )
+                    } else null
+                } else null
+            }
+        } catch (_: Exception) { null }
     }
 
     // --- Call History Operations ---

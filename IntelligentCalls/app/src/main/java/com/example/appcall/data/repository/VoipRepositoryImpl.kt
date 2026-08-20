@@ -625,12 +625,19 @@ class VoipRepositoryImpl @Inject constructor(
         return try {
             val response = apiService.getTranscript(auth, callId)
             if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
+                val dto = response.body()!!
+                val segJson = if (!dto.speakerSegments.isNullOrEmpty()) com.google.gson.Gson().toJson(dto.speakerSegments) else null
+                localDatabase.saveTranscript(callId, dto.rawText, segJson, dto.confidenceScore)
+                Result.success(dto)
             } else {
-                Result.failure(Exception("Transcript non disponible (${response.code()})"))
+                val local = localDatabase.getLocalTranscript(callId)
+                if (local != null) Result.success(local)
+                else Result.failure(Exception("Transcript non disponible (${response.code()})"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val local = localDatabase.getLocalTranscript(callId)
+            if (local != null) Result.success(local)
+            else Result.failure(e)
         }
     }
 
