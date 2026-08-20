@@ -113,7 +113,7 @@ private const val EXTRA_CALL_NUMBER = "call_number"
 private const val EXTRA_CALL_ENDED = "call_ended"
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : androidx.fragment.app.FragmentActivity() {
 
     @Inject
     lateinit var voipRepository: VoipRepository
@@ -147,6 +147,40 @@ class MainActivity : ComponentActivity() {
     private val interceptedNumberState = mutableStateOf("")
 
     private var nativeCallSessionActive = false
+
+    fun authenticateWithBiometrics(
+        title: String = "Audio Vault Security",
+        subtitle: String = "Verify your fingerprint or face to access recordings",
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        val executor = androidx.core.content.ContextCompat.getMainExecutor(this)
+        val biometricPrompt = androidx.biometric.BiometricPrompt(
+            this,
+            executor,
+            object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onSuccess()
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    onError(errString.toString())
+                }
+            }
+        )
+
+        val promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setSubtitle(subtitle)
+            .setAllowedAuthenticators(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
 
     override fun onResume() {
         super.onResume()
@@ -2157,6 +2191,75 @@ fun SettingsSection(
                                 Text(strings.testServer, color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                    }
+                }
+            }
+
+            // ── BIOMETRIC VAULT SECURITY CARD ──
+            item {
+                val netPrefs = context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                var isBiometricEnabled by remember { mutableStateOf(netPrefs.getBoolean("biometric_vault_lock", false)) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("BIOMETRIC VAULT SECURITY", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                            Text("Require Fingerprint or Face ID to view call recordings", color = Text2, fontSize = 11.5.sp)
+                        }
+                        Switch(
+                            checked = isBiometricEnabled,
+                            onCheckedChange = {
+                                isBiometricEnabled = it
+                                netPrefs.edit().putBoolean("biometric_vault_lock", it).apply()
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
+                        )
+                    }
+                }
+            }
+
+            // ── CRM & AUTOMATION WEBHOOK CARD ──
+            item {
+                val netPrefs = context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                var crmWebhookUrl by remember { mutableStateOf(netPrefs.getString("custom_crm_webhook_url", "") ?: "") }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text("CRM & AUTOMATION WEBHOOK (ZAPIER / MAKE)", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Text("Automatically dispatch call summaries & tasks to Notion, Slack, or HubSpot", color = Text2, fontSize = 11.5.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = crmWebhookUrl,
+                            onValueChange = {
+                                crmWebhookUrl = it
+                                netPrefs.edit().putString("custom_crm_webhook_url", it.trim()).apply()
+                            },
+                            placeholder = { Text("https://hooks.zapier.com/hooks/catch/...", color = Text3, fontSize = 12.sp) },
+                            label = { Text("Webhook Endpoint URL", color = Text3, fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
                     }
                 }
             }

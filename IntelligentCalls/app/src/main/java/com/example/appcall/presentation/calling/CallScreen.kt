@@ -3,6 +3,7 @@ package com.example.appcall.presentation.calling
 import android.content.Context
 import android.media.AudioManager
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -481,7 +482,14 @@ fun ActiveCallOverlay(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Real-Time Animated Sound Waveform
+                    LiveAudioWaveformVisualizer(
+                        barColor = if (consentGiven) NeonTeal else ElectricViolet
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     // Call control toggles
                     Row(
@@ -534,9 +542,9 @@ fun ActiveCallOverlay(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = strings.audioTranscript.uppercase(),
-                                        fontSize = 11.sp,
+                                        text = strings.audioTranscript,
                                         color = NeonTeal,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
@@ -600,3 +608,42 @@ fun ActiveCallOverlay(
     }
 }
 
+@Composable
+fun LiveAudioWaveformVisualizer(
+    modifier: Modifier = Modifier,
+    barColor: Color = NeonTeal
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "waveform")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val barCount = 14
+        for (i in 0 until barCount) {
+            val normalizedIndex = i.toFloat() / barCount
+            val wave = Math.sin(phase.toDouble() + (normalizedIndex * 4 * Math.PI)).toFloat()
+            val dynamicHeight = (10 + ((wave.coerceIn(-1f, 1f) + 1f) / 2f) * 22).dp
+
+            Box(
+                modifier = Modifier
+                    .width(3.5.dp)
+                    .height(dynamicHeight)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(barColor.copy(alpha = 0.45f + ((wave.coerceIn(-1f, 1f) + 1f) / 2f) * 0.55f))
+            )
+        }
+    }
+}

@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -63,14 +64,77 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
 
+    val isBiometricLockEnabled = remember { netPrefs.getBoolean("biometric_vault_lock", false) }
+    var isUnlocked by remember { mutableStateOf(!isBiometricLockEnabled) }
+
     LaunchedEffect(Unit) {
         recordingFiles = getRecordingsList()
+        if (isBiometricLockEnabled && !isUnlocked) {
+            (context as? com.example.appcall.MainActivity)?.authenticateWithBiometrics(
+                title = "Unlock Audio Vault",
+                subtitle = "Scan your fingerprint or face to view recordings",
+                onSuccess = { isUnlocked = true },
+                onError = { /* Keep locked */ }
+            )
+        }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             mediaPlayer?.release()
         }
+    }
+
+    if (!isUnlocked) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0F172A))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color(0x332DD4BF)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🔒", fontSize = 32.sp)
+                }
+                Text(
+                    text = "Audio Vault Locked",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Biometric authentication is required to access your audio recordings.",
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+                Button(
+                    onClick = {
+                        (context as? com.example.appcall.MainActivity)?.authenticateWithBiometrics(
+                            title = "Unlock Audio Vault",
+                            subtitle = "Scan your fingerprint or face to view recordings",
+                            onSuccess = { isUnlocked = true },
+                            onError = { err -> Toast.makeText(context, err, Toast.LENGTH_SHORT).show() }
+                        ) ?: run { isUnlocked = true }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonTeal),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Unlock with Biometrics", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        return
     }
 
     if (showDeleteAllDialog) {

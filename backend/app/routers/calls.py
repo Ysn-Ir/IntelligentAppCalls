@@ -712,3 +712,66 @@ def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Dep
         "has_summary": summary is not None,
         "transcript_confidence": transcript.confidence_score if transcript else None,
     }
+
+@router.post("/api/v1/integrations/crm-webhook/test")
+def test_crm_webhook(payload: dict, token: str = Depends(verify_token)):
+    """Tests a user-provided CRM or Zapier webhook URL."""
+    webhook_url = payload.get("webhook_url") or os.getenv("CRM_WEBHOOK_URL")
+    if not webhook_url:
+        raise HTTPException(status_code=400, detail="Webhook URL required")
+    try:
+        import httpx
+        test_data = {
+            "event": "test.ping",
+            "message": "IntelligentCalls CRM Webhook connection successful",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(webhook_url, json=test_data)
+            return {"status": "ok", "status_code": resp.status_code, "url": webhook_url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Webhook connection error: {str(e)}")
+
+@router.post("/api/v1/calls/{id}/dispatch-webhook")
+def dispatch_call_webhook(id: str, payload: dict = {}, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Dispatches a structured JSON call summary to a CRM / Zapier endpoint."""
+    webhook_url = payload.get("webhook_url") or os.getenv("CRM_WEBHOOK_URL") or os.getenv("ZAPIER_WEBHOOK_URL")
+    if not webhook_url:
+        raise HTTPException(status_code=400, detail="No CRM webhook URL configured")
+    try:
+        import httpx
+        call = db.query(Call).filter(Call.id == id).first()
+        if not call:
+            raise HTTPException(status_code=404, detail="Call not found")
+        contact = db.query(Contact).filter(Contact.id == call.contact_id).first() if call else None
+        summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
+        appointment = db.query(Appointment).filter(Appointment.call_id == id).first()
+        reminders = db.query(Reminder).filter(Reminder.call_id == id).all()
+
+        data = {
+            "event": "call.summary.ready",
+            "call_id": id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "contact": {
+                "id": contact.id if contact else None,
+                "name": f"{contact.first_name or ''} {contact.last_name or ''}".strip() if contact else None,
+                "phone": contact.phone_number if contact else None,
+                "email": contact.email if contact else None
+            },
+            "summary": summary.summary_text if summary else None,
+            "appointment": {
+                "title": appointment.title if appointment else None,
+                "scheduled_at": appointment.scheduled_at.isoformat() if appointment and appointment.scheduled_at else None,
+                "status": appointment.status if appointment else None
+            } if appointment else None,
+            "tasks": [
+                {"title": r.title, "priority": r.priority, "status": r.status}
+                for r in reminders
+            ]
+        }
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(webhook_url, json=data)
+            return {"status": "ok", "delivered": True, "http_status": resp.status_code}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to dispatch: {str(e)}")
+

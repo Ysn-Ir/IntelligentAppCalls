@@ -59,6 +59,9 @@ dependencies {
     implementation(libs.retrofit.gson)
     implementation(libs.okhttp.logging)
 
+    // Biometric Security
+    implementation(libs.androidx.biometric)
+
 
 
     // Compose

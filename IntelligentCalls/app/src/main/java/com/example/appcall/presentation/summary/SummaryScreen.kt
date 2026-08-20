@@ -847,6 +847,38 @@ fun SummaryScreen(
                                                  modifier = Modifier
                                                      .fillMaxWidth()
                                                      .clip(RoundedCornerShape(8.dp))
+                                                     .background(Surface2)
+                                                     .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                                     .clickable {
+                                                         try {
+                                                             val calIntent = android.content.Intent(android.content.Intent.ACTION_INSERT).apply {
+                                                                 data = android.provider.CalendarContract.Events.CONTENT_URI
+                                                                 putExtra(android.provider.CalendarContract.Events.TITLE, appointment.title ?: "CRM Meeting")
+                                                                 putExtra(android.provider.CalendarContract.Events.DESCRIPTION, "Call with ${appointment.contactName ?: "Contact"}\nSummary: $summaryText")
+                                                                 try {
+                                                                     val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US)
+                                                                     val parsed = format.parse(appointment.scheduledAt.take(16))
+                                                                     if (parsed != null) {
+                                                                         putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, parsed.time)
+                                                                         putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, parsed.time + 3600000)
+                                                                     }
+                                                                 } catch (_: Exception) {}
+                                                             }
+                                                             context.startActivity(calIntent)
+                                                         } catch (e: Exception) {
+                                                             android.widget.Toast.makeText(context, "Calendar: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                                         }
+                                                     }
+                                                     .padding(vertical = 10.dp),
+                                                 contentAlignment = Alignment.Center
+                                             ) {
+                                                 Text(text = "📅 Add to Calendar", color = AccentText, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                                             }
+
+                                             Box(
+                                                 modifier = Modifier
+                                                     .fillMaxWidth()
+                                                     .clip(RoundedCornerShape(8.dp))
                                                      .border(1.dp, BorderStrong, RoundedCornerShape(8.dp))
                                                      .clickable { showVoiceDialog = true }
                                                      .padding(vertical = 10.dp),

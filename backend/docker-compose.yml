@@ -23,6 +23,8 @@ services:
       - WHISPER_MODEL=small
       - WHISPER_DEVICE=cpu
       - JWT_SECRET=${JWT_SECRET:-appcall_secret_jwt_key_2026}
+      - CRM_WEBHOOK_URL=${CRM_WEBHOOK_URL:-}
+      - ZAPIER_WEBHOOK_URL=${ZAPIER_WEBHOOK_URL:-}
     depends_on:
       - postgres
       - redis
