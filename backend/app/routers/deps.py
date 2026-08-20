@@ -63,6 +63,8 @@ def verify_token(authorization: Optional[str] = Header(None)) -> str:
             db.close()
 
         return user_id
-    except Exception as e:
-        logger.warning(f"JWT Verification failed ({e}) — falling back to test user")
-        return "test-user-uuid-1111"
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid/Expired token"
+        )

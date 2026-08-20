@@ -2,7 +2,8 @@ import os
 import uuid
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
 from ..database import User, get_db
@@ -12,47 +13,50 @@ from .deps import verify_token, create_access_token
 router = APIRouter(tags=["Auth & Users"])
 logger = logging.getLogger("intelligent_calls.auth")
 
-@router.post("/api/v1/auth/login")
-def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == request.email).first()
-    if not user:
-        user = db.query(User).first()
-        if not user:
-            user = User(
-                id="test-user-uuid-1111",
-                first_name="Admin",
-                last_name="User",
-                email=request.email,
-                password_hash=bcrypt.hash(request.password) if request.password else None,
-                number="+33100000000"
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-
-    token = create_access_token(user_id=user.id, email=user.email)
-    return {"access_token": token, "token_type": "bearer"}
-
-@router.post("/api/v1/auth/register")
+@router.post("/api/v1/auth/register", response_model=schemas.LoginResponse)
 def register(request: schemas.RegisterRequest, db: Session = Depends(get_db)):
+    if not request.email or not request.password:
+        raise HTTPException(status_code=400, detail="Missing email or password")
+    
     existing = db.query(User).filter(User.email == request.email).first()
     if existing:
-        token = create_access_token(user_id=existing.id, email=existing.email)
-        return {"access_token": token, "token_type": "bearer"}
-
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    pwd_hash = bcrypt.hash(request.password)
     new_user = User(
         id=str(uuid.uuid4()),
         first_name=request.first_name,
         last_name=request.last_name,
         email=request.email,
-        password_hash=bcrypt.hash(request.password) if request.password else None,
-        number=request.phone_number
+        number=getattr(request, "number", None) or getattr(request, "phone_number", None) or "+33100000000",
+        password_hash=pwd_hash
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    token = create_access_token(new_user.id, new_user.email)
+    return {"access_token": token, "token_type": "bearer"}
 
-    token = create_access_token(user_id=new_user.id, email=new_user.email)
+@router.post("/api/v1/auth/login", response_model=schemas.LoginResponse)
+def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
+    if not request.email or not request.password:
+        raise HTTPException(status_code=400, detail="Missing email or password")
+    
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found. Please sign up first.")
+    
+    if not user.password_hash or not bcrypt.verify(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token(user.id, user.email)
+    return {"access_token": token, "token_type": "bearer"}
+
+@router.post("/api/v1/auth/refresh", response_model=schemas.LoginResponse)
+def refresh(authorization: Optional[str] = Header(None)):
+    user_id = verify_token(authorization)
+    token = create_access_token(user_id, "user@example.com")
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/api/v1/voip/token", response_model=schemas.TokenResponse)
@@ -92,11 +96,12 @@ def get_me(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
         "first_name": user.first_name,
         "last_name": user.last_name,
         "email": user.email,
-        "number": user.number
+        "number": user.number,
+        "created_at": user.created_at.isoformat() + "Z" if getattr(user, "created_at", None) else datetime.utcnow().isoformat() + "Z"
     }
 
 @router.put("/api/v1/users/me")
-def update_me(req: schemas.ProfileUpdateRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+def update_profile(req: schemas.ProfileUpdateRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         user = db.query(User).first()
