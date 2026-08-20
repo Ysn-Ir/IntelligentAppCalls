@@ -29,7 +29,7 @@ CHATBOT_SYSTEM_PROMPT = """Tu es un assistant IA professionnel pour l'applicatio
 Tu as accès en temps réel aux données exactes de l'utilisateur :
 1. Ses Tâches (To-Do list)
 2. Son Agenda & Rendez-vous
-3. Son Carnet de Contacts (noms, numéros de téléphone, emails, entreprises)
+3. Son Carnet de Contacts (noms, numéros de téléphone, emails)
 4. Ses Résumés d'Appels récents & Transcriptions
 
 Règles strictes :
@@ -65,7 +65,7 @@ def chat(
     """
     Processes a user message and returns an AI reply with source attribution.
     """
-    from ..database import ChatbotSession, Contact, Task, AgendaItem, Appointment, Call, CallSummary
+    from ..database import ChatbotSession, Contact, Task, Agenda, Appointment, Call, CallSummary
 
     # 1. Load or create session
     session = None
@@ -92,26 +92,25 @@ def chat(
     ]) if tasks else "(Aucune tâche enregistrée)"
 
     # 3. Fetch User Real Data Context: Agenda & Appointments
-    agenda_items = db.query(AgendaItem).filter((AgendaItem.user_id == user_id) | (AgendaItem.user_id.is_(None))).all()
+    agenda_items = db.query(Agenda).filter((Agenda.user_id == user_id) | (Agenda.user_id.is_(None))).all()
+    user_contacts = db.query(Contact).filter((Contact.user_id == user_id) | (Contact.user_id.is_(None))).all()
+    contact_map = {c.id: f"{c.first_name} {c.last_name}" for c in user_contacts}
+
     appointments = db.query(Appointment).filter(
-        (Appointment.contact_id.in_([c.id for c in db.query(Contact.id).filter(Contact.user_id == user_id).all()])) |
-        (Appointment.contact_id.is_(None))
+        (Appointment.user_id == user_id) | (Appointment.user_id.is_(None))
     ).all()
 
-    agenda_parts = [f"- {a.title} à {a.time}" for a in agenda_items]
+    agenda_parts = [f"- {a.title} prévu le {a.scheduled_at}" for a in agenda_items]
     for app in appointments:
-        c_name = app.contact_name or "Contact"
-        phone_txt = f" ({app.phone_number})" if app.phone_number else ""
-        agenda_parts.append(f"- Rendez-vous '{app.title or 'RDV'}' avec {c_name}{phone_txt} le {app.scheduled_at} [Statut: {app.status}]")
+        c_name = contact_map.get(app.contact_id, "Contact")
+        agenda_parts.append(f"- Rendez-vous '{app.title or 'RDV'}' avec {c_name} le {app.scheduled_at} [Statut: {app.status}]")
     agenda_text = "\n".join(agenda_parts) if agenda_parts else "(Aucun événement d'agenda)"
 
     # 4. Fetch User Real Data Context: Contacts
-    contacts = db.query(Contact).filter(Contact.user_id == user_id).all()
     contacts_parts = []
-    for c in contacts:
-        company_txt = f", Entreprise: {c.company}" if c.company else ""
+    for c in user_contacts:
         email_txt = f", Email: {c.email}" if c.email else ""
-        contacts_parts.append(f"- {c.first_name} {c.last_name}: Téléphone {c.phone}{company_txt}{email_txt}")
+        contacts_parts.append(f"- {c.first_name} {c.last_name}: Téléphone {c.phone_number}{email_txt}")
     contacts_text = "\n".join(contacts_parts) if contacts_parts else "(Aucun contact enregistré)"
 
     # 5. Fetch User Real Data Context: Recent Calls & Summaries
@@ -119,7 +118,7 @@ def chat(
     call_summaries_parts = []
     for call in recent_calls:
         sum_obj = db.query(CallSummary).filter(CallSummary.call_id == call.id).first()
-        c_label = f"{call.contact.first_name} {call.contact.last_name} ({call.contact.phone})" if call.contact else "Numéro non répertorié"
+        c_label = f"{call.contact.first_name} {call.contact.last_name} ({call.contact.phone_number})" if call.contact else "Numéro non répertorié"
         s_text = sum_obj.summary_text if sum_obj else "En attente de transcription"
         call_summaries_parts.append(f"- Appel du {call.started_at} avec {c_label} : {s_text}")
     calls_text = "\n".join(call_summaries_parts) if call_summaries_parts else "(Aucun appel récent)"
@@ -137,7 +136,7 @@ def chat(
     if contact_id:
         c_found = db.query(Contact).filter(Contact.id == contact_id).first()
         if c_found:
-            target_contact_label = f"{c_found.first_name} {c_found.last_name} ({c_found.phone})"
+            target_contact_label = f"{c_found.first_name} {c_found.last_name} ({c_found.phone_number})"
 
     full_context = (
         f"{CHATBOT_SYSTEM_PROMPT}\n\n"
@@ -157,14 +156,14 @@ def chat(
         {"role": "user", "content": message}
     ]
 
-    # 8. Call LLM
+    # 8. Call LLM with Multi-Model Fallback
     client = _get_openai()
+    reply = None
     if client:
         active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
         primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
         candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b"]
-        
-        reply = None
+
         for model in candidates:
             try:
                 response = client.chat.completions.create(
@@ -180,11 +179,9 @@ def chat(
                 logger.warning(f"Groq model {model} attempt failed: {e}")
                 continue
 
-        if not reply:
-            reply = _smart_offline_reply(message, tasks, agenda_items, appointments, contacts, recent_calls, chunks)
-    else:
-        logger.warning("No LLM client configured — generating factual offline database reply.")
-        reply = _smart_offline_reply(message, tasks, agenda_items, appointments, contacts, recent_calls, chunks)
+    if not reply:
+        logger.info("Generating factual offline database reply.")
+        reply = _smart_offline_reply(message, tasks, agenda_items, appointments, user_contacts, recent_calls, chunks)
 
     # 9. Save updated history
     history.append({"role": "user", "content": message})
@@ -239,10 +236,9 @@ def _smart_offline_reply(
     if any(w in msg_lower for w in ["agenda", "rendez-vous", "rdv", "calendrier", "planning"]):
         all_events = []
         for a in agenda_items:
-            all_events.append(f"• {a.title} à {a.time}")
+            all_events.append(f"• {a.title} prévu le {a.scheduled_at}")
         for app in appointments:
-            c_name = app.contact_name or "Contact"
-            all_events.append(f"• {app.title or 'Rendez-vous'} avec {c_name} le {app.scheduled_at} ({app.status})")
+            all_events.append(f"• {app.title or 'Rendez-vous'} le {app.scheduled_at} ({app.status})")
         if not all_events:
             return "Vous n'avez aucun rendez-vous ou événement prévu dans votre agenda."
         return "Voici vos rendez-vous et événements planifiés :\n" + "\n".join(all_events)
@@ -252,17 +248,17 @@ def _smart_offline_reply(
         matched = []
         for c in contacts:
             full_name = f"{c.first_name} {c.last_name}".lower()
-            if any(part in msg_lower for part in full_name.split()) or (c.company and c.company.lower() in msg_lower):
+            if any(part in msg_lower for part in full_name.split()):
                 matched.append(c)
         if matched:
             lines = ["Voici les coordonnées trouvées dans vos contacts :"]
             for c in matched:
-                lines.append(f"• {c.first_name} {c.last_name} : {c.phone} (Email: {c.email or 'N/A'})")
+                lines.append(f"• {c.first_name} {c.last_name} : {c.phone_number} (Email: {c.email or 'N/A'})")
             return "\n".join(lines)
         if contacts:
             lines = ["Voici vos contacts enregistrés :"]
             for c in contacts[:5]:
-                lines.append(f"• {c.first_name} {c.last_name} : {c.phone}")
+                lines.append(f"• {c.first_name} {c.last_name} : {c.phone_number}")
             return "\n".join(lines)
         return "Aucun contact correspondant n'a été trouvé dans votre répertoire."
 
@@ -280,7 +276,7 @@ def _smart_offline_reply(
         excerpt = chunks[0]["chunk_text"][:250]
         return f"D'après les transcriptions de vos appels :\n\n{excerpt}"
 
-    return "Je suis prêt à vous aider. Vous pouvez me demander vos tâches, vos rendez-vous d'agenda, les coordonnées de vos contacts ou les résumés de vos appels récents."
+    return "Je suis votre assistant Intelligent Calls. Vous pouvez me demander vos tâches, votre agenda, les coordonnées de vos contacts ou les résumés de vos appels."
 
 
 def get_session_history(session_id: str, db) -> List[dict]:
