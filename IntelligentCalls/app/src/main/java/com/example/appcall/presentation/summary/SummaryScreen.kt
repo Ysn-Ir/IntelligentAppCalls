@@ -76,7 +76,9 @@ fun SummaryScreen(
                 }?.let { allFiles.addAll(it) }
             }
         }
-        return allFiles.firstOrNull { it.name.contains(targetCallId, ignoreCase = true) }
+        val targetPrefix = if (targetCallId.length >= 8) targetCallId.take(8) else targetCallId
+        return allFiles.firstOrNull { it.name.contains(targetPrefix, ignoreCase = true) }
+            ?: allFiles.firstOrNull { it.name.contains(targetCallId, ignoreCase = true) }
             ?: allFiles.maxByOrNull { it.lastModified() }
     }
 
@@ -250,9 +252,10 @@ fun SummaryScreen(
 
                         // 1. Caller Card with AI Sentiment Stickers & Topic Tags
                         item {
-                            val contactName = summary.appointment?.contactName ?: "Contact Appel"
-                            val phoneNumber = summary.appointment?.phoneNumber ?: "+33 6 12 34 56 78"
+                            val contactName = summary.appointment?.contactName?.takeIf { it.isNotBlank() } ?: "Appel Enregistré"
+                            val phoneNumber = summary.appointment?.phoneNumber?.takeIf { it.isNotBlank() } ?: ""
                             val initials = contactName.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("").uppercase()
+                            val confidencePercent = (summary.confidenceScore ?: 94.0).toInt()
 
                             Box(
                                 modifier = Modifier
@@ -291,8 +294,9 @@ fun SummaryScreen(
                                                 fontSize = 15.5.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
+                                            val subTitle = if (phoneNumber.isNotBlank()) "$phoneNumber · Enregistré" else "Audio Enregistré"
                                             Text(
-                                                text = "$phoneNumber · Enregistré",
+                                                text = subTitle,
                                                 color = Text3,
                                                 fontSize = 11.5.sp,
                                                 fontFamily = FontFamily.Monospace,
@@ -305,7 +309,21 @@ fun SummaryScreen(
                                                 .size(32.dp)
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(Surface2)
-                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    if (phoneNumber.isNotBlank()) {
+                                                        try {
+                                                            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                                                                data = android.net.Uri.parse("tel:$phoneNumber")
+                                                            }
+                                                            context.startActivity(dialIntent)
+                                                        } catch (e: Exception) {
+                                                            Toast.makeText(context, "Impossible de composer le numéro", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    } else {
+                                                        Toast.makeText(context, "Numéro de téléphone non disponible", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(text = "📞", fontSize = 13.sp)
@@ -342,7 +360,7 @@ fun SummaryScreen(
                                                 .background(AccentDim)
                                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                                         ) {
-                                            Text(text = "🎯 Confiance IA 94%", color = AccentText, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(text = "🎯 Confiance IA $confidencePercent%", color = AccentText, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
                                         }
                                         Box(
                                             modifier = Modifier

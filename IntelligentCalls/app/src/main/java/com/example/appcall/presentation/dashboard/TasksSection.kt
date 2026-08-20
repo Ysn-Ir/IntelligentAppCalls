@@ -370,6 +370,8 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             Divider(color = BorderColor, thickness = 1.dp)
             Spacer(modifier = Modifier.height(14.dp))
 
+            var showDeleteVoiceDialog by remember { mutableStateOf(false) }
+
             // Action: Exporter mes données
             Box(
                 modifier = Modifier
@@ -377,7 +379,35 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                     .clip(RoundedCornerShape(9.dp))
                     .background(Surface1)
                     .border(1.dp, BorderColor, RoundedCornerShape(9.dp))
-                    .clickable { }
+                    .clickable {
+                        coroutineScope.launch {
+                            voipRepository.exportAllData()
+                                .onSuccess { jsonContent ->
+                                    try {
+                                        val exportFile = java.io.File(context.cacheDir, "appcall_gdpr_export.json")
+                                        exportFile.writeText(jsonContent)
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            exportFile
+                                        )
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "application/json"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            putExtra(Intent.EXTRA_SUBJECT, "Export Données RGPD AppCall")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Exporter mes données (JSON)"))
+                                        Toast.makeText(context, "Export généré avec succès", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Erreur export: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "Export échoué : ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    }
                     .padding(12.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -398,7 +428,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                     .clip(RoundedCornerShape(9.dp))
                     .background(Surface1)
                     .border(1.dp, BorderColor, RoundedCornerShape(9.dp))
-                    .clickable { }
+                    .clickable { showDeleteVoiceDialog = true }
                     .padding(12.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -407,6 +437,43 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                     color = DangerColor,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (showDeleteVoiceDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteVoiceDialog = false },
+                    containerColor = Surface1,
+                    title = { Text("Supprimer les enregistrements vocaux", color = Text1, fontWeight = FontWeight.Bold) },
+                    text = { Text("Voulez-vous supprimer les enregistrements audio et transcriptions ? Les fichiers locaux et distants seront effacés.", color = Text2, fontSize = 12.sp) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val targetDirs = listOf(
+                                        File(context.filesDir, "recordings"),
+                                        File(context.filesDir, "recordings_native"),
+                                        context.getExternalFilesDir(null)?.let { File(it, "recordings") }
+                                    ).filterNotNull()
+
+                                    targetDirs.forEach { dir ->
+                                        if (dir.exists() && dir.isDirectory) {
+                                            dir.listFiles()?.forEach { it.delete() }
+                                        }
+                                    }
+                                    audioFiles = getRecordingsList()
+                                    voipRepository.deleteVoiceData()
+                                        .onSuccess { Toast.makeText(context, "Tous les enregistrements vocaux ont été supprimés", Toast.LENGTH_SHORT).show() }
+                                        .onFailure { Toast.makeText(context, "Enregistrements locaux supprimés", Toast.LENGTH_SHORT).show() }
+                                }
+                                showDeleteVoiceDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
+                        ) { Text("Confirmer", color = Text1) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteVoiceDialog = false }) { Text("Annuler", color = Text3) }
+                    }
                 )
             }
 

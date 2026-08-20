@@ -876,7 +876,7 @@ def download_audio(id: str, token: str = Depends(verify_token), db: Session = De
     file_path = None
     if os.path.exists(UPLOAD_DIR):
         for f in os.listdir(UPLOAD_DIR):
-            if f.startswith(f"{id}_"):
+            if f.startswith(id):
                 file_path = os.path.join(UPLOAD_DIR, f)
                 break
                 
