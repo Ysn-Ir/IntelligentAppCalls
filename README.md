@@ -93,104 +93,99 @@ IntelligentAppCalls/
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Complete Startup & Connection Guide
 
-### 1. Start the Backend (FastAPI)
+### Step 1: Find Your Computer's Wi-Fi IP Address
 
-```bash
+Open a terminal (PowerShell or Command Prompt) on your PC and run:
+```powershell
+ipconfig
+```
+Look for **`Wireless LAN adapter Wi-Fi`** ➡️ **`IPv4 Address`** (for example: `192.168.1.12`).
+
+---
+
+### Step 2: Start the FastAPI AI Backend
+
+Navigate to the `backend/` folder:
+```powershell
 cd backend
+```
 
-# Create & activate virtual environment
+Activate your Python virtual environment (or create one if needed):
+```powershell
+# Create virtualenv (first time only)
 python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
+
+# Activate on Windows PowerShell / CMD:
+.\venv\Scripts\activate
+# (On Linux / macOS: source venv/bin/activate)
 
 # Install dependencies
 pip install -r requirements.txt
+```
 
-# Run the server on all network interfaces (0.0.0.0)
+Start the backend server on **`0.0.0.0`** so that devices on your local network can reach it:
+```powershell
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-*API Documentation will be available at:* **`http://localhost:8000/docs`**
+
+> [!IMPORTANT]
+> **Why `--host 0.0.0.0` is required:**
+> If you run `uvicorn` without `--host 0.0.0.0`, it binds only to `127.0.0.1` (localhost) and refuses connections from your mobile phone.
+>
+> When Windows Defender Firewall prompts you, click **"Allow access" / "Autoriser"** for Private networks.
+
+*Interactive API Swagger Documentation is available at:* **`http://localhost:8000/docs`**
 
 ---
 
-### 2. 🌐 Network & IP Configuration Guide (Wi-Fi, USB & Changing Networks)
+### Step 3: Configure the Android App
 
-The Android app features a dynamic URL interceptor (`DynamicUrlInterceptor`), allowing you to switch between Wi-Fi networks, USB reverse tethering, or remote VPNs without recompiling the app!
+Open the **IntelligentCalls** app on your phone:
 
-#### 📍 How to find your PC's IP address:
-- **On Windows**: Open PowerShell or Command Prompt and run:
-  ```powershell
-  ipconfig
-  ```
-  Look for **IPv4 Address** under `Wireless LAN adapter Wi-Fi` (e.g. `192.168.1.12` or `192.168.1.177`).
-- **On macOS / Linux**:
-  ```bash
-  ip a   # or: ifconfig
-  ```
-
----
-
-#### 📶 Mode A — Wi-Fi LAN Mode (Same Wi-Fi / Hotspot)
-1. **Connect both your PC and Android phone to the same Wi-Fi network** (or connect your PC to your phone's Mobile Hotspot).
-2. **Start the backend** ensuring `--host 0.0.0.0` is used so it accepts external incoming connections:
-   ```bash
-   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+#### Option A: Wi-Fi Mode (Recommended)
+1. Tap the **⚙️ Paramètres** tab at the bottom right.
+2. In **URL du serveur**, enter your computer's IP address and port:
+   ```text
+   http://192.168.1.12:8000
    ```
-3. **Configure the IP in the Android App**:
-   - Open the **IntelligentCalls** app on your phone.
-   - Tap the **⚙️ Paramètres** tab in the bottom bar.
-   - Under **CONFIGURATION SERVEUR & IA**, enter your PC's IP and port:
-     ```
-     http://192.168.1.12:8000
-     ```
-   - Tap **Enregistrer** (Save), then tap **🔄 Tester**.
-   - You should see the confirmation toast: `✅ Backend connecté (HTTP 200)`.
+   *(Replace `192.168.1.12` with your actual Wi-Fi IPv4 address from Step 1).*
+3. Tap **Enregistrer** (Save).
+4. Tap **🔄 Tester**. You should see:
+   ```text
+   ✅ Backend connecté (HTTP 200)
+   ```
 
-> [!TIP]
-> **Switching Wi-Fi Networks (e.g. Home ➡️ Work ➡️ Mobile Hotspot)**:
-> Whenever you change Wi-Fi networks, your router assigns a new local IP to your PC.
-> 1. Run `ipconfig` on your PC to get the new IPv4 address.
-> 2. Open the app ➡️ **⚙️ Paramètres** ➡️ enter the new IP address ➡️ Tap **Enregistrer** & **🔄 Tester**.
-> You don't need to rebuild or reinstall the application!
-
----
-
-#### 🔌 Mode B — USB Reverse Tethering Mode (No Wi-Fi Needed / Ultra Low Latency)
-If you don't have Wi-Fi or want direct USB communication:
-1. Connect your phone to your PC with a USB cable (with **USB Debugging** enabled).
-2. Run the ADB reverse port forwarding command on your PC:
-   ```bash
+#### Option B: USB Cable Mode (ADB Reverse)
+If your phone is plugged in via USB with USB Debugging enabled:
+1. On your PC terminal, run:
+   ```powershell
    adb reverse tcp:8000 tcp:8000
    ```
-3. In the Android app ➡️ **⚙️ Paramètres** ➡️ tap the **🔌 Mode USB** button (automatically sets `http://127.0.0.1:8000`).
-4. Tap **🔄 Tester** to verify the connection.
+2. In the app's **⚙️ Paramètres** tab, tap **🔌 Mode USB** (`http://127.0.0.1:8000`).
+3. Tap **Enregistrer** (Save), then **🔄 Tester**.
 
 ---
 
-#### 🔒 Mode C — Tailscale / VPN / Remote Server
-If running over a VPN (e.g. Tailscale / WireGuard):
-- Enter the VPN IP (e.g., `http://100.89.108.117:8000`) into the **⚙️ Paramètres** URL input in the Android app.
+### Step 4: Build & Install the Android App (If updating)
 
----
-
-### 3. Build & Install the Android App
-
-Connect your Android device (e.g. Samsung Galaxy S21 / Android 15) and run:
-```bash
+From the project root:
+```powershell
 cd IntelligentCalls
 .\gradlew.bat :app:assembleDebug
+```
+To install on your connected device:
+```powershell
 adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ---
 
-### 4. Start the Web Dashboard (Next.js)
+### Step 5: Start the Next.js Web Dashboard
 
-```bash
+Open a new terminal and navigate to `dashboard/`:
+```powershell
 cd dashboard
 npm install
 npm run dev
@@ -203,30 +198,48 @@ npm run dev
 
 To ensure crystal-clear 2-way call audio on Samsung Galaxy devices running Android 14 / 15:
 
-1. Go to **Settings** ➡️ **Accessibility** ➡️ **Installed Apps**.
+1. Go to **Settings (Paramètres téléphone)** ➡️ **Accessibility (Accessibilité)** ➡️ **Installed Apps (Applications installées)**.
 2. Tap **IntelligentCalls** and toggle **ON** (`CallAccessibilityService`).
-3. Ensure **Wi-Fi Calling** is **OFF** in your quick settings panel.
+3. Ensure **Wi-Fi Calling (Appels Wi-Fi)** is **OFF** in your quick settings panel.
 4. Make or receive any phone call. The app will automatically record the audio into `Appel_<Contact>_<YYYY-MM-DD_HH-mm>.mp4` and send it to the AI pipeline for instant transcription and appointment extraction.
 
 ---
 
-## 🎯 Key Features Breakdown
+## 📱 Features Overview
 
-### 🤖 French AI Appointment Detection & Agenda Sync
-- Dynamically resolves French relative expressions (*"demain 14h"*, *"mardi prochain"*, *"vendredi après-midi"*) into strict calendar timestamps (`YYYY-MM-DDTHH:MM:SS`).
-- Synchronizes automatically to **Mon Agenda** on your phone and the backend CRM calendar.
+### 1. 📞 Appels & Contacts (Screen 1)
+- **Top Tab Switcher**: Seamlessly switch between `📞 Historique` and `👥 Contacts`.
+- **Search & Filter**: Live contact search and call filter tabs (`Tous`, `Manqués`, `Avec résumé`).
+- **AI Transcription Consent Toggle**: Instant per-user switch to enable or disable AI voice analysis.
+- **Direct Calling**: One-tap native SIM call (`📱`) or VoIP call (`Appeler`).
+- **AI Badges**: Waveform indicators, audio HD tags, and sentiment pills (`😃 Positif`).
 
-### 👥 Real Device Contacts Integration
-- Direct phone book resolution via `ContactsContract`.
-- Replaces generic placeholder names with your actual caller identities, phone numbers, and avatars.
+### 2. 📝 Call Analysis & Summary (Screen 2)
+- **Interactive Audio Scrubber**: Dynamic waveform visualization, duration tracking, and playback speed pills (`1×`, `1.5×`, `2×`).
+- **AI Summary Card**: Formatted bullet points extracted from conversation context.
+- **Appointment Extraction**: 2x2 grid displaying Date, Time, Title, and Contact with `Valider RDV` and `Modifier` options.
+- **Dual-Speaker Transcript**: Left bubble for Caller, right bubble for You with timestamps and confidence scores.
 
-### 📋 High-Density Compact Tasks & Agenda UI
-- Collapsible **`+ Ajouter`** creation drawers that preserve 100% of the screen for your tasks and appointments.
-- Category badges (`📞 Appel`, `📅 RDV`, `⚡ Urgent`, `📝 Suivi`).
+### 3. 🤖 AI Assistant RAG Chat (Screen 3)
+- Query all call transcripts and CRM data using Groq LLaMA / GPT-4o.
+- Filter chat context by specific contact or search across all calls.
+- Sources citation badge indicating which call the answer was derived from.
 
-### 🛡️ Full GDPR Compliance
-- **Art. 15 (Right of Access & Portability)**: 1-click JSON export of all transcripts, calls, and summaries.
-- **Art. 17 (Right to Erasure)**: Anonymize contacts and purge audio recordings.
+### 4. 📅 Smart Agenda (Screen 4)
+- Real-time digital clock (`HH:mm:ss`) and Monday-to-Sunday day strip picker.
+- **`＋ Nouveau RDV` Creator**: Collapsible drawer with quick day chips (`Aujourd'hui`, `Demain`, `+1 sem`), native DatePicker, quick time chips (`09:00`, `14:00`, `18:00`), and native TimePicker.
+- Direct `Rappeler` dialer button and `Valider` sync button.
+
+### 5. 📋 Tasks & Audio Vault (Screen 5)
+- **Tâches IA**: Extracted action items with checkboxes and source call tags.
+- **Coffre-fort Audio**: Local voice recordings scanner with in-app audio playback and download.
+- **RGPD Privacy**: Data export and right-to-be-forgotten deletion.
+
+### 6. ⚙️ Settings (Screen 6)
+- Shizuku API elevation manager.
+- Server URL configuration & connectivity tester.
+- Recording engine selector (Bluetooth SCO / PBX bridge).
+- GDPR Article 15 JSON data export and Article 17 full account deletion.
 
 ---
 

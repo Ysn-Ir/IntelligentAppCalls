@@ -973,20 +973,12 @@ def get_agenda(user_id: str = Depends(verify_token), db: Session = Depends(get_d
         c_name = None
         p_num = None
         contact_obj = db.query(Contact).filter(Contact.id == a.contact_id).first() if a.contact_id else None
-        summary_obj = db.query(CallSummary).filter(CallSummary.detected_appointment_id == a.id).first()
-        call_id = summary_obj.call_id if summary_obj else getattr(a, "call_id", None)
-        call_obj = db.query(Call).filter(Call.id == call_id).first() if call_id else None
-
         if contact_obj:
             c_name = f"{contact_obj.first_name} {contact_obj.last_name}".strip()
             p_num = contact_obj.phone_number
-        elif call_obj and call_obj.twilio_params:
-            try:
-                tp = json.loads(call_obj.twilio_params)
-                c_name = tp.get("contact_name")
-                p_num = tp.get("caller_id")
-            except Exception:
-                pass
+
+        summary_obj = db.query(CallSummary).filter(CallSummary.detected_appointment_id == a.id).first()
+        call_id_val = summary_obj.call_id if summary_obj else None
 
         results.append(schemas.AgendaDto(
             id=a.id,
@@ -994,7 +986,7 @@ def get_agenda(user_id: str = Depends(verify_token), db: Session = Depends(get_d
             scheduled_at=a.scheduled_at.isoformat() + "Z" if a.scheduled_at else datetime.utcnow().isoformat() + "Z",
             contact_name=c_name,
             phone_number=p_num,
-            call_id=call_id,
+            call_id=call_id_val,
             status=a.status or "SCHEDULED"
         ))
         seen_ids.add(a.id)
