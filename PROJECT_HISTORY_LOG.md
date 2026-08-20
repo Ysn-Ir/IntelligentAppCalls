@@ -191,6 +191,31 @@
 
 ---
 
+### Incident #11: Call Audio Playback Defaulting to Most Recent Device Recording
+* **Discovery**: Opening older calls in `SummaryScreen.kt` played the audio of the newest call recorded on the phone.
+* **Symptoms**: Regardless of which historical call was selected, tapping Play played the latest recording.
+* **Root Cause**: `findCallAudioFile` contained a fallback line `?: allFiles.maxByOrNull { it.lastModified() }` when prefix lookup didn't match.
+* **Solution Implemented**:
+  - Removed `maxByOrNull` completely.
+  - Added direct database-to-file mapping via `getFileForCall(callId)` in `AppLocalDatabase.kt`.
+  - Added remote streaming and downloading pipeline via `GET /api/v1/calls/{id}/audio` in `ApiService.kt` and `VoipRepositoryImpl.kt` caching to `call_remote_${callId}.mp4`.
+
+---
+
+### Incident #12: Recent Calls Missing from History List & Cryptic File Names
+* **Discovery**: Calls made natively on the phone disappeared from the call history list when online, and audio recordings were displayed with raw Unix filenames.
+* **Symptoms**:
+  - `getCallHistory()` returned only the server list, hiding recent local native calls.
+  - Recordings in the Audio Vault showed technical names like `native-1787262244108.m4a`.
+* **Root Cause**:
+  - When API request succeeded, `VoipRepositoryImpl.getCallHistory()` returned only `response.body()!!` without merging local database rows.
+  - Recording display text used raw `file.name`.
+* **Solution Implemented**:
+  - Merged server and local SQLite history in `getCallHistory()`, preserving all native calls and sorting descending by `startedAt`.
+  - Added intelligent name & contact resolver in `TasksSection.kt` and `FilesSection.kt` to display clean titles (`🎙️ Appel avec [Nom]`) and localized date/time subtitles.
+
+---
+
 ## 3. Component Status & Verification Summary
 
 | Feature / Module | Status | Verification Result |
@@ -204,5 +229,6 @@
 | **Multilingual AI RAG Engine (7 Languages)** | **OPERATIONAL** | Real-time factual answers in EN, FR, AR, ES, DE, ZH, JA |
 | **Full Multilingual Android UI** | **OPERATIONAL** | 100% of screens localized with reactive switching |
 | **Offline-First SQLite Schema (v9)** | **OPERATIONAL** | Non-destructive caching of summaries and audio transcripts |
+| **Historical Audio Binding & Remote Stream** | **OPERATIONAL** | Strict call-to-file binding + backend audio caching |
 | **Backend Integration Audit (35 Endpoints)** | **100% PASS** | Score: 35/35 endpoints passing (`audit_routes.py`) |
 | **Android Compilation** | **100% PASS** | `BUILD SUCCESSFUL` (0 errors) |
