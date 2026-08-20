@@ -318,23 +318,37 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
             detail="Twilio non configuré sur le serveur (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER manquants)"
         )
 
+    # Determine agent's phone to ring first
+    agent_phone = os.getenv("TWILIO_AGENT_PHONE_NUMBER") or os.getenv("AGENT_FORWARD_PHONE_NUMBER")
+    if not agent_phone:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.number:
+            agent_phone = user.number
+        else:
+            agent_phone = "+33100000000"
+
     try:
         from twilio.rest import Client
         client = Client(account_sid, auth_token)
 
         # Base URL for webhooks
         server_url = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:8000")
-        voice_url = f"{server_url.rstrip('/')}/webhooks/twilio/voice"
         recording_cb = f"{server_url.rstrip('/')}/webhooks/twilio/recording-complete"
         status_cb = f"{server_url.rstrip('/')}/webhooks/twilio/status"
 
+        # TwiML executed as soon as agent answers: speaks brief notice and dials the client with dual-channel recording
+        bridge_twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="fr-FR">Connexion en cours avec votre contact...</Say>
+    <Dial record="record-from-answer-dual" recordingStatusCallback="{recording_cb}" recordingStatusCallbackMethod="POST">
+        <Number>{contact.phone_number}</Number>
+    </Dial>
+</Response>"""
+
         call = client.calls.create(
-            to=contact.phone_number,
+            to=agent_phone,
             from_=twilio_number,
-            url=voice_url,
-            record=True,
-            recording_status_callback=recording_cb,
-            recording_status_callback_method="POST",
+            twiml=bridge_twiml,
             status_callback=status_cb,
             status_callback_method="POST"
         )
@@ -349,7 +363,8 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
             twilio_params=json.dumps({
                 "call_sid": call.sid,
                 "caller_id": twilio_number,
-                "target": contact.phone_number
+                "target": contact.phone_number,
+                "agent_phone": agent_phone
             })
         )
         db.add(new_call)
@@ -360,7 +375,7 @@ def initiate_twilio_outbound_call(request: schemas.CallRequest, user_id: str = D
             "contact_id": contact.id,
             "status": call.status,
             "direction": "OUTBOUND",
-            "message": f"Appel Twilio lancé vers {contact.phone_number}"
+            "message": f"Appel Twilio lancé. Votre téléphone ({agent_phone}) va sonner pour vous connecter à {contact.phone_number}."
         }
     except Exception as e:
         logger.error(f"Error creating Twilio outbound call: {e}")
