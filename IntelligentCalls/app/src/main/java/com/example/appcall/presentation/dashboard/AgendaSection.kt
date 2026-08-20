@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.local.AppLocalDatabase
+import com.example.appcall.data.notification.AppNotificationManager
 import com.example.appcall.domain.repository.VoipRepository
 import com.example.appcall.presentation.theme.*
 import kotlinx.coroutines.delay
@@ -109,17 +110,35 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         }
     }
 
-    var selectedDayIndex by remember { mutableIntStateOf(1) } // 0=Lun, 1=Mar, etc.
+    // Dynamic Calendar Days for Current Week (Mon to Sun)
+    data class CalendarDayItem(
+        val dayName: String,
+        val dayNum: Int,
+        val isoDate: String,
+        val isToday: Boolean
+    )
+
+    val todayIso = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+    var selectedDayIso by remember { mutableStateOf<String?>(null) } // null = All days
 
     val calendarDays = remember {
         val cal = Calendar.getInstance()
+        cal.firstDayOfWeek = Calendar.MONDAY
         cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-        val dayNames = listOf("Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim")
-        dayNames.mapIndexed { idx, name ->
+        val dayNames = listOf("LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM")
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        dayNames.map { name ->
             val dayNum = cal.get(Calendar.DAY_OF_MONTH)
+            val iso = isoFormat.format(cal.time)
+            val isToday = (iso == todayIso)
             cal.add(Calendar.DAY_OF_MONTH, 1)
-            Pair(name, dayNum)
+            CalendarDayItem(name, dayNum, iso, isToday)
         }
+    }
+
+    val filteredAppointments = remember(appointments, selectedDayIso) {
+        if (selectedDayIso == null) appointments
+        else appointments.filter { it.scheduledAt.startsWith(selectedDayIso!!) || it.scheduledAt.contains(selectedDayIso!!) }
     }
 
     LaunchedEffect(Unit) {
@@ -181,39 +200,72 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Day Strip Picker
+            // Dynamic Day Strip Picker with Filter
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                calendarDays.forEachIndexed { index, (dayName, dayNum) ->
-                    val isActive = selectedDayIndex == index
+                // "TOUS" Filter Chip
+                val isAllSelected = selectedDayIso == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isAllSelected) Text1 else Surface1)
+                        .border(1.dp, if (isAllSelected) Text1 else BorderColor, RoundedCornerShape(9.dp))
+                        .clickable { selectedDayIso = null }
+                        .padding(horizontal = 10.dp, vertical = 11.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "TOUS (${appointments.size})",
+                        color = if (isAllSelected) BgColor else Text2,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                calendarDays.forEach { day ->
+                    val isActive = selectedDayIso == day.isoDate
+                    val count = appointments.count { it.scheduledAt.startsWith(day.isoDate) || it.scheduledAt.contains(day.isoDate) }
+
                     Box(
                         modifier = Modifier
-                            .width(42.dp)
+                            .width(46.dp)
                             .clip(RoundedCornerShape(9.dp))
                             .background(if (isActive) Text1 else Surface1)
-                            .border(1.dp, if (isActive) Text1 else BorderColor, RoundedCornerShape(9.dp))
-                            .clickable { selectedDayIndex = index }
-                            .padding(vertical = 9.dp),
+                            .border(1.dp, if (isActive) Text1 else if (day.isToday) BorderStrong else BorderColor, RoundedCornerShape(9.dp))
+                            .clickable {
+                                selectedDayIso = if (selectedDayIso == day.isoDate) null else day.isoDate
+                            }
+                            .padding(vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = dayName,
-                                color = if (isActive) BgColor.copy(alpha = 0.6f) else Text3,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text = day.dayName,
+                                color = if (isActive) BgColor.copy(alpha = 0.7f) else Text3,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "$dayNum",
-                                color = if (isActive) BgColor else Text1,
-                                fontSize = 14.sp,
+                                text = "${day.dayNum}",
+                                color = if (isActive) BgColor else if (day.isToday) AccentColor else Text1,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 3.dp)
+                                modifier = Modifier.padding(top = 1.dp)
                             )
+                            if (count > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isActive) BgColor else AccentColor)
+                                )
+                            }
                         }
                     }
                 }
@@ -278,6 +330,13 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                         )
                                         appointments = localDatabase.getAgendaAppointments()
                                         voipRepository.createAgenda(id, title, time)
+                                        AppNotificationManager.showAppointmentNotification(
+                                            context = context,
+                                            appointmentId = id,
+                                            title = title,
+                                            scheduledAt = time,
+                                            contactName = "Manuel"
+                                        )
                                     }
                                 }
                             },
@@ -396,17 +455,18 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         }
 
         // Agenda List
-        if (appointments.isEmpty()) {
+        if (filteredAppointments.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val emptyMsg = if (selectedDayIso != null) "Aucun rendez-vous pour ce jour ($selectedDayIso)" else "Aucun rendez-vous dans l'agenda"
                 Text(
-                    text = "Aucun rendez-vous dans l'agenda",
+                    text = emptyMsg,
                     color = Text3,
-                    fontSize = 14.sp
+                    fontSize = 13.5.sp
                 )
             }
         } else {
@@ -415,7 +475,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                items(appointments) { appt ->
+                items(filteredAppointments) { appt ->
                     val isConfirmed = appt.status?.contains("CONFIRM", ignoreCase = true) == true || appt.status?.contains("VALID", ignoreCase = true) == true
                     val statusText = if (isConfirmed) "Confirmé" else "Proposé"
                     val (tagBg, tagColor) = if (isConfirmed) Pair(SuccessDim, SuccessColor) else Pair(WarnDim, WarnColor)
@@ -437,21 +497,22 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                 Text(
                                     text = appt.title.takeIf { it.isNotBlank() } ?: "Rendez-vous de suivi",
                                     color = Text1,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(5.dp))
+                                            .clip(RoundedCornerShape(6.dp))
                                             .background(tagBg)
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            .padding(horizontal = 7.dp, vertical = 3.dp)
                                     ) {
                                         Text(
                                             text = statusText,
                                             color = tagColor,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
 

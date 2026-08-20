@@ -330,53 +330,75 @@ fun SummaryScreen(
                                         }
                                     }
 
-                                    // AI Sentiment & Feature Stickers Strip
+                                    // AI Sentiment & Feature Badge Chips Strip
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(top = 10.dp)
                                             .horizontalScroll(rememberScrollState()),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(Surface2)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
-                                            Text(text = "🎙️ Audio HD", color = Text2, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Text3))
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Text(text = "Audio HD", color = Text2, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                            }
                                         }
+
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(SuccessDim)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .border(1.dp, SuccessColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
-                                            Text(text = "😃 Sentiment Positif", color = SuccessColor, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(SuccessColor))
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Text(text = "Positif", color = SuccessColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
+
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(AccentDim)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .border(1.dp, AccentColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
-                                            Text(text = "🎯 Confiance IA $confidencePercent%", color = AccentText, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(AccentColor))
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Text(text = "IA · $confidencePercent%", color = AccentText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
+
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(Surface2)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
-                                            Text(text = "#RDV", color = Text3, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(text = "#RDV", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                                         }
+
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(5.dp))
+                                                .clip(RoundedCornerShape(6.dp))
                                                 .background(Surface2)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
-                                            Text(text = "#SuiviClient", color = Text3, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                                            Text(text = "#SuiviClient", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                                         }
                                     }
                                 }

@@ -425,17 +425,14 @@ def get_calls(
 def get_transcript(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
     if not transcript:
-        call = db.query(Call).filter(Call.id == id).first()
-        if call and call.ai_status == "PROCESSING":
-            return {
-                "id": f"pending-{id}",
-                "call_id": id,
-                "raw_text": "",
-                "language": "fr",
-                "confidence_score": 0.0,
-                "speaker_segments": []
-            }
-        raise HTTPException(status_code=404, detail="Transcript not found")
+        return {
+            "id": f"pending-{id}",
+            "call_id": id,
+            "raw_text": "",
+            "language": "fr",
+            "confidence_score": 0.0,
+            "speaker_segments": []
+        }
 
     segments = []
     if transcript.speaker_segments:

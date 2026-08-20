@@ -183,55 +183,25 @@ class MainActivity : ComponentActivity() {
             syncRequest
         )
 
-        // Register the native call BroadcastReceiver
-        val phoneStateReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(ctx: android.content.Context, intent: android.content.Intent) {
-                if (intent.action != android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+        // Initialize Native Notification Channels
+        com.example.appcall.data.notification.AppNotificationManager.initChannels(this)
 
-                val stateStr = intent.getStringExtra(android.telephony.TelephonyManager.EXTRA_STATE)
-                val number = intent.getStringExtra(android.telephony.TelephonyManager.EXTRA_INCOMING_NUMBER)
-                    ?: "Appel en cours"
-
-                android.util.Log.d("PhoneReceiver", "State: $stateStr | number: $number")
-
-                when (stateStr) {
-                    android.telephony.TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                        // Call connected (outgoing or incoming answered).
-                        // Bring our Activity to the foreground so the Compose dialog can appear.
-                        val bringToFront = Intent(ctx, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            putExtra(EXTRA_CALL_INTERCEPTED, true)
-                            putExtra(EXTRA_CALL_NUMBER, number)
-                        }
-                        ctx.startActivity(bringToFront)
-                    }
-                    android.telephony.TelephonyManager.EXTRA_STATE_IDLE -> {
-                        // Call ended — tell the Activity to tear down the session
-                        if (nativeCallSessionActive) {
-                            val end = Intent(ctx, MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                putExtra(EXTRA_CALL_ENDED, true)
-                            }
-                            ctx.startActivity(end)
-                        }
-                    }
-                }
-            }
+        // Handle navigation from incoming intents / notifications
+        val summaryCallId = intent.getStringExtra("navigate_to_summary_call_id")
+        if (!summaryCallId.isNullOrBlank()) {
+            activeCallIdForSummaryState.value = summaryCallId
+            currentScreenState.value = AppScreen.SUMMARY
         }
-
-        val filter = android.content.IntentFilter(android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED)
-        registerReceiver(phoneStateReceiver, filter)
-
-        // Handle the intent that launched this Activity (cold start from receiver)
-        handleIncomingIntent(intent)
+        val targetSection = intent.getIntExtra("navigate_to_section", -1)
+        if (targetSection >= 0) {
+            selectedSectionState.value = targetSection
+        }
 
         setContent {
             AppCallTheme {
                 var currentScreen by currentScreenState
                 var activeCallIdForSummary by activeCallIdForSummaryState
                 var selectedSection by selectedSectionState
-                var showInterceptConsent by showInterceptConsentState
-                val interceptedNumber by interceptedNumberState
 
                 // ── PREVENT ACCIDENTAL APP CLOSING ON BACK GESTURE ──
                 androidx.activity.compose.BackHandler {
@@ -241,78 +211,6 @@ class MainActivity : ComponentActivity() {
                         currentScreen == AppScreen.DASHBOARD && selectedSection != 0 -> selectedSection = 0
                         currentScreen == AppScreen.DASHBOARD -> moveTaskToBack(true)
                     }
-                }
-
-                // Consent dialog — appears when a native call is detected
-                if (showInterceptConsent) {
-                    AlertDialog(
-                        onDismissRequest = { showInterceptConsent = false },
-                        containerColor = Color(0xFF1F2C34),
-                        title = {
-                            Text(
-                                text = "Enregistrer cet appel ?",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        text = {
-                            Column {
-                                Text(
-                                    text = "Appel : $interceptedNumber",
-                                    color = NeonTeal,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "L'application peut enregistrer cet appel pour générer un résumé et détecter les rendez-vous.\n\nL'enregistrement reste privé et est supprimé après traitement.",
-                                    color = Color.LightGray,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    showInterceptConsent = false
-                                    nativeCallSessionActive = true
-                                    callingManager.startCall(
-                                        Contact(
-                                            id = "native",
-                                            firstName = interceptedNumber,
-                                            lastName = "",
-                                            phoneNumber = interceptedNumber,
-                                            email = "",
-                                            globalGdprConsent = true
-                                        )
-                                    )
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonTeal)
-                            ) {
-                                Text("Oui, enregistrer", color = Color(0xFF111B21), fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        dismissButton = {
-                            OutlinedButton(
-                                onClick = {
-                                    showInterceptConsent = false
-                                    nativeCallSessionActive = true
-                                    // No recording — just track the call
-                                    callingManager.startCall(
-                                        Contact(
-                                            id = "native",
-                                            firstName = interceptedNumber,
-                                            lastName = "",
-                                            phoneNumber = interceptedNumber,
-                                            email = "",
-                                            globalGdprConsent = false
-                                        )
-                                    )
-                                }
-                            ) {
-                                Text("Non, juste le résumé", color = Color.Gray)
-                            }
-                        }
-                    )
                 }
 
                 when (currentScreen) {
@@ -442,6 +340,20 @@ class MainActivity : ComponentActivity() {
     private fun handleIncomingIntent(intent: Intent?) {
         intent ?: return
 
+        val summaryCallId = intent.getStringExtra("navigate_to_summary_call_id")
+        if (!summaryCallId.isNullOrBlank()) {
+            activeCallIdForSummaryState.value = summaryCallId
+            currentScreenState.value = AppScreen.SUMMARY
+            return
+        }
+
+        val targetSection = intent.getIntExtra("navigate_to_section", -1)
+        if (targetSection >= 0) {
+            selectedSectionState.value = targetSection
+            currentScreenState.value = AppScreen.DASHBOARD
+            return
+        }
+
         when {
             intent.getBooleanExtra(EXTRA_CALL_INTERCEPTED, false) -> {
                 val number = intent.getStringExtra(EXTRA_CALL_NUMBER) ?: "Appel en cours"
@@ -460,7 +372,6 @@ class MainActivity : ComponentActivity() {
                 activeCallIdForSummaryState.value = callId
                 currentScreenState.value = AppScreen.SUMMARY
             }
-      
         }
     }
 }

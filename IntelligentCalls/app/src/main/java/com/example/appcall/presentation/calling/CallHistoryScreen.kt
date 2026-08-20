@@ -373,19 +373,25 @@ fun CallHistoryRow(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(SuccessDim)
+                                .border(0.5.dp, SuccessColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "😃 Positif",
-                                color = SuccessColor,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(SuccessColor))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Positif",
+                                    color = SuccessColor,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(Surface2)
+                                .border(0.5.dp, BorderColor, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(

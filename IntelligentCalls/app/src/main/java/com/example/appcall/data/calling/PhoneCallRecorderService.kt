@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.example.appcall.data.notification.AppNotificationManager
 import com.example.appcall.domain.repository.VoipRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -222,12 +223,12 @@ class PhoneCallRecorderService : Service() {
             val sizeKb = "${(file.length() + 1023) / 1024} KB"
             val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).format(java.util.Date())
 
+            val prefs = getSharedPreferences("call_recording_prefs", Context.MODE_PRIVATE)
+            val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
+            val phoneNumber = prefs.getString("active_phone_number", null)
+
             try {
                 val db = com.example.appcall.data.local.AppLocalDatabase(this)
-                val prefs = getSharedPreferences("call_recording_prefs", Context.MODE_PRIVATE)
-                val contactName = prefs.getString("active_contact_name", null) ?: "Appel Téléphonique"
-                val phoneNumber = prefs.getString("active_phone_number", null)
-
                 db.saveFile(id = callId, name = file.name, path = file.absolutePath, size = sizeKb)
                 val existing = db.getCallHistory().firstOrNull { it.id == callId }
                 db.saveCallHistoryItem(
@@ -246,7 +247,15 @@ class PhoneCallRecorderService : Service() {
             // Use a fresh independent scope — the service scope is cancelled in onDestroy()
             CoroutineScope(Dispatchers.IO).launch {
                 voipRepository.uploadCallAudio(callId, file)
-                    .onSuccess { Log.d(TAG, "Upload successful for call $callId") }
+                    .onSuccess {
+                        Log.d(TAG, "Upload successful for call $callId")
+                        AppNotificationManager.showCallProcessedNotification(
+                            this@PhoneCallRecorderService,
+                            callId,
+                            contactName,
+                            "Enregistrement transféré. Résumé et transcription IA en cours."
+                        )
+                    }
                     .onFailure { Log.e(TAG, "Upload failed: ${it.message}") }
             }
         } else {

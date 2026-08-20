@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.local.AppLocalDatabase
+import com.example.appcall.data.notification.AppNotificationManager
 import com.example.appcall.domain.repository.VoipRepository
 import com.example.appcall.presentation.theme.*
 import kotlinx.coroutines.launch
@@ -40,6 +41,8 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
     val coroutineScope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(localDatabase.getTasks()) }
     var gdprConsentEnabled by remember { mutableStateOf(true) }
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+    var newTaskTitle by remember { mutableStateOf("") }
 
     fun getRecordingsList(): List<File> {
         val targetDirs = listOf(
@@ -90,14 +93,86 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
     ) {
         // ── SECTION 1: TÂCHES DÉTECTÉES PAR L'IA ──
         item {
-            Text(
-                text = "TÂCHES DÉTECTÉES PAR L'IA",
-                color = Text3,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-                modifier = Modifier.padding(top = 2.dp, bottom = 9.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 9.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "TÂCHES DÉTECTÉES PAR L'IA",
+                    color = Text3,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Surface1)
+                        .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                        .clickable { showAddTaskDialog = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "＋ Ajouter",
+                        color = Text1,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            if (showAddTaskDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAddTaskDialog = false },
+                    containerColor = Surface1,
+                    title = { Text("Nouvelle tâche", color = Text1, fontWeight = FontWeight.Bold) },
+                    text = {
+                        OutlinedTextField(
+                            value = newTaskTitle,
+                            onValueChange = { newTaskTitle = it },
+                            placeholder = { Text("Ex: Rappeler le client demain...", color = Text3, fontSize = 13.sp) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (newTaskTitle.isNotBlank()) {
+                                    val title = newTaskTitle.trim()
+                                    val taskId = "task-${System.currentTimeMillis()}"
+                                    newTaskTitle = ""
+                                    showAddTaskDialog = false
+                                    coroutineScope.launch {
+                                        localDatabase.saveTask(
+                                            id = taskId,
+                                            title = title,
+                                            completed = false
+                                        )
+                                        tasks = localDatabase.getTasks()
+                                        voipRepository.createTask(taskId, title, completed = false)
+                                        AppNotificationManager.showTaskNotification(context, taskId, title)
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Text1)
+                        ) { Text("Ajouter", color = BgColor, fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showAddTaskDialog = false }) { Text("Annuler", color = Text3) }
+                    }
+                )
+            }
         }
 
         if (tasks.isEmpty()) {
