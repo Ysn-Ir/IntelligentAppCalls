@@ -395,7 +395,8 @@ class AppLocalDatabase @Inject constructor(
             put(KEY_CONTACT_NAME_CALL, summary.contactName ?: summary.appointment?.contactName)
             put(KEY_PHONE_NUMBER_CALL, summary.phoneNumber ?: summary.appointment?.phoneNumber)
         }
-        db.insertWithOnConflict(TABLE_CALLS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        db.insertWithOnConflict(TABLE_CALLS, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+        db.update(TABLE_CALLS, values, "$KEY_CALL_ID = ?", arrayOf(summary.callId))
     }
 
     fun getCallSummary(callId: String): CallSummary? {
