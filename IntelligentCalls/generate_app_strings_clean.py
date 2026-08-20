@@ -1,4 +1,9 @@
-package com.example.appcall.presentation.theme
+# Complete generation of AppStrings.kt
+import os
+
+path = r"c:\Users\khali\OneDrive\Bureau\intelligentCall\IntelligentCalls\app\src\main\java\com\example\appcall\presentation\theme\AppStrings.kt"
+
+template = '''package com.example.appcall.presentation.theme
 
 import java.util.Locale
 
@@ -1462,3 +1467,9 @@ fun getAppLocale(languageCode: String): Locale {
         else -> Locale.ENGLISH
     }
 }
+'''
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(template)
+
+print("Regenerated AppStrings.kt cleanly!")

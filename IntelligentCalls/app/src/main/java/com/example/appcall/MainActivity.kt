@@ -497,7 +497,7 @@ fun AiAssistantSection(
         chatMessages = listOf(
             ChatDisplayItem(
                 isUser = false,
-                text = "Nouvelle conversation démarrée ! Posez votre question sur l'ensemble de vos appels."
+                text = strings.aiNewConversationStarted
             )
         )
     }
@@ -519,7 +519,7 @@ fun AiAssistantSection(
             chatMessages = listOf(
                 ChatDisplayItem(
                     isUser = false,
-                    text = "Bonjour ! Je suis votre assistant IA. Vous pouvez me poser des questions sur l'ensemble de vos appels ou cibler un contact spécifique."
+                    text = strings.aiWelcomeMessage
                 )
             )
         }
@@ -2357,7 +2357,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = editFirst,
                         onValueChange = { editFirst = it },
-                        label = { Text("Prénom", color = Text3) },
+                        label = { Text(strings.firstNameLabel, color = Text3) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
                             unfocusedBorderColor = BorderColor,
@@ -2368,7 +2368,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = editLast,
                         onValueChange = { editLast = it },
-                        label = { Text("Nom", color = Text3) },
+                        label = { Text(strings.lastNameLabel, color = Text3) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
                             unfocusedBorderColor = BorderColor,
@@ -2379,7 +2379,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = editMail,
                         onValueChange = { editMail = it },
-                        label = { Text("Email", color = Text3) },
+                        label = { Text(strings.emailLabel, color = Text3) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
                             unfocusedBorderColor = BorderColor,
@@ -2390,7 +2390,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = editPhone,
                         onValueChange = { editPhone = it },
-                        label = { Text("Numéro de téléphone", color = Text3) },
+                        label = { Text(strings.phoneLabel, color = Text3) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
                             unfocusedBorderColor = BorderColor,
@@ -2414,7 +2414,7 @@ fun SettingsSection(
                                 profileLastName = it.lastName
                                 profileEmail = it.email
                                 profileNumber = it.number ?: ""
-                                Toast.makeText(context, "Profil mis à jour", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.profileUpdatedSuccess, Toast.LENGTH_SHORT).show()
                             }.onFailure {
                                 Toast.makeText(context, "Erreur mise à jour: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
@@ -2422,7 +2422,7 @@ fun SettingsSection(
                         showEditProfileDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Text1)
-                ) { Text(strings.saveServer, color = BgColor, fontWeight = FontWeight.Bold) }
+                ) { Text(strings.save, color = BgColor, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showEditProfileDialog = false }) { Text(strings.close, color = Text3) }
@@ -2445,7 +2445,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = oldP,
                         onValueChange = { oldP = it },
-                        label = { Text("Ancien mot de passe", color = Text3) },
+                        label = { Text(strings.oldPasswordLabel, color = Text3) },
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
@@ -2457,7 +2457,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = newP,
                         onValueChange = { newP = it },
-                        label = { Text("Nouveau mot de passe", color = Text3) },
+                        label = { Text(strings.newPasswordLabel, color = Text3) },
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
@@ -2469,7 +2469,7 @@ fun SettingsSection(
                     OutlinedTextField(
                         value = confirmP,
                         onValueChange = { confirmP = it },
-                        label = { Text("Confirmer le mot de passe", color = Text3) },
+                        label = { Text(strings.confirmPasswordLabel, color = Text3) },
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = BorderStrong,
@@ -2484,17 +2484,17 @@ fun SettingsSection(
                 Button(
                     onClick = {
                         if (newP.isBlank()) {
-                            Toast.makeText(context, "Le mot de passe ne peut pas être vide", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.passwordEmptyError, Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         if (newP != confirmP) {
-                            Toast.makeText(context, "Les mots de passe ne correspondent pas", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.passwordMismatchError, Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         coroutineScope.launch {
                             voipRepository.changePassword(oldP, newP)
                                 .onSuccess {
-                                    Toast.makeText(context, "Mot de passe modifié avec succès", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, strings.passwordUpdatedSuccess, Toast.LENGTH_SHORT).show()
                                     showChangePasswordDialog = false
                                 }
                                 .onFailure {
