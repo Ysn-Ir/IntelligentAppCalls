@@ -71,6 +71,9 @@ class CallSummaryDto(BaseModel):
     call_id: str
     summary_text: str
     status: str
+    sentiment: Optional[str] = "NEUTRAL"
+    intent: Optional[str] = None
+    tags: Optional[List[str]] = None
     confidence_score: Optional[float] = None
     detected_appointment_id: Optional[str] = None
     appointment: Optional[AppointmentDto] = None

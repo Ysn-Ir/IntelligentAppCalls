@@ -75,6 +75,9 @@ data class CallSummaryDto(
     @SerializedName("call_id") val callId: String,
     @SerializedName("summary_text") val summaryText: String,
     @SerializedName("status") val status: String,
+    @SerializedName("sentiment") val sentiment: String? = null,
+    @SerializedName("intent") val intent: String? = null,
+    @SerializedName("tags") val tags: List<String>? = null,
     @SerializedName("confidence_score") val confidenceScore: Double?,
     @SerializedName("detected_appointment_id") val detectedAppointmentId: String?,
     @SerializedName("appointment") val appointment: AppointmentDto? = null
@@ -97,6 +100,9 @@ data class CallSummaryDto(
             callId = callId,
             summaryText = summaryText,
             status = status,
+            sentiment = sentiment,
+            intent = intent,
+            tags = tags ?: emptyList(),
             confidenceScore = confidenceScore,
             detectedAppointmentId = detectedAppointmentId,
             appointment = app

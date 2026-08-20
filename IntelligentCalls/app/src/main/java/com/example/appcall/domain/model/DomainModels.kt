@@ -43,6 +43,9 @@ data class CallSummary(
     val callId: String,
     val summaryText: String,
     val status: String,
+    val sentiment: String? = null,
+    val intent: String? = null,
+    val tags: List<String> = emptyList(),
     val confidenceScore: Double?,
     val detectedAppointmentId: String?,
     val appointment: Appointment? = null

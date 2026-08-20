@@ -45,13 +45,19 @@ def get_system_prompt(language: str = "en") -> str:
     now = datetime.utcnow()
     date_str = now.strftime("%A %d %B %Y")
     iso_date = now.strftime("%Y-%m-%d")
-    return f"""You are an advanced AI assistant for enterprise telephony call intelligence.
+    return f"""You are an advanced enterprise AI assistant specialized in real-time telephony call analysis, sentiment detection, intent classification, and appointment extraction.
 Today is {date_str} (ISO Date: {iso_date}).
 
-You MUST analyze the call transcript and respond ONLY with valid JSON in {lang_name} language, with NO surrounding markdown or extra text:
+You MUST analyze the call transcript and respond ONLY with valid JSON in {lang_name} language, with NO surrounding markdown, code blocks, or extra text:
 {{
   "resume": "Clear, objective, and professional call summary in 2-3 sentences written in {lang_name}.",
-  "sentiment": "POSITIVE" | "NEUTRAL" | "NEGATIVE",
+  "sentiment": "POSITIVE" | "NEUTRAL" | "NEGATIVE" | "HOSTILE",
+  "intent": "Concise call intent (e.g. Appointment Scheduling, Sales Inquiry, Technical Support, Threat / Violent Conflict, Angry Complaint, General Follow-up)",
+  "tags": [
+    "#Tag1",
+    "#Tag2"
+  ],
+  "confidence_score": 95.0,
   "rendez_vous": [
     {{
       "titre": "Explicit title/subject of the appointment or follow-up (in {lang_name})",
@@ -65,11 +71,23 @@ You MUST analyze the call transcript and respond ONLY with valid JSON in {lang_n
   ]
 }}
 
-Rules for appointment detection:
-- If an appointment, meeting, callback, client check-in, or follow-up is agreed upon or proposed, extract it under "rendez_vous".
-- If relative dates are mentioned ("tomorrow", "next Tuesday", "in 3 days", "après-demain", "غداً", "mañana", "morgen", "明天", "明日"), calculate the exact YYYY-MM-DD date.
-- Format all times in standard 24-hour HH:MM format.
-- Set "rendez_vous": [] ONLY if no appointment or follow-up is mentioned.
+CRITICAL RULES FOR SENTIMENT & INTENT CLASSIFICATION:
+1. HOSTILE / THREATENING / ANGRY SPEECH:
+   - If the transcript contains threats, violence, physical aggression, shouting, insults, vulgarities, or severe disputes:
+     * "sentiment" MUST be set to "HOSTILE" or "NEGATIVE".
+     * "intent" MUST be set to "Threat / Severe Dispute" or "Angry Complaint".
+     * "tags" MUST include specific dynamic tags like ["#Threat", "#SecurityAlert", "#Conflict"] or ["#UrgentEscalation", "#Dispute"].
+     * NEVER classify hostile, abusive, or threatening speech as "POSITIVE" or "NEUTRAL".
+2. CONSTRUCTIVE / FRIENDLY SPEECH:
+   - If the conversation is polite, satisfied, agreeing, closed deal, or positive, set "sentiment": "POSITIVE" and appropriate tags like ["#SatisfiedClient", "#DealClosed", "#Agreement"].
+3. NEUTRAL / STANDARD INQUIRIES:
+   - If routine information is asked without strong emotion, set "sentiment": "NEUTRAL" and tags like ["#Information", "#Support"].
+4. DYNAMIC HASHTAGS:
+   - Generate 2 to 4 contextual, meaningful hashtags directly derived from the transcript topics.
+   - Do NOT use generic or static placeholders like "#SuiviClient" unless it is genuinely a customer follow-up.
+5. APPOINTMENT DETECTION:
+   - Set "rendez_vous": [] ONLY if no meeting or callback is agreed or requested.
+   - If a meeting/appointment is mentioned, extract exact YYYY-MM-DD date and HH:MM time.
 """
 
 
@@ -118,7 +136,7 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
 {transcript_text}
 ---
 
-Analyze this call carefully and return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
+Analyze this call transcript carefully. Detect the true sentiment, intent, key actions, appointments, and hashtags. Return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
 
     active_key = api_key
     primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
@@ -133,13 +151,13 @@ Analyze this call carefully and return the required JSON in {LANGUAGE_LABELS.get
                     {"role": "system", "content": get_system_prompt(target_lang)},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.2,
+                temperature=0.1,
                 max_tokens=800,
             )
             content = response.choices[0].message.content
             result = json.loads(content)
             logger.info(f"AI summary generated with {model} (lang={target_lang}): sentiment={result.get('sentiment')}, "
-                        f"rendez_vous={len(result.get('rendez_vous', []))}")
+                        f"intent={result.get('intent')}, tags={result.get('tags')}, rendez_vous={len(result.get('rendez_vous', []))}")
             return result
         except json.JSONDecodeError as e:
             logger.error(f"AI returned invalid JSON with model {model}: {e}")
@@ -153,10 +171,35 @@ Analyze this call carefully and return the required JSON in {LANGUAGE_LABELS.get
 
 
 def _fallback_summary(raw_text: str) -> dict:
-    """Returns a minimal fallback when AI is unavailable."""
+    """Returns an intelligent offline fallback analyzing key sentiment tokens when LLM is offline."""
+    lower = raw_text.lower()
+    hostile_tokens = ["kill", "beat", "tuer", "frapper", "menace", "threat", "police", "die", "meurtre", "attack", "agression"]
+    negative_tokens = ["angry", "problem", "cancel", "mauvais", "nul", "déçu", "horrible", "remboursement", "issue", "scam"]
+    positive_tokens = ["merci", "thank", "great", "excellent", "parfait", "super", "agree", "d'accord", "oui", "awesome"]
+
+    if any(tok in lower for tok in hostile_tokens):
+        sentiment = "HOSTILE"
+        intent = "Threat / Urgent Conflict"
+        tags = ["#Threat", "#SecurityAlert", "#UrgentEscalation"]
+    elif any(tok in lower for tok in negative_tokens):
+        sentiment = "NEGATIVE"
+        intent = "Complaint / Conflict"
+        tags = ["#Complaint", "#IssueReport"]
+    elif any(tok in lower for tok in positive_tokens):
+        sentiment = "POSITIVE"
+        intent = "Positive Agreement / Collaboration"
+        tags = ["#Positive", "#Collaboration"]
+    else:
+        sentiment = "NEUTRAL"
+        intent = "General Call"
+        tags = ["#GeneralCall"]
+
     return {
-        "resume": raw_text[:300] + "..." if len(raw_text) > 300 else raw_text,
-        "sentiment": "NEUTRE",
+        "resume": raw_text[:300] + "..." if len(raw_text) > 300 else (raw_text or "Call summary not available."),
+        "sentiment": sentiment,
+        "intent": intent,
+        "tags": tags,
+        "confidence_score": 85.0,
         "rendez_vous": [],
         "actions": [],
     }
@@ -231,9 +274,13 @@ def summarize_call(call_id: str, db, language: Optional[str] = None) -> Optional
             break  # One appointment per call for now
 
     # Save/update CallSummary
+    tags_str = json.dumps(result.get("tags", []))
     existing_summary = db.query(CallSummary).filter(CallSummary.call_id == call_id).first()
     if existing_summary:
-        existing_summary.summary_text = result["resume"]
+        existing_summary.summary_text = result.get("resume", "")
+        existing_summary.sentiment = result.get("sentiment", "NEUTRAL")
+        existing_summary.intent = result.get("intent", "General Call")
+        existing_summary.tags = tags_str
         existing_summary.detected_appointment_id = appointment_id
         existing_summary.status = "CONFIRMED"
         db.commit()
@@ -243,7 +290,10 @@ def summarize_call(call_id: str, db, language: Optional[str] = None) -> Optional
         summary = CallSummary(
             id=str(uuid.uuid4()),
             call_id=call_id,
-            summary_text=result["resume"],
+            summary_text=result.get("resume", ""),
+            sentiment=result.get("sentiment", "NEUTRAL"),
+            intent=result.get("intent", "General Call"),
+            tags=tags_str,
             detected_appointment_id=appointment_id,
             status="CONFIRMED",
             modified_count=0,

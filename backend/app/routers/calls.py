@@ -367,12 +367,24 @@ def get_calls(
 @router.get("/api/v1/calls/{id}/transcript")
 def get_transcript(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
+    if not transcript or not transcript.raw_text:
+        # Check if local audio recording file exists and trigger on-demand transcription
+        for ext in ["wav", "m4a", "mp4"]:
+            candidate = os.path.join(UPLOAD_DIR, f"{id}.{ext}")
+            if os.path.exists(candidate):
+                try:
+                    from ..ai.transcriber import transcribe_call
+                    transcript = transcribe_call(id, candidate, db)
+                    break
+                except Exception as e:
+                    logger.warning(f"On-demand transcript failed for {candidate}: {e}")
+
     if not transcript:
         return {
             "id": f"pending-{id}",
             "call_id": id,
             "raw_text": "",
-            "language": "fr",
+            "language": "en",
             "confidence_score": 0.0,
             "speaker_segments": []
         }
@@ -431,6 +443,9 @@ def ensure_call_summary_exists(call_id: str, db: Session) -> CallSummary:
         id=str(uuid.uuid4()),
         call_id=call_id,
         summary_text="Traitement IA en cours. Le résumé sera généré dès la fin de la transcription audio.",
+        sentiment="NEUTRAL",
+        intent="Pending AI Analysis",
+        tags="[]",
         detected_appointment_id=None,
         status="PROCESSING",
         modified_count=0
@@ -476,13 +491,23 @@ def get_summary(id: str, token: str = Depends(verify_token), db: Session = Depen
         )
         
     transcript_row = db.query(Transcript).filter(Transcript.call_id == id).first()
-    confidence = transcript_row.confidence_score if transcript_row else 100.0
+    confidence = transcript_row.confidence_score if transcript_row else (summary.modified_count and 95.0 or 90.0)
+
+    tags_list = []
+    if summary.tags:
+        try:
+            tags_list = json.loads(summary.tags)
+        except Exception:
+            tags_list = [t.strip() for t in summary.tags.split(",") if t.strip()]
 
     return schemas.CallSummaryDto(
         id=summary.id,
         call_id=summary.call_id,
         summary_text=summary.summary_text,
         status=summary.status,
+        sentiment=summary.sentiment or "NEUTRAL",
+        intent=summary.intent or "General Call",
+        tags=tags_list if tags_list else ["#CallAnalysis"],
         confidence_score=confidence,
         detected_appointment_id=summary.detected_appointment_id or (appt.id if appt else None),
         appointment=appt_dto

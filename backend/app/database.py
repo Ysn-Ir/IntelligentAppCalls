@@ -73,6 +73,9 @@ class CallSummary(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     call_id = Column(String(36), ForeignKey("calls.id"), unique=True)
     summary_text = Column(Text)
+    sentiment = Column(String(30), default="NEUTRAL")
+    intent = Column(String(100), nullable=True)
+    tags = Column(String(255), nullable=True)
     detected_appointment_id = Column(String(36), ForeignKey("appointments.id"), nullable=True)
     status = Column(String(15), default="PROPOSED")
     modified_count = Column(Integer, default=0)
@@ -169,6 +172,9 @@ def _ensure_schema(eng):
         ("calls", "ai_status", "VARCHAR(20) DEFAULT 'PENDING'"),
         ("transcripts", "speaker_segments", "TEXT NULL"),
         ("appointments", "title", "VARCHAR(255) NULL"),
+        ("call_summaries", "sentiment", "VARCHAR(30) DEFAULT 'NEUTRAL'"),
+        ("call_summaries", "intent", "VARCHAR(100) NULL"),
+        ("call_summaries", "tags", "VARCHAR(255) NULL"),
     ]
     with eng.connect() as conn:
         for table, col, col_type in columns_to_ensure:

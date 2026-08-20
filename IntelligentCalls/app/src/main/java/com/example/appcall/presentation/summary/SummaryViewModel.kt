@@ -105,6 +105,13 @@ class SummaryViewModel @Inject constructor(
                     val lowConfidence = summary.confidenceScore != null && summary.confidenceScore < 60.0
                     _isLowConfidence.value = lowConfidence
                     _isEditing.value = lowConfidence
+
+                    // Ensure transcript is also up-to-date
+                    launch {
+                        voipRepository.getTranscript(callId).onSuccess {
+                            if (it.rawText.isNotBlank()) _transcript.value = it
+                        }
+                    }
                 }
                 .onFailure {
                     // Placeholder while processing
@@ -314,5 +321,14 @@ class SummaryViewModel @Inject constructor(
         _summaryText.value = mockSummary.summaryText
         _isLowConfidence.value = true
         _isEditing.value = true
+    }
+
+    fun refreshTranscript() {
+        val callId = currentCallId ?: return
+        viewModelScope.launch {
+            voipRepository.getTranscript(callId).onSuccess {
+                _transcript.value = it
+            }
+        }
     }
 }

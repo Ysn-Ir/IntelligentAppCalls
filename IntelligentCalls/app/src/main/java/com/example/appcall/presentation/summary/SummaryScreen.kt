@@ -269,7 +269,15 @@ fun SummaryScreen(
                             val contactName = summary.appointment?.contactName?.takeIf { it.isNotBlank() } ?: "Appel Enregistré"
                             val phoneNumber = summary.appointment?.phoneNumber?.takeIf { it.isNotBlank() } ?: ""
                             val initials = contactName.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").uppercase()
-                            val confidencePercent = (summary.confidenceScore ?: 94.0).toInt()
+                            val confidencePercent = ((summary.confidenceScore ?: transcript?.confidenceScore ?: 90.0)).toInt().coerceIn(0, 100)
+
+                            val rawSentiment = (summary.sentiment ?: "NEUTRAL").uppercase()
+                            val (sentimentText, sentimentColor, sentimentBg) = when {
+                                rawSentiment in listOf("HOSTILE", "MENACE", "THREAT", "CONFLICT") -> Triple("Menace / Conflit", Color(0xFFEF4444), Color(0x33EF4444))
+                                rawSentiment in listOf("NEGATIVE", "NEGATIF", "NÉGATIF") -> Triple("Négatif", WarnColor, WarnDim)
+                                rawSentiment in listOf("POSITIVE", "POSITIF") -> Triple("Positif", SuccessColor, SuccessDim)
+                                else -> Triple("Neutre", Text2, Surface2)
+                            }
 
                             Box(
                                 modifier = Modifier
@@ -348,7 +356,7 @@ fun SummaryScreen(
                                         }
                                     }
 
-                                    // AI Sentiment & Feature Badge Chips Strip
+                                    // AI Sentiment, Intent & Dynamic Hashtag Chips Strip
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -371,20 +379,22 @@ fun SummaryScreen(
                                             }
                                         }
 
+                                        // Dynamic Sentiment Pill
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(SuccessDim)
-                                                .border(1.dp, SuccessColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                .background(sentimentBg)
+                                                .border(1.dp, sentimentColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                                 .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(SuccessColor))
+                                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(sentimentColor))
                                                 Spacer(modifier = Modifier.width(5.dp))
-                                                Text(text = "Positif", color = SuccessColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                Text(text = sentimentText, color = sentimentColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
 
+                                        // Dynamic Confidence Pill
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
@@ -399,24 +409,33 @@ fun SummaryScreen(
                                             }
                                         }
 
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Surface2)
-                                                .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
-                                        ) {
-                                            Text(text = "#RDV", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                        // Dynamic Intent Pill
+                                        summary.intent?.takeIf { it.isNotBlank() }?.let { intentStr ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Surface2)
+                                                    .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 8.dp, vertical = 3.5.dp)
+                                            ) {
+                                                Text(text = intentStr, color = Text2, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                            }
                                         }
 
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(Surface2)
-                                                .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
-                                        ) {
-                                            Text(text = "#SuiviClient", color = Text3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                        // Dynamic Hashtags
+                                        if (summary.tags.isNotEmpty()) {
+                                            summary.tags.forEach { tag ->
+                                                val cleanTag = if (tag.startsWith("#")) tag else "#$tag"
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(Surface2)
+                                                        .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 3.5.dp)
+                                                ) {
+                                                    Text(text = cleanTag, color = Text3, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -969,14 +988,30 @@ fun SummaryScreen(
                          // 6. Transcript Block
                          item {
                              Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                                 Text(
-                                     text = strings.audioTranscript.uppercase(),
-                                     color = Text2,
-                                     fontSize = 11.5.sp,
-                                     fontWeight = FontWeight.Bold,
-                                     letterSpacing = 0.5.sp,
-                                     modifier = Modifier.padding(bottom = 12.dp)
-                                 )
+                                 Row(
+                                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                     horizontalArrangement = Arrangement.SpaceBetween,
+                                     verticalAlignment = Alignment.CenterVertically
+                                 ) {
+                                     Text(
+                                         text = strings.audioTranscript.uppercase(),
+                                         color = Text2,
+                                         fontSize = 11.5.sp,
+                                         fontWeight = FontWeight.Bold,
+                                         letterSpacing = 0.5.sp
+                                     )
+                                     IconButton(
+                                         onClick = { viewModel.refreshTranscript() },
+                                         modifier = Modifier.size(24.dp)
+                                     ) {
+                                         Icon(
+                                             imageVector = Icons.Default.Refresh,
+                                             contentDescription = "Sync Transcript",
+                                             tint = Text3,
+                                             modifier = Modifier.size(15.dp)
+                                         )
+                                     }
+                                 }
 
                                  val segments = transcript?.speakerSegments
                                  if (!segments.isNullOrEmpty()) {
@@ -1041,7 +1076,16 @@ fun SummaryScreen(
                                              Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
                                          }
                                      } else {
-                                         Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             verticalAlignment = Alignment.CenterVertically,
+                                             horizontalArrangement = Arrangement.SpaceBetween
+                                         ) {
+                                             Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
+                                             TextButton(onClick = { viewModel.refreshTranscript() }) {
+                                                 Text("Recharger", color = AccentText, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                             }
+                                         }
                                      }
                                  }
                              }
