@@ -759,6 +759,51 @@ class VoipRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getProfile(): Result<com.example.appcall.data.model.UserProfileDto> {
+        val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        return try {
+            val response = apiService.getProfile(auth)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Erreur chargement profil: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateProfile(firstName: String?, lastName: String?, email: String?, number: String?): Result<com.example.appcall.data.model.UserProfileDto> {
+        val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        return try {
+            val req = com.example.appcall.data.model.ProfileUpdateRequest(firstName, lastName, email, number)
+            val response = apiService.updateProfile(auth, req)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Erreur mise à jour profil: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun changePassword(oldPassword: String, newPassword: String): Result<Unit> {
+        val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+        return try {
+            val req = com.example.appcall.data.model.PasswordChangeRequest(oldPassword, newPassword)
+            val response = apiService.changePassword(auth, req)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                val errorMsg = response.errorBody()?.string() ?: "Erreur mot de passe"
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun requestBodyOf(file: java.io.File): RequestBody {
         return requestBodyCompanion(file)
     }

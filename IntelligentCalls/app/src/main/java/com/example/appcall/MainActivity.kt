@@ -942,6 +942,30 @@ fun SettingsSection(
     val context = androidx.compose.ui.platform.LocalContext.current
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showDeleteVoiceDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
+
+    // User Profile state
+    var userProfile by remember { mutableStateOf<com.example.appcall.data.model.UserProfileDto?>(null) }
+    var profileFirstName by remember { mutableStateOf("") }
+    var profileLastName by remember { mutableStateOf("") }
+    var profileEmail by remember { mutableStateOf("") }
+    var profileNumber by remember { mutableStateOf("") }
+
+    // Change Password state
+    var oldPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        voipRepository.getProfile().onSuccess {
+            userProfile = it
+            profileFirstName = it.firstName
+            profileLastName = it.lastName
+            profileEmail = it.email
+            profileNumber = it.number ?: ""
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -953,10 +977,223 @@ fun SettingsSection(
     ) {
         item {
             Text("Paramètres", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Text1)
-            Text("Configuration, enregistrement & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
+            Text("Profil, Twilio Cloud, réseau & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
         }
 
-        // ── SHIZUKU STATUS CARD ─────────────────────────────────────────────────
+        // ── 1. USER PROFILE CARD ────────────────────────────────────────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("MON PROFIL & IDENTIFIANTS", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(AccentDim)
+                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        ) {
+                            Text("Compte Actif", color = AccentText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val initials = "${profileFirstName.take(1)}${profileLastName.take(1)}".uppercase().ifBlank { "U" }
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Surface2)
+                                .border(1.dp, AccentColor.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = initials, color = Text1, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            val displayName = if (profileFirstName.isNotBlank() || profileLastName.isNotBlank()) {
+                                "$profileFirstName $profileLastName".trim()
+                            } else "Utilisateur"
+                            Text(text = displayName, color = Text1, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                            Text(text = profileEmail.ifBlank { "Non renseigné" }, color = Text2, fontSize = 12.sp)
+                            if (profileNumber.isNotBlank()) {
+                                Text(text = profileNumber, color = Text3, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showEditProfileDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("✏️ Modifier Profil", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { 
+                                oldPassword = ""
+                                newPassword = ""
+                                confirmPassword = ""
+                                showChangePasswordDialog = true 
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("🔒 Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. TWILIO CLOUD TELEPHONY (2-WAY HD) ────────────────────────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Column {
+                    val twilioPrefs = remember { context.getSharedPreferences("twilio_settings", android.content.Context.MODE_PRIVATE) }
+                    var twilioEnabled by remember { mutableStateOf(twilioPrefs.getBoolean("twilio_enabled", false)) }
+                    var accountSid by remember { mutableStateOf(twilioPrefs.getString("twilio_account_sid", "") ?: "") }
+                    var authToken by remember { mutableStateOf(twilioPrefs.getString("twilio_auth_token", "") ?: "") }
+                    var twilioNumber by remember { mutableStateOf(twilioPrefs.getString("twilio_phone_number", "") ?: "") }
+                    var twimlAppSid by remember { mutableStateOf(twilioPrefs.getString("twilio_twiml_app_sid", "") ?: "") }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("TWILIO CLOUD TELEPHONY", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                            Text("Enregistrement 2-Way HD opérateur", color = Text2, fontSize = 11.5.sp)
+                        }
+                        Switch(
+                            checked = twilioEnabled,
+                            onCheckedChange = {
+                                twilioEnabled = it
+                                twilioPrefs.edit().putBoolean("twilio_enabled", it).apply()
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
+                        )
+                    }
+
+                    if (twilioEnabled) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Les appels VoIP passent directement par le réseau Twilio avec enregistrement stéréo 2 voix (Opérateur + Client) et transcription Whisper automatique.",
+                            color = Text3,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = accountSid,
+                            onValueChange = { accountSid = it },
+                            label = { Text("Account SID (ACxxxxxxxx...)", color = Text3, fontSize = 11.5.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = authToken,
+                            onValueChange = { authToken = it },
+                            label = { Text("Auth Token", color = Text3, fontSize = 11.5.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = twilioNumber,
+                            onValueChange = { twilioNumber = it },
+                            label = { Text("Numéro Virtuel Twilio (+33...)", color = Text3, fontSize = 11.5.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = twimlAppSid,
+                            onValueChange = { twimlAppSid = it },
+                            label = { Text("TwiML App SID (APxxxxxxxx...)", color = Text3, fontSize = 11.5.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BorderStrong,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Text1,
+                                unfocusedTextColor = Text1
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                twilioPrefs.edit()
+                                    .putBoolean("twilio_enabled", true)
+                                    .putString("twilio_account_sid", accountSid.trim())
+                                    .putString("twilio_auth_token", authToken.trim())
+                                    .putString("twilio_phone_number", twilioNumber.trim())
+                                    .putString("twilio_twiml_app_sid", twimlAppSid.trim())
+                                    .apply()
+                                Toast.makeText(context, "Configuration Twilio enregistrée", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Enregistrer Twilio", color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 3. SHIZUKU STATUS CARD ──────────────────────────────────────────────
         item {
             val isShizukuAvailable = remember { shizukuManager?.isShizukuAvailable() == true }
             val hasShizukuPerm = remember { shizukuManager?.hasShizukuPermission() == true }
@@ -1004,7 +1241,7 @@ fun SettingsSection(
             }
         }
 
-        // ── SERVER CONFIG CARD ─────────────────────────────────────────────────
+        // ── 4. SERVER CONFIG CARD ───────────────────────────────────────────────
         item {
             Box(
                 modifier = Modifier
@@ -1126,78 +1363,6 @@ fun SettingsSection(
                         ) {
                             Text("🔄 Tester", color = Text2, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
-                    }
-                }
-            }
-        }
-
-        // ── CALL RECORDING SETTINGS CARD ───────────────────────────────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Text("MODE D'ENREGISTREMENT APPEL SIM", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    val callPrefs = remember { context.getSharedPreferences("call_settings", android.content.Context.MODE_PRIVATE) }
-                    var useBtSco by remember { mutableStateOf(callPrefs.getBoolean("use_bt_sco", true)) }
-                    var useBridgeMode by remember { mutableStateOf(callPrefs.getBoolean("use_pbx_bridge", false)) }
-                    var gatewayNum by remember { mutableStateOf(callPrefs.getString("pbx_gateway_number", "") ?: "") }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Micro Casque Bluetooth (SCO)", color = Text1, fontSize = 13.sp)
-                        Switch(
-                            checked = useBtSco,
-                            onCheckedChange = {
-                                useBtSco = it
-                                callPrefs.edit().putBoolean("use_bt_sco", it).apply()
-                            },
-                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Pont d'Appel PBX (2-Way Server)", color = Text1, fontSize = 13.sp)
-                        Switch(
-                            checked = useBridgeMode,
-                            onCheckedChange = {
-                                useBridgeMode = it
-                                callPrefs.edit().putBoolean("use_pbx_bridge", it).apply()
-                            },
-                            colors = SwitchDefaults.colors(checkedThumbColor = BgColor, checkedTrackColor = Text1)
-                        )
-                    }
-                    if (useBridgeMode) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = gatewayNum,
-                            onValueChange = {
-                                gatewayNum = it
-                                callPrefs.edit().putString("pbx_gateway_number", it.trim()).apply()
-                            },
-                            label = { Text("Numéro Passerelle PBX (ex: +33180000000)", color = Text3) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
-                            )
-                        )
                     }
                 }
             }
@@ -1363,6 +1528,176 @@ fun SettingsSection(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler", color = Text3) }
+            },
+            containerColor = Surface1
+        )
+    }
+
+    // Dialog for Edit Profile Information
+    if (showEditProfileDialog) {
+        var editFirst by remember { mutableStateOf(profileFirstName) }
+        var editLast by remember { mutableStateOf(profileLastName) }
+        var editMail by remember { mutableStateOf(profileEmail) }
+        var editPhone by remember { mutableStateOf(profileNumber) }
+
+        AlertDialog(
+            onDismissRequest = { showEditProfileDialog = false },
+            title = { Text("Modifier mes informations", color = Text1, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editFirst,
+                        onValueChange = { editFirst = it },
+                        label = { Text("Prénom", color = Text3) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                    OutlinedTextField(
+                        value = editLast,
+                        onValueChange = { editLast = it },
+                        label = { Text("Nom", color = Text3) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                    OutlinedTextField(
+                        value = editMail,
+                        onValueChange = { editMail = it },
+                        label = { Text("Email", color = Text3) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                    OutlinedTextField(
+                        value = editPhone,
+                        onValueChange = { editPhone = it },
+                        label = { Text("Numéro de téléphone", color = Text3) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            voipRepository.updateProfile(
+                                firstName = editFirst.trim(),
+                                lastName = editLast.trim(),
+                                email = editMail.trim(),
+                                number = editPhone.trim()
+                            ).onSuccess {
+                                profileFirstName = it.firstName
+                                profileLastName = it.lastName
+                                profileEmail = it.email
+                                profileNumber = it.number ?: ""
+                                Toast.makeText(context, "Profil mis à jour", Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(context, "Erreur mise à jour: ${it.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        showEditProfileDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Text1)
+                ) { Text("Enregistrer", color = BgColor, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfileDialog = false }) { Text("Annuler", color = Text3) }
+            },
+            containerColor = Surface1
+        )
+    }
+
+    // Dialog for Change Password
+    if (showChangePasswordDialog) {
+        var oldP by remember { mutableStateOf("") }
+        var newP by remember { mutableStateOf("") }
+        var confirmP by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showChangePasswordDialog = false },
+            title = { Text("Changer mon mot de passe", color = Text1, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = oldP,
+                        onValueChange = { oldP = it },
+                        label = { Text("Ancien mot de passe", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newP,
+                        onValueChange = { newP = it },
+                        label = { Text("Nouveau mot de passe", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                    OutlinedTextField(
+                        value = confirmP,
+                        onValueChange = { confirmP = it },
+                        label = { Text("Confirmer le mot de passe", color = Text3) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BorderStrong,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newP.isBlank()) {
+                            Toast.makeText(context, "Le mot de passe ne peut pas être vide", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (newP != confirmP) {
+                            Toast.makeText(context, "Les mots de passe ne correspondent pas", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        coroutineScope.launch {
+                            voipRepository.changePassword(oldP, newP)
+                                .onSuccess {
+                                    Toast.makeText(context, "Mot de passe modifié avec succès", Toast.LENGTH_SHORT).show()
+                                    showChangePasswordDialog = false
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "Erreur : ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Text1)
+                ) { Text("Changer", color = BgColor, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showChangePasswordDialog = false }) { Text("Annuler", color = Text3) }
             },
             containerColor = Surface1
         )

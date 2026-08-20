@@ -93,6 +93,23 @@ interface ApiService {
         @Body reminder: ReminderDto
     ): Response<Unit>
 
+    @GET("users/me")
+    suspend fun getProfile(
+        @Header("Authorization") token: String
+    ): Response<UserProfileDto>
+
+    @PUT("users/me")
+    suspend fun updateProfile(
+        @Header("Authorization") token: String,
+        @Body request: ProfileUpdateRequest
+    ): Response<UserProfileDto>
+
+    @PUT("users/me/password")
+    suspend fun changePassword(
+        @Header("Authorization") token: String,
+        @Body request: PasswordChangeRequest
+    ): Response<ResponseBody>
+
     @GET("users/me/voice-data/export")
     suspend fun exportVoiceData(
         @Header("Authorization") token: String

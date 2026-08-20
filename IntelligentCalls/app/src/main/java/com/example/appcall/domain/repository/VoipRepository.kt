@@ -55,4 +55,9 @@ interface VoipRepository {
     suspend fun exportAllData(): Result<String>
     suspend fun deleteCallData(callId: String): Result<Unit>
     suspend fun eraseContactData(contactId: String): Result<Unit>
+
+    // ── Profile & Credentials Management ──────────────────────────────────
+    suspend fun getProfile(): Result<com.example.appcall.data.model.UserProfileDto>
+    suspend fun updateProfile(firstName: String?, lastName: String?, email: String?, number: String?): Result<com.example.appcall.data.model.UserProfileDto>
+    suspend fun changePassword(oldPassword: String, newPassword: String): Result<Unit>
 }

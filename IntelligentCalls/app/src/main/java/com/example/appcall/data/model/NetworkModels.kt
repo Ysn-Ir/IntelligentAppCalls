@@ -20,6 +20,26 @@ data class LoginResponse(
     @SerializedName("token_type") val tokenType: String
 )
 
+data class UserProfileDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("first_name") val firstName: String,
+    @SerializedName("last_name") val lastName: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("number") val number: String? = null
+)
+
+data class ProfileUpdateRequest(
+    @SerializedName("first_name") val firstName: String? = null,
+    @SerializedName("last_name") val lastName: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("number") val number: String? = null
+)
+
+data class PasswordChangeRequest(
+    @SerializedName("old_password") val oldPassword: String,
+    @SerializedName("new_password") val newPassword: String
+)
+
 data class TokenResponse(
     @SerializedName("token") val token: String
 )

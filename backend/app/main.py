@@ -176,6 +176,45 @@ def get_me(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
         "created_at": user.created_at.isoformat() + "Z" if user.created_at else datetime.utcnow().isoformat() + "Z"
     }
 
+@app.put("/api/v1/users/me")
+def update_profile(req: schemas.ProfileUpdateRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = db.query(User).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+    if req.first_name is not None:
+        user.first_name = req.first_name
+    if req.last_name is not None:
+        user.last_name = req.last_name
+    if req.email is not None:
+        user.email = req.email
+    if req.number is not None:
+        user.number = req.number
+    db.commit()
+    db.refresh(user)
+    return {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "number": user.number
+    }
+
+@app.put("/api/v1/users/me/password")
+def change_password(req: schemas.PasswordChangeRequest, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        user = db.query(User).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+    if user.password_hash:
+        if not bcrypt.verify(req.old_password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Ancien mot de passe incorrect")
+    user.password_hash = bcrypt.hash(req.new_password)
+    db.commit()
+    return {"message": "Mot de passe mis à jour avec succès"}
+
 @app.get("/api/v1/contacts", response_model=List[schemas.ContactDto])
 def get_contacts(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     contacts = db.query(Contact).all()
