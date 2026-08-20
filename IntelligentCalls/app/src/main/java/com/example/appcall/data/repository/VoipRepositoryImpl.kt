@@ -180,25 +180,9 @@ class VoipRepositoryImpl @Inject constructor(
                 emptyList()
             }
             val combined = (deviceContacts + backendContacts).distinctBy { it.phoneNumber.replace("\\s".toRegex(), "") }
-            if (combined.isNotEmpty()) {
-                Result.success(combined)
-            } else {
-                val mockContacts = listOf(
-                    Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", true),
-                    Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
-                )
-                Result.success(mockContacts)
-            }
+            Result.success(combined)
         } catch (e: Exception) {
-            if (deviceContacts.isNotEmpty()) {
-                Result.success(deviceContacts)
-            } else {
-                val mockContacts = listOf(
-                    Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", true),
-                    Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
-                )
-                Result.success(mockContacts)
-            }
+            Result.success(deviceContacts)
         }
     }
 
@@ -647,6 +631,66 @@ class VoipRepositoryImpl @Inject constructor(
 
     // ── Chatbot RAG ───────────────────────────────────────────────────────
 
+    private fun generateLocalFactualReply(message: String, contactId: String?): ChatResponseDto {
+        val lower = message.lowercase()
+        val tasks = localDatabase.getTasks()
+        val agenda = localDatabase.getAgendaAppointments()
+        val contacts = getDeviceContacts()
+        val history = localDatabase.getCallHistory()
+
+        val reply = when {
+            lower.contains("tâche") || lower.contains("tache") || lower.contains("todo") || lower.contains("faire") -> {
+                if (tasks.isEmpty()) {
+                    "Vous n'avez actuellement aucune tâche enregistrée dans votre liste."
+                } else {
+                    val lines = tasks.map { "• [${if (it.completed) "Terminée" else "En cours"}] ${it.title}" }
+                    "Voici vos tâches enregistrées :\n" + lines.joinToString("\n")
+                }
+            }
+            lower.contains("agenda") || lower.contains("rendez-vous") || lower.contains("rdv") || lower.contains("planning") -> {
+                if (agenda.isEmpty()) {
+                    "Vous n'avez aucun rendez-vous ou événement prévu dans votre agenda."
+                } else {
+                    val lines = agenda.map { "• ${it.title} prévu le ${it.scheduledAt}" }
+                    "Voici vos rendez-vous et événements planifiés :\n" + lines.joinToString("\n")
+                }
+            }
+            lower.contains("contact") || lower.contains("numéro") || lower.contains("numero") || lower.contains("téléphone") || lower.contains("telephone") || lower.contains("joindre") -> {
+                val matched = contacts.filter { 
+                    val fn = "${it.firstName} ${it.lastName}".lowercase()
+                    fn.split(" ").any { part -> part.isNotBlank() && lower.contains(part) }
+                }
+                if (matched.isNotEmpty()) {
+                    val lines = matched.map { "• ${it.firstName} ${it.lastName} : ${it.phoneNumber}" }
+                    "Voici les coordonnées trouvées dans vos contacts :\n" + lines.joinToString("\n")
+                } else if (contacts.isNotEmpty()) {
+                    val lines = contacts.take(5).map { "• ${it.firstName} ${it.lastName} : ${it.phoneNumber}" }
+                    "Voici vos contacts enregistrés :\n" + lines.joinToString("\n")
+                } else {
+                    "Aucun contact correspondant n'a été trouvé dans votre carnet d'adresses."
+                }
+            }
+            lower.contains("appel") || lower.contains("résumé") || lower.contains("conversation") || lower.contains("dernier") -> {
+                val filteredHistory = if (contactId != null) history.filter { it.contactId == contactId } else history
+                if (filteredHistory.isNotEmpty()) {
+                    val lines = filteredHistory.take(4).map { "• Appel avec ${it.contactName} (${it.startedAt}) : ${it.status}" }
+                    "Voici vos derniers appels enregistrés :\n" + lines.joinToString("\n")
+                } else {
+                    "Aucun historique d'appel n'est enregistré pour le moment."
+                }
+            }
+            else -> {
+                "Je suis votre assistant Intelligent Calls. Vous pouvez me demander vos tâches, votre agenda, les coordonnées de vos contacts ou les résumés de vos appels."
+            }
+        }
+
+        return ChatResponseDto(
+            sessionId = "local-session-${System.currentTimeMillis()}",
+            reply = reply,
+            sources = emptyList()
+        )
+    }
+
     override suspend fun chatWithContact(
         contactId: String,
         message: String,
@@ -658,23 +702,10 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Chat request failed: ${response.code()}"))
+                Result.success(generateLocalFactualReply(message, contactId))
             }
         } catch (e: Exception) {
-            // Offline fallback response
-            Result.success(
-                ChatResponseDto(
-                    sessionId = sessionId ?: "offline-session-${System.currentTimeMillis()}",
-                    reply = "D'après l'historique des appels enregistrés, vous avez convenu d'un rendez-vous mardi prochain à 14h.",
-                    sources = listOf(
-                        ChatSourceDto(
-                            callId = "call-1",
-                            callDate = "2026-07-21T14:00:00Z",
-                            excerpt = "Mardi prochain à 14h dans vos bureaux."
-                        )
-                    )
-                )
-            )
+            Result.success(generateLocalFactualReply(message, contactId))
         }
     }
 
@@ -685,16 +716,10 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                Result.failure(Exception("Global chat failed: ${response.code()}"))
+                Result.success(generateLocalFactualReply(message, null))
             }
         } catch (e: Exception) {
-            Result.success(
-                ChatResponseDto(
-                    sessionId = sessionId ?: "offline-global-${System.currentTimeMillis()}",
-                    reply = "Voici le récapitulatif global : plusieurs appels ont été transcrits et vos rendez-vous ont été détectés automatiquement.",
-                    sources = emptyList()
-                )
-            )
+            Result.success(generateLocalFactualReply(message, null))
         }
     }
 

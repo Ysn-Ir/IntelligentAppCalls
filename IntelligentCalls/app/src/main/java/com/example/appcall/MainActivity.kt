@@ -134,6 +134,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var tokenStorage: com.example.appcall.data.repository.TokenStorage
 
+    @Inject
+    lateinit var offlineSyncManager: com.example.appcall.data.sync.OfflineSyncManager
+
     // Compose-observable state
     private val currentScreenState by lazy {
         mutableStateOf(if (tokenStorage.token != null) AppScreen.DASHBOARD else AppScreen.LOGIN)
@@ -144,6 +147,13 @@ class MainActivity : ComponentActivity() {
     private val interceptedNumberState = mutableStateOf("")
 
     private var nativeCallSessionActive = false
+
+    override fun onResume() {
+        super.onResume()
+        if (::offlineSyncManager.isInitialized) {
+            offlineSyncManager.triggerSync()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
