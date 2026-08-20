@@ -116,28 +116,36 @@ def summarize_transcript(raw_text: str, speaker_segments: list) -> dict:
 
 Analyse cet appel et retourne le JSON demandé."""
 
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": get_system_prompt()},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=0.2,
-            max_tokens=800,
-        )
-        content = response.choices[0].message.content
-        result = json.loads(content)
-        logger.info(f"AI summary generated with {model}: sentiment={result.get('sentiment')}, "
-                    f"rendez_vous={len(result.get('rendez_vous', []))}")
-        return result
-    except json.JSONDecodeError as e:
-        logger.error(f"AI returned invalid JSON: {e}")
-        return _fallback_summary(raw_text)
-    except Exception as e:
-        logger.error(f"AI summarization error: {e}")
-        return _fallback_summary(raw_text)
+    active_key = api_key
+    primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
+    candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b"]
+
+    for model in candidates:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": get_system_prompt()},
+                    {"role": "user", "content": user_message},
+                ],
+                temperature=0.2,
+                max_tokens=800,
+            )
+            content = response.choices[0].message.content
+            result = json.loads(content)
+            logger.info(f"AI summary generated with {model}: sentiment={result.get('sentiment')}, "
+                        f"rendez_vous={len(result.get('rendez_vous', []))}")
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"AI returned invalid JSON with model {model}: {e}")
+            continue
+        except Exception as e:
+            logger.warning(f"Groq model {model} summarization attempt failed: {e}")
+            continue
+
+    logger.error("All candidate LLM models failed — using fallback summary.")
+    return _fallback_summary(raw_text)
 
 
 def _fallback_summary(raw_text: str) -> dict:

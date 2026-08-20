@@ -160,18 +160,27 @@ def chat(
     # 8. Call LLM
     client = _get_openai()
     if client:
-        try:
-            active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-            model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile") if active_key.startswith("gsk_") else OPENAI_MODEL
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=600,
-            )
-            reply = response.choices[0].message.content.strip()
-        except Exception as e:
-            logger.error(f"Chatbot LLM error: {e}")
+        active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+        primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
+        candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b"]
+        
+        reply = None
+        for model in candidates:
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=600,
+                )
+                reply = response.choices[0].message.content.strip()
+                logger.info(f"Chatbot response generated successfully with model: {model}")
+                break
+            except Exception as e:
+                logger.warning(f"Groq model {model} attempt failed: {e}")
+                continue
+
+        if not reply:
             reply = _smart_offline_reply(message, tasks, agenda_items, appointments, contacts, recent_calls, chunks)
     else:
         logger.warning("No LLM client configured — generating factual offline database reply.")
