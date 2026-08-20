@@ -631,7 +631,7 @@ class VoipRepositoryImpl @Inject constructor(
 
     // ── Chatbot RAG ───────────────────────────────────────────────────────
 
-    private fun generateLocalFactualReply(message: String, contactId: String?): ChatResponseDto {
+    private fun generateLocalFactualReply(message: String, contactId: String?): ChatResponseDto? {
         val lower = message.lowercase()
         val tasks = localDatabase.getTasks()
         val agenda = localDatabase.getAgendaAppointments()
@@ -679,16 +679,16 @@ class VoipRepositoryImpl @Inject constructor(
                     "Aucun historique d'appel n'est enregistré pour le moment."
                 }
             }
-            else -> {
-                "Je suis votre assistant Intelligent Calls. Vous pouvez me demander vos tâches, votre agenda, les coordonnées de vos contacts ou les résumés de vos appels."
-            }
+            else -> null
         }
 
-        return ChatResponseDto(
-            sessionId = "local-session-${System.currentTimeMillis()}",
-            reply = reply,
-            sources = emptyList()
-        )
+        return reply?.let {
+            ChatResponseDto(
+                sessionId = "local-session-${System.currentTimeMillis()}",
+                reply = it,
+                sources = emptyList()
+            )
+        }
     }
 
     override suspend fun chatWithContact(
@@ -702,10 +702,20 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                Result.success(generateLocalFactualReply(message, contactId))
+                val localReply = generateLocalFactualReply(message, contactId)
+                if (localReply != null) {
+                    Result.success(localReply)
+                } else {
+                    Result.failure(Exception("Serveur IA indisponible (HTTP ${response.code()}). Vérifiez la configuration du serveur dans Paramètres."))
+                }
             }
         } catch (e: Exception) {
-            Result.success(generateLocalFactualReply(message, contactId))
+            val localReply = generateLocalFactualReply(message, contactId)
+            if (localReply != null) {
+                Result.success(localReply)
+            } else {
+                Result.failure(Exception("Connexion au serveur IA impossible : ${e.message}. Vérifiez l'adresse IP dans Paramètres."))
+            }
         }
     }
 
@@ -716,10 +726,20 @@ class VoipRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
-                Result.success(generateLocalFactualReply(message, null))
+                val localReply = generateLocalFactualReply(message, null)
+                if (localReply != null) {
+                    Result.success(localReply)
+                } else {
+                    Result.failure(Exception("Serveur IA indisponible (HTTP ${response.code()}). Vérifiez la configuration du serveur dans Paramètres."))
+                }
             }
         } catch (e: Exception) {
-            Result.success(generateLocalFactualReply(message, null))
+            val localReply = generateLocalFactualReply(message, null)
+            if (localReply != null) {
+                Result.success(localReply)
+            } else {
+                Result.failure(Exception("Connexion au serveur IA impossible : ${e.message}. Vérifiez l'adresse IP dans Paramètres."))
+            }
         }
     }
 

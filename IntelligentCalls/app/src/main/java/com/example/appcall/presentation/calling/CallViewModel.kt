@@ -42,11 +42,7 @@ class CallViewModel @Inject constructor(
             voipRepository.getContacts().onSuccess {
                 _contacts.value = it
             }.onFailure {
-                // Fallback for demonstration/offline purposes if backend is unavailable
-                _contacts.value = listOf(
-                    Contact("1", "Jean", "Dupont", "+33612345678", "jean.dupont@example.com", false),
-                    Contact("2", "Marie", "Martin", "+33687654321", "marie.martin@example.com", true)
-                )
+                _contacts.value = emptyList()
             }
         }
     }
