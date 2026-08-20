@@ -193,9 +193,14 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_schema(engine)
     
+    # Seed demo records if requested for dev/test environment
+    should_seed = os.getenv("SEED_DEV_DATA", "true").lower() in ["true", "1", "yes"] or os.getenv("ENVIRONMENT") == "development"
+    if not should_seed:
+        return
+
     db = SessionLocal()
     try:
-        # Seed 1 fake user if empty
+        # Seed 1 user if empty
         if db.query(User).count() == 0:
             from passlib.hash import bcrypt
             user = User(

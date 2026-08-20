@@ -67,22 +67,29 @@ def get_voip_token(user_id: str = Depends(verify_token), db: Session = Depends(g
     api_key = os.getenv("TWILIO_API_KEY") or account_sid
     api_secret = os.getenv("TWILIO_API_SECRET") or auth_token
 
-    if account_sid and auth_token and twiml_app_sid:
-        try:
-            from twilio.jwt.access_token import AccessToken
-            from twilio.jwt.access_token.grants import VoiceGrant
+    if not (account_sid and auth_token and twiml_app_sid):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="VoIP provider credentials not configured on server. Please configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_TWIML_APP_SID."
+        )
 
-            token = AccessToken(account_sid, api_key, api_secret, identity=user_id, ttl=3600)
-            voice_grant = VoiceGrant(
-                outgoing_application_sid=twiml_app_sid,
-                incoming_allow=True
-            )
-            token.add_grant(voice_grant)
-            return {"token": token.to_jwt()}
-        except Exception as e:
-            logger.error(f"Error generating Twilio AccessToken: {e}")
+    try:
+        from twilio.jwt.access_token import AccessToken
+        from twilio.jwt.access_token.grants import VoiceGrant
 
-    return {"token": f"dev_twilio_token_{uuid.uuid4().hex}"}
+        token = AccessToken(account_sid, api_key, api_secret, identity=user_id, ttl=3600)
+        voice_grant = VoiceGrant(
+            outgoing_application_sid=twiml_app_sid,
+            incoming_allow=True
+        )
+        token.add_grant(voice_grant)
+        return {"token": token.to_jwt()}
+    except Exception as e:
+        logger.error(f"Error generating Twilio AccessToken: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate VoIP access token: {str(e)}"
+        )
 
 @router.get("/api/v1/users/me")
 def get_me(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):

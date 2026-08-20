@@ -655,47 +655,29 @@ async def upload_audio(
 
 @router.get("/api/v1/calls/{id}/audio")
 def download_audio(id: str, token: str = Depends(verify_token), db: Session = Depends(get_db)):
+    """Downloads or streams the recorded audio file for a completed call."""
     file_path = None
     if os.path.exists(UPLOAD_DIR):
         for f in os.listdir(UPLOAD_DIR):
-            if f.startswith(id):
+            if f.startswith(id) or f.endswith(f"_{id}.wav") or f.endswith(f"_{id}.mp4"):
                 file_path = os.path.join(UPLOAD_DIR, f)
                 break
                 
     if not file_path or not os.path.exists(file_path):
-        mock_file = os.path.join(UPLOAD_DIR, "mock_call_record.mp4")
-        if not os.path.exists(mock_file):
-            import math
-            import struct
-            num_samples = 16000
-            data_size = num_samples * 2
-            header = struct.pack(
-                '<4sI4s4sIHHIIHH4sI',
-                b'RIFF',
-                36 + data_size,
-                b'WAVE',
-                b'fmt ',
-                16,
-                1,
-                1,
-                8000,
-                16000,
-                2,
-                16,
-                b'data',
-                data_size
-            )
-            tone_bytes = bytearray()
-            for i in range(num_samples):
-                sample = int(32767.0 * math.sin(2.0 * math.pi * 440.0 * i / 8000.0))
-                tone_bytes.extend(struct.pack('<h', sample))
-                
-            with open(mock_file, "wb") as f:
-                f.write(header)
-                f.write(tone_bytes)
-        file_path = mock_file
+        # Check call row in db for audio_url
+        call = db.query(Call).filter(Call.id == id).first()
+        if call and call.audio_url:
+            candidate = os.path.join(UPLOAD_DIR, os.path.basename(call.audio_url))
+            if os.path.exists(candidate):
+                file_path = candidate
 
-    if file_path and file_path.endswith(".wav"):
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Enregistrement audio introuvable pour l'appel '{id}'"
+        )
+
+    if file_path.endswith(".wav"):
         return FileResponse(file_path, media_type="audio/wav", filename=f"call_record_{id}.wav")
     return FileResponse(file_path, media_type="audio/mp4", filename=f"call_record_{id}.mp4")
 
