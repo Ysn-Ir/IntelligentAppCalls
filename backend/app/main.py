@@ -157,8 +157,29 @@ def refresh(authorization: Optional[str] = Header(None)):
     return {"access_token": token, "token_type": "bearer"}
 
 @app.get("/api/v1/voip/token", response_model=schemas.TokenResponse)
-def get_voip_token(token: str = Depends(verify_token)):
-    return {"token": f"fake_twilio_token_{uuid.uuid4().hex}"}
+def get_voip_token(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twiml_app_sid = os.getenv("TWILIO_TWIML_APP_SID")
+    api_key = os.getenv("TWILIO_API_KEY") or account_sid
+    api_secret = os.getenv("TWILIO_API_SECRET") or auth_token
+
+    if account_sid and auth_token and twiml_app_sid:
+        try:
+            from twilio.jwt.access_token import AccessToken
+            from twilio.jwt.access_token.grants import VoiceGrant
+
+            token = AccessToken(account_sid, api_key, api_secret, identity=user_id, ttl=3600)
+            voice_grant = VoiceGrant(
+                outgoing_application_sid=twiml_app_sid,
+                incoming_allow=True
+            )
+            token.add_grant(voice_grant)
+            return {"token": token.to_jwt()}
+        except Exception as e:
+            logger.error(f"Error generating Twilio AccessToken: {e}")
+
+    return {"token": f"dev_twilio_token_{uuid.uuid4().hex}"}
 
 @app.get("/api/v1/users/me")
 def get_me(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
@@ -1087,24 +1108,159 @@ def create_file_item(file: schemas.FileDto, user_id: str = Depends(verify_token)
     db.commit()
     db.refresh(new_f)
     return schemas.FileDto(id=new_f.id, name=new_f.name, path=new_f.path, size=new_f.size)
-    db.add(new_f)
-    db.commit()
-    db.refresh(new_f)
-    return schemas.FileDto(id=new_f.id, name=new_f.name, path=new_f.path, size=new_f.size)
-
-# ----------------- Twilio Webhook Stubs -----------------
+# ----------------- Twilio Production Webhooks -----------------
 
 @app.post("/webhooks/twilio/voice")
-def twilio_voice():
-    return {"status": "ok"}
+async def twilio_voice(request: Request, db: Session = Depends(get_db)):
+    """
+    Handles Twilio Voice webhook when a call is placed or received.
+    Returns TwiML with dual-channel recording enabled so both caller and callee
+    are captured in HD audio.
+    """
+    try:
+        form = await request.form()
+        call_sid = form.get("CallSid", f"twilio_{uuid.uuid4().hex[:12]}")
+        from_number = form.get("From", "+33100000000")
+        to_number = form.get("To", "+33100000000")
+        direction = form.get("Direction", "inbound").upper()
+
+        # Ensure Call record exists in DB
+        call = db.query(Call).filter(Call.id == call_sid).first()
+        if not call:
+            call = Call(
+                id=call_sid,
+                contact_id="1",
+                direction="OUTBOUND" if "outbound" in direction.lower() else "INBOUND",
+                status="ONGOING",
+                ai_status="PROCESSING",
+                twilio_params=json.dumps({
+                    "caller_id": from_number,
+                    "target": to_number,
+                    "call_sid": call_sid,
+                    "direction": direction
+                })
+            )
+            db.add(call)
+            db.commit()
+
+        # Build TwiML Response
+        try:
+            from twilio.twiml.voice_response import VoiceResponse, Dial
+            vr = VoiceResponse()
+            dial = Dial(
+                record="record-from-answer-dual",
+                recording_status_callback="/webhooks/twilio/recording-complete",
+                recording_status_callback_method="POST"
+            )
+            if to_number.startswith("client:"):
+                dial.client(to_number.replace("client:", ""))
+            else:
+                dial.number(to_number)
+            vr.append(dial)
+            twiml_xml = str(vr)
+        except Exception:
+            # Fallback direct TwiML XML string
+            twiml_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Dial record="record-from-answer-dual" recordingStatusCallback="/webhooks/twilio/recording-complete" recordingStatusCallbackMethod="POST">
+        <Number>{to_number}</Number>
+    </Dial>
+</Response>"""
+
+        return Response(content=twiml_xml, media_type="application/xml")
+    except Exception as e:
+        logger.error(f"Error handling /webhooks/twilio/voice: {e}")
+        return Response(content="<Response><Hangup/></Response>", media_type="application/xml")
+
+@app.post("/webhooks/twilio/recording-complete")
+async def twilio_recording_complete(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Called by Twilio as soon as dual-channel call recording is ready.
+    Downloads the audio into uploads/ and triggers Whisper STT & French RDV extraction.
+    """
+    try:
+        form = await request.form()
+        call_sid = form.get("CallSid")
+        recording_url = form.get("RecordingUrl")
+        recording_sid = form.get("RecordingSid")
+        duration = form.get("RecordingDuration", "0")
+
+        logger.info(f"Twilio recording complete for {call_sid}: {recording_url} (Duration: {duration}s)")
+
+        if call_sid and recording_url:
+            # Save audio file locally
+            audio_url = f"{recording_url}.wav"
+            local_filename = f"twilio_{call_sid}.wav"
+            local_filepath = os.path.join(UPLOAD_DIR, local_filename)
+
+            # Download recording in background
+            def _download_and_process():
+                try:
+                    import requests
+                    auth = None
+                    acc_sid = os.getenv("TWILIO_ACCOUNT_SID")
+                    auth_tok = os.getenv("TWILIO_AUTH_TOKEN")
+                    if acc_sid and auth_tok:
+                        auth = (acc_sid, auth_tok)
+
+                    resp = requests.get(audio_url, auth=auth, timeout=30)
+                    if resp.status_code == 200:
+                        with open(local_filepath, "wb") as f:
+                            f.write(resp.content)
+                        logger.info(f"Saved Twilio audio ({len(resp.content)} bytes) to {local_filepath}")
+
+                        # Update DB and run AI Pipeline
+                        bg_db = SessionLocal()
+                        try:
+                            c = bg_db.query(Call).filter(Call.id == call_sid).first()
+                            if c:
+                                c.audio_url = f"/uploads/{local_filename}"
+                                c.status = "COMPLETED"
+                                c.ai_status = "PROCESSING"
+                                bg_db.commit()
+
+                            # Run Whisper STT and AI Summarizer
+                            from .ai.transcriber import transcribe_call
+                            from .ai.summarizer import summarize_call
+
+                            transcribe_call(call_sid, local_filepath, bg_db)
+                            summarize_call(call_sid, bg_db)
+                            logger.info(f"AI Pipeline finished successfully for Twilio call {call_sid}")
+                        finally:
+                            bg_db.close()
+                except Exception as ex:
+                    logger.error(f"Error downloading/processing Twilio audio for {call_sid}: {ex}")
+
+            background_tasks.add_task(_download_and_process)
+
+        return {"status": "recording_queued_for_ai"}
+    except Exception as e:
+        logger.error(f"Error in /webhooks/twilio/recording-complete: {e}")
+        return {"status": "error", "detail": str(e)}
 
 @app.post("/webhooks/twilio/status")
-def twilio_status():
-    return {"status": "ok"}
+async def twilio_status(request: Request, db: Session = Depends(get_db)):
+    """Handles Twilio call status events (completed, busy, failed, no-answer)."""
+    try:
+        form = await request.form()
+        call_sid = form.get("CallSid")
+        call_status = form.get("CallStatus", "completed").upper()
+
+        if call_sid:
+            call = db.query(Call).filter(Call.id == call_sid).first()
+            if call:
+                call.status = call_status
+                db.commit()
+
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Error in /webhooks/twilio/status: {e}")
+        return {"status": "ok"}
 
 @app.post("/webhooks/twilio/media-stream")
 def twilio_media_stream():
-    return {"status": "ok"}
+    """Stub for live WebSocket media streams."""
+    return {"status": "media_stream_ready"}
 
 # ----------------- WebSocket Live Transcript -----------------
 

@@ -206,9 +206,9 @@ class CallingManager @Inject constructor(
         _transcript.value = ""
 
         coroutineScope.launch {
-            val prefs = context.getSharedPreferences("call_settings", Context.MODE_PRIVATE)
-            val useBridgeMode = prefs.getBoolean("use_pbx_bridge", false)
-            val gatewayNumber = prefs.getString("pbx_gateway_number", "") ?: ""
+            val twilioPrefs = context.getSharedPreferences("twilio_settings", Context.MODE_PRIVATE)
+            val isTwilioEnabled = twilioPrefs.getBoolean("twilio_enabled", false)
+            val twilioVirtualNumber = twilioPrefs.getString("twilio_phone_number", "") ?: ""
 
             // Create a call row on the backend so we have an ID ready
             val callResult = voipRepository.initiateCall(contact.id)
@@ -224,9 +224,12 @@ class CallingManager @Inject constructor(
                 .putString("active_phone_number", contact.phoneNumber)
                 .apply()
 
-            // Determine dial target: if Bridge Mode is active and gateway set, dial gateway number
-            val dialNumber = if (useBridgeMode && gatewayNumber.isNotBlank()) gatewayNumber else contact.phoneNumber
-            Log.d(TAG, "Dialing via SIM: $dialNumber (Bridge Mode=$useBridgeMode, Target=${contact.phoneNumber})")
+            // Determine dial target: if Twilio Virtual Number is set, route through Twilio gateway
+            val dialNumber = if (isTwilioEnabled && twilioVirtualNumber.isNotBlank()) {
+                Log.d(TAG, "Routing via Twilio Virtual Number: $twilioVirtualNumber (Target: ${contact.phoneNumber})")
+                twilioVirtualNumber
+            } else contact.phoneNumber
+            Log.d(TAG, "Dialing: $dialNumber (TwilioEnabled=$isTwilioEnabled, Target=${contact.phoneNumber})")
 
             // Launch native dialer
             val dialIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${dialNumber}"))
