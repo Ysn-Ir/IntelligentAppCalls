@@ -338,6 +338,8 @@ def summarize_call(call_id: str, db, language: Optional[str] = None) -> Optional
 
     # Save/update CallSummary
     tags_str = json.dumps(result.get("tags", []))
+    if call:
+        call.ai_status = "DONE"
     existing_summary = db.query(CallSummary).filter(CallSummary.call_id == call_id).first()
     if existing_summary:
         existing_summary.summary_text = result.get("resume", "")

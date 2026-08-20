@@ -51,6 +51,10 @@ object NetworkModule {
         dynamicUrlInterceptor: DynamicUrlInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(90, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor(dynamicUrlInterceptor)
             .addInterceptor(loggingInterceptor)
             .build()

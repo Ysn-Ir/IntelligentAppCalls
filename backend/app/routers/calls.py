@@ -727,14 +727,24 @@ def get_ai_status(id: str, token: str = Depends(verify_token), db: Session = Dep
         raise HTTPException(status_code=404, detail="Appel introuvable")
     transcript = db.query(Transcript).filter(Transcript.call_id == id).first()
     summary = db.query(CallSummary).filter(CallSummary.call_id == id).first()
-    status_str = getattr(call, "ai_status", "PROCESSING")
-    if transcript is not None and summary is not None:
-        status_str = "DONE"
+    
+    is_ready = (
+        transcript is not None 
+        and bool(transcript.raw_text) 
+        and summary is not None 
+        and summary.status in ["CONFIRMED", "VALIDATED", "MODIFIED"]
+        and not (summary.summary_text or "").startswith("Traitement IA")
+    )
+    
+    status_str = "DONE" if is_ready else getattr(call, "ai_status", "PROCESSING")
+    if not is_ready and status_str == "DONE":
+        status_str = "PROCESSING"
+
     return {
         "call_id": id,
         "ai_status": status_str,
-        "has_transcript": transcript is not None,
-        "has_summary": summary is not None,
+        "has_transcript": transcript is not None and bool(transcript.raw_text),
+        "has_summary": summary is not None and not (summary.summary_text or "").startswith("Traitement IA"),
         "transcript_confidence": transcript.confidence_score if transcript else None,
     }
 

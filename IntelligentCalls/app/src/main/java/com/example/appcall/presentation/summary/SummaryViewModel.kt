@@ -70,31 +70,39 @@ class SummaryViewModel @Inject constructor(
                 }
             }
 
-            // Start AI status polling
+            // Start AI status & live transcript polling
             pollingJob = launch {
                 var attempts = 0
                 while (isActive && attempts < 40) {
                     attempts++
-                    voipRepository.getAiStatus(callId).onSuccess { statusDto ->
-                        _aiStatus.value = statusDto
-                        if (statusDto.aiStatus == "DONE") {
-                            // Status finished, load latest summary & transcript
-                            voipRepository.getTranscript(callId).onSuccess { _transcript.value = it }
-                            voipRepository.getCallSummary(callId).onSuccess { summary ->
-                                _uiState.value = SummaryScreenState.Success(summary)
-                                _summaryText.value = summary.summaryText
-                                val lowConf = summary.confidenceScore != null && summary.confidenceScore < 60.0
-                                _isLowConfidence.value = lowConf
-                                _isEditing.value = lowConf
-                            }
-                            return@launch
+                    
+                    // Fetch transcript
+                    voipRepository.getTranscript(callId).onSuccess { tr ->
+                        if (tr.rawText.isNotBlank()) {
+                            _transcript.value = tr
                         }
                     }
-                    // Fetch intermediate transcript if available
-                    voipRepository.getTranscript(callId).onSuccess {
-                        if (it.rawText.isNotBlank()) _transcript.value = it
+
+                    // Fetch latest summary
+                    voipRepository.getCallSummary(callId).onSuccess { summary ->
+                        val isFinal = summary.status in listOf("CONFIRMED", "VALIDATED", "MODIFIED") && 
+                                      !summary.summaryText.startsWith("Traitement IA")
+                        if (isFinal) {
+                            _uiState.value = SummaryScreenState.Success(summary)
+                            _summaryText.value = summary.summaryText
+                            val lowConf = summary.confidenceScore != null && summary.confidenceScore < 60.0
+                            _isLowConfidence.value = lowConf
+                            _isEditing.value = lowConf
+                            // Also do one final transcript fetch
+                            voipRepository.getTranscript(callId).onSuccess { _transcript.value = it }
+                            return@launch
+                        } else if (_uiState.value !is SummaryScreenState.Success) {
+                            _uiState.value = SummaryScreenState.Success(summary)
+                            _summaryText.value = summary.summaryText
+                        }
                     }
-                    delay(2500)
+
+                    delay(2000)
                 }
             }
 
@@ -106,7 +114,6 @@ class SummaryViewModel @Inject constructor(
                     _isLowConfidence.value = lowConfidence
                     _isEditing.value = lowConfidence
 
-                    // Ensure transcript is also up-to-date
                     launch {
                         voipRepository.getTranscript(callId).onSuccess {
                             if (it.rawText.isNotBlank()) _transcript.value = it
