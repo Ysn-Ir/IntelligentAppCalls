@@ -40,7 +40,13 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.ui.text.style.TextOverflow
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -202,7 +208,13 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            AppCallTheme {
+            val themePrefs = remember { getSharedPreferences("app_theme", android.content.Context.MODE_PRIVATE) }
+            var currentThemeMode by remember {
+                val saved = themePrefs.getString("selected_theme", "DARK") ?: "DARK"
+                mutableStateOf(try { AppThemeMode.valueOf(saved) } catch (e: Exception) { AppThemeMode.DARK })
+            }
+
+            AppCallTheme(themeMode = currentThemeMode) {
                 var currentScreen by currentScreenState
                 var activeCallIdForSummary by activeCallIdForSummaryState
                 var selectedSection by selectedSectionState
@@ -316,6 +328,8 @@ class MainActivity : ComponentActivity() {
                                         SettingsSection(
                                             voipRepository = voipRepository,
                                             shizukuManager = shizukuManager,
+                                            currentThemeMode = currentThemeMode,
+                                            onThemeChange = { newMode -> currentThemeMode = newMode },
                                             onLogout = {
                                                 tokenStorage.clear()
                                                 loginViewModel.resetState()
@@ -399,7 +413,9 @@ fun AiAssistantSection(
     localDatabase: AppLocalDatabase,
     voipRepository: VoipRepository
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var promptText by remember { mutableStateOf("") }
+    var attachedFileName by remember { mutableStateOf<String?>(null) }
     var chatMessages by remember {
         mutableStateOf<List<ChatDisplayItem>>(emptyList())
     }
@@ -411,8 +427,47 @@ fun AiAssistantSection(
     var sessionList by remember { mutableStateOf<List<com.example.appcall.data.local.ChatSessionSummary>>(emptyList()) }
     val coroutineScope = rememberCoroutineScope()
 
+    // ── SPEECH-TO-TEXT DICTATION LAUNCHER ──
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                promptText = if (promptText.isBlank()) spokenText else "$promptText $spokenText"
+                android.widget.Toast.makeText(context, "Texte dicté ajouté !", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ── FILE PICKER LAUNCHER ──
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            try {
+                var fileName: String? = null
+                val cursor = context.contentResolver.query(it, null, null, null, null)
+                cursor?.use { c ->
+                    val nameIndex = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (c.moveToFirst() && nameIndex >= 0) {
+                        fileName = c.getString(nameIndex)
+                    }
+                }
+                if (fileName == null) {
+                    fileName = it.lastPathSegment ?: "document.pdf"
+                }
+                attachedFileName = fileName
+                android.widget.Toast.makeText(context, "Fichier joint : $fileName", android.widget.Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "Erreur fichier: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun startNewConversation() {
         currentSessionId = "session-${System.currentTimeMillis()}"
+        attachedFileName = null
         chatMessages = listOf(
             ChatDisplayItem(
                 isUser = false,
@@ -520,7 +575,7 @@ fun AiAssistantSection(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Aucune conversation enregistrée.", color = Color.Gray, fontSize = 13.sp)
+                            Text("Aucune conversation enregistrée.", color = Text3, fontSize = 13.sp)
                         }
                     } else {
                         LazyColumn(
@@ -531,14 +586,15 @@ fun AiAssistantSection(
                                 val dateStr = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRENCH).format(Date(session.lastTimestamp))
                                 val isCurrent = session.sessionId == currentSessionId
 
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isCurrent) Color(0x3300F2FE) else Color(0xFF1E293B)
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isCurrent) Surface2 else Surface1)
+                                        .border(1.dp, if (isCurrent) AccentColor else BorderColor, RoundedCornerShape(10.dp))
+                                        .padding(10.dp)
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
+                                    Column {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -546,30 +602,33 @@ fun AiAssistantSection(
                                         ) {
                                             Text(
                                                 text = dateStr,
-                                                color = if (isCurrent) NeonTeal else Color.Gray,
+                                                color = if (isCurrent) AccentText else Text2,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold
                                             )
-                                            Card(
-                                                shape = RoundedCornerShape(4.dp),
-                                                colors = CardDefaults.cardColors(containerColor = Color(0x1AFFFFFF))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(if (isCurrent) AccentDim else Surface2)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = "${session.messageCount} msg",
-                                                    color = Color.White,
-                                                    fontSize = 10.sp,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                    text = if (isCurrent) "Session Active" else "${session.messageCount} msg",
+                                                    color = if (isCurrent) AccentText else Text3,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
 
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = session.previewText,
-                                            color = Color.White,
-                                            fontSize = 13.sp,
+                                            color = Text1,
+                                            fontSize = 12.5.sp,
                                             fontWeight = FontWeight.Medium,
-                                            maxLines = 2
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
 
                                         Spacer(modifier = Modifier.height(8.dp))
@@ -585,22 +644,22 @@ fun AiAssistantSection(
                                                 Icon(
                                                     Icons.Default.Delete,
                                                     contentDescription = "Supprimer",
-                                                    tint = Color(0xFFEF4444),
-                                                    modifier = Modifier.size(16.dp)
+                                                    tint = DangerColor,
+                                                    modifier = Modifier.size(15.dp)
                                                 )
                                             }
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Button(
                                                 onClick = { openSession(session.sessionId) },
                                                 colors = ButtonDefaults.buttonColors(
-                                                    containerColor = if (isCurrent) NeonTeal else ElectricViolet
+                                                    containerColor = if (isCurrent) AccentColor else Surface2
                                                 ),
                                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                                 shape = RoundedCornerShape(6.dp)
                                             ) {
                                                 Text(
                                                     text = if (isCurrent) "Actif" else "Ouvrir",
-                                                    color = if (isCurrent) Color.Black else Color.White,
+                                                    color = if (isCurrent) Text1 else Text2,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -615,7 +674,7 @@ fun AiAssistantSection(
             },
             confirmButton = {
                 TextButton(onClick = { showHistoryDialog = false }) {
-                    Text("Fermer", color = NeonTeal, fontWeight = FontWeight.Bold)
+                    Text("Fermer", color = Text1, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -638,15 +697,17 @@ fun AiAssistantSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Assistant Intelligent Calls",
                         color = Text1,
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "gpt-4o · groq-llama",
+                        text = "gpt-4o · groq-llama-3.3",
                         color = Text3,
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -655,30 +716,32 @@ fun AiAssistantSection(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(7.dp))
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Surface1)
-                            .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
                             .clickable {
                                 sessionList = localDatabase.getChatSessions(selectedContactId)
                                 showHistoryDialog = true
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("Historique", color = Text2, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.Menu, contentDescription = "Historique", tint = Text2, modifier = Modifier.size(16.dp))
                     }
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(7.dp))
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Surface1)
-                            .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
-                            .clickable { startNewConversation() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            .clickable { startNewConversation() },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("＋ Nouveau", color = Text2, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.Add, contentDescription = "Nouveau", tint = AccentColor, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -806,6 +869,46 @@ fun AiAssistantSection(
             }
         }
 
+        // ── ATTACHED FILE CHIP (If selected) ──
+        if (attachedFileName != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(BgColor)
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Surface2)
+                        .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = AccentText, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = attachedFileName!!,
+                            color = Text1,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Supprimer fichier",
+                            tint = Text3,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clickable { attachedFileName = null }
+                        )
+                    }
+                }
+            }
+        }
+
         // ── CHAT INPUT BAR ──
         Row(
             modifier = Modifier
@@ -815,17 +918,22 @@ fun AiAssistantSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
+            // File Attachment Button
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(34.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    .clickable {
+                        filePickerLauncher.launch("*/*")
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "📎", fontSize = 13.sp)
+                Icon(Icons.Default.Share, contentDescription = "Joindre un document", tint = Text2, modifier = Modifier.size(16.dp))
             }
 
+            // Input TextField
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -850,46 +958,65 @@ fun AiAssistantSection(
                 )
             }
 
+            // Microphone Dictation Button
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(34.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Surface1)
-                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp)),
+                    .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                    .clickable {
+                        try {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Parlez à votre assistant AppCall...")
+                            }
+                            speechLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Dictée vocale non disponible sur ce terminal", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "🎙", fontSize = 13.sp)
+                Icon(Icons.Default.Call, contentDescription = "Dictée vocale", tint = AccentColor, modifier = Modifier.size(16.dp))
             }
 
+            // Send Button
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(34.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (promptText.isNotBlank()) Text1 else Surface2)
                     .clickable(enabled = promptText.isNotBlank() && !isLoading) {
-                        val userText = promptText.trim()
+                        val basePrompt = promptText.trim()
+                        val fullPrompt = if (attachedFileName != null) {
+                            "$basePrompt\n[Fichier joint: $attachedFileName]"
+                        } else basePrompt
+
                         promptText = ""
+                        attachedFileName = null
                         if (currentSessionId.isNullOrBlank()) {
                             currentSessionId = "session-${System.currentTimeMillis()}"
                         }
                         val activeSessionId = currentSessionId!!
 
-                        chatMessages = chatMessages + ChatDisplayItem(isUser = true, text = userText)
+                        chatMessages = chatMessages + ChatDisplayItem(isUser = true, text = fullPrompt)
                         isLoading = true
 
                         // Save user message to persistent local history
                         localDatabase.saveChatMessage(
                             contactId = selectedContactId,
                             isUser = true,
-                            text = userText,
+                            text = fullPrompt,
                             sessionId = activeSessionId
                         )
 
                         coroutineScope.launch {
                             // Check offline local command
-                            val lower = userText.lowercase()
+                            val lower = fullPrompt.lowercase()
                             if (lower.startsWith("tâche") || lower.startsWith("todo") || lower.startsWith("créer tâche")) {
-                                val taskTitle = userText.substringAfter("tâche").substringAfter("todo").trim()
+                                val taskTitle = fullPrompt.substringAfter("tâche").substringAfter("todo").trim()
                                 if (taskTitle.isNotBlank()) {
                                     localDatabase.saveTask("task-${System.currentTimeMillis()}", taskTitle, false)
                                     val reply = "J'ai ajouté la tâche : '$taskTitle'"
@@ -908,9 +1035,9 @@ fun AiAssistantSection(
                             // RAG Chatbot query
                             val contactId = selectedContactId
                             val result = if (contactId != null) {
-                                voipRepository.chatWithContact(contactId, userText, activeSessionId)
+                                voipRepository.chatWithContact(contactId, fullPrompt, activeSessionId)
                             } else {
-                                voipRepository.globalChat(userText, activeSessionId)
+                                voipRepository.globalChat(fullPrompt, activeSessionId)
                             }
 
                             result.onSuccess { res ->
@@ -945,7 +1072,12 @@ fun AiAssistantSection(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "↑", color = if (promptText.isNotBlank()) BgColor else Text3, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Icon(
+                    Icons.Default.Send,
+                    contentDescription = "Envoyer",
+                    tint = if (promptText.isNotBlank()) BgColor else Text3,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -955,6 +1087,8 @@ fun AiAssistantSection(
 fun SettingsSection(
     voipRepository: VoipRepository,
     shizukuManager: com.example.appcall.data.calling.ShizukuManager? = null,
+    currentThemeMode: AppThemeMode = AppThemeMode.DARK,
+    onThemeChange: (AppThemeMode) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -996,7 +1130,7 @@ fun SettingsSection(
     ) {
         item {
             Text("Paramètres", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Text1)
-            Text("Profil, Twilio Cloud, réseau & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
+            Text("Profil, Thème, IA, VoIP, Réseau & RGPD", fontSize = 11.5.sp, color = Text3, modifier = Modifier.padding(top = 2.dp))
         }
 
         // ── 1. USER PROFILE CARD ────────────────────────────────────────────────
@@ -1082,6 +1216,80 @@ fun SettingsSection(
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
                             Text("Mot de passe", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. APPARENCE & THÈME ───────────────────────────────────────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Surface1)
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("APPARENCE & THÈME", color = Text3, fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.5.sp)
+                            Text("Personnalisez l'affichage visuel", color = Text2, fontSize = 11.5.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val themeOptions = listOf(
+                        Triple(AppThemeMode.DARK, "🌙 Sombre", "Obscur"),
+                        Triple(AppThemeMode.LIGHT, "☀️ Clair", "Lumineux"),
+                        Triple(AppThemeMode.SYSTEM, "📱 Système", "Auto")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        themeOptions.forEach { (mode, title, sub) ->
+                            val isSelected = currentThemeMode == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) AccentColor else Surface2)
+                                    .border(1.dp, if (isSelected) AccentColor else BorderColor, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onThemeChange(mode)
+                                        context.getSharedPreferences("app_theme", android.content.Context.MODE_PRIVATE)
+                                            .edit()
+                                            .putString("selected_theme", mode.name)
+                                            .apply()
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = title,
+                                        color = if (isSelected) Text1 else Text2,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = sub,
+                                        color = if (isSelected) Text1.copy(alpha = 0.8f) else Text3,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
