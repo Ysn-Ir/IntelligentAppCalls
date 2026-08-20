@@ -56,6 +56,9 @@ fun CallScreen(
     }
 
     val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     val filteredContacts = remember(contacts, contactSearchQuery) {
@@ -91,7 +94,7 @@ fun CallScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "📞 Historique (${callHistory.size})",
+                        text = "📞 ${strings.historyTab} (${callHistory.size})",
                         color = if (selectedTab == 0) BgColor else Text2,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -109,7 +112,7 @@ fun CallScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "👥 Contacts (${contacts.size})",
+                        text = "👥 ${strings.contactsTab} (${contacts.size})",
                         color = if (selectedTab == 1) BgColor else Text2,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -150,14 +153,14 @@ fun CallScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Transcription & Analyse IA",
+                                        text = strings.aiConsentTitle,
                                         color = Text1,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = if (consentGiven) "Actif: Les appels seront transcrits & résumés"
-                                               else "Désactivé: Appel audio classique",
+                                        text = if (consentGiven) strings.aiConsentActive
+                                               else strings.aiConsentInactive,
                                         color = if (consentGiven) SuccessColor else Text3,
                                         fontSize = 11.sp,
                                         modifier = Modifier.padding(top = 2.dp)
@@ -193,7 +196,7 @@ fun CallScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 decorationBox = { innerTextField ->
                                     if (contactSearchQuery.isEmpty()) {
-                                        Text("Rechercher un contact...", color = Text3, fontSize = 13.sp)
+                                        Text(strings.searchContactPlaceholder, color = Text3, fontSize = 13.sp)
                                     }
                                     innerTextField()
                                 }
@@ -207,7 +210,7 @@ fun CallScreen(
                                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Aucun contact trouvé", color = Text3, fontSize = 13.sp)
+                                Text(strings.contactsList, color = Text3, fontSize = 13.sp)
                             }
                         }
                     } else {

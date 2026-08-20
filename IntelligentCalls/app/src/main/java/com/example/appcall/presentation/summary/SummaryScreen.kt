@@ -51,6 +51,10 @@ fun SummaryScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = getAppStrings(appLanguageCode)
+
     val uiState by viewModel.uiState.collectAsState()
     val summaryText by viewModel.summaryText.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
@@ -208,7 +212,7 @@ fun SummaryScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = AccentColor, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text(text = "Chargement de l'analyse...", color = Text3, fontSize = 13.sp)
+                            Text(text = strings.loadingAnalysis, color = Text3, fontSize = 13.sp)
                         }
                     }
                 }
@@ -224,7 +228,7 @@ fun SummaryScreen(
                                 onClick = { viewModel.loadSummary(callId) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Surface2)
                             ) {
-                                Text("Réessayer", color = Text1)
+                                Text(strings.retry, color = Text1)
                             }
                         }
                     }
@@ -252,8 +256,8 @@ fun SummaryScreen(
                                         Icon(Icons.Default.Warning, contentDescription = null, tint = WarnColor, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
-                                            Text(text = "Score de confiance IA faible (< 60%)", color = WarnColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                            Text(text = "Veuillez vérifier et ajuster le résumé ou les informations du rendez-vous.", color = Text2, fontSize = 11.sp)
+                                            Text(text = strings.lowConfidenceWarning, color = WarnColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(text = strings.lowConfidenceSubtitle, color = Text2, fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -645,7 +649,7 @@ fun SummaryScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "RÉSUMÉ INTELLIGENT",
+                                            text = strings.callSummary.uppercase(),
                                             color = Text2,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
@@ -654,366 +658,366 @@ fun SummaryScreen(
                                         IconButton(
                                             onClick = { viewModel.toggleEdit() },
                                             modifier = Modifier.size(20.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = "Edit",
-                                                tint = Text3,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                    }
+                                         ) {
+                                             Icon(
+                                                 imageVector = Icons.Default.Edit,
+                                                 contentDescription = strings.editSummary,
+                                                 tint = Text3,
+                                                 modifier = Modifier.size(14.dp)
+                                             )
+                                         }
+                                     }
 
-                                    Spacer(modifier = Modifier.height(11.dp))
+                                     Spacer(modifier = Modifier.height(11.dp))
 
-                                    if (isEditing) {
-                                        OutlinedTextField(
-                                            value = summaryText,
-                                            onValueChange = { viewModel.updateSummaryText(it) },
-                                            textStyle = androidx.compose.ui.text.TextStyle(color = Text1, fontSize = 13.sp),
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = AccentColor,
-                                                unfocusedBorderColor = BorderColor,
-                                                focusedContainerColor = Surface2,
-                                                unfocusedContainerColor = Surface2
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Button(
-                                            onClick = { viewModel.saveSummary() },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("Enregistrer les modifications", color = BgColor, fontWeight = FontWeight.Bold)
-                                        }
-                                    } else {
-                                        val lines = summaryText.split("\n").filter { it.isNotBlank() }
-                                        if (lines.isNotEmpty()) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                                lines.forEach { line ->
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(9.dp)
-                                                    ) {
-                                                        Text(text = "—", color = Text3, fontSize = 13.sp)
-                                                        Text(
-                                                            text = line.removePrefix("- ").removePrefix("* ").trim(),
-                                                            color = Text1,
-                                                            fontSize = 13.sp,
-                                                            lineHeight = 18.sp
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            Text(text = "Résumé en cours de traitement...", color = Text3, fontSize = 13.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                                     if (isEditing) {
+                                         OutlinedTextField(
+                                             value = summaryText,
+                                             onValueChange = { viewModel.updateSummaryText(it) },
+                                             textStyle = androidx.compose.ui.text.TextStyle(color = Text1, fontSize = 13.sp),
+                                             modifier = Modifier.fillMaxWidth(),
+                                             colors = OutlinedTextFieldDefaults.colors(
+                                                 focusedBorderColor = AccentColor,
+                                                 unfocusedBorderColor = BorderColor,
+                                                 focusedContainerColor = Surface2,
+                                                 unfocusedContainerColor = Surface2
+                                             )
+                                         )
+                                         Spacer(modifier = Modifier.height(8.dp))
+                                         Button(
+                                             onClick = { viewModel.saveSummary() },
+                                             colors = ButtonDefaults.buttonColors(containerColor = Text1),
+                                             shape = RoundedCornerShape(8.dp),
+                                             modifier = Modifier.fillMaxWidth()
+                                         ) {
+                                             Text(strings.save, color = BgColor, fontWeight = FontWeight.Bold)
+                                         }
+                                     } else {
+                                         val lines = summaryText.split("\n").filter { it.isNotBlank() }
+                                         if (lines.isNotEmpty()) {
+                                             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                                 lines.forEach { line ->
+                                                     Row(
+                                                         modifier = Modifier.fillMaxWidth(),
+                                                         horizontalArrangement = Arrangement.spacedBy(9.dp)
+                                                     ) {
+                                                         Text(text = "—", color = Text3, fontSize = 13.sp)
+                                                         Text(
+                                                             text = line.removePrefix("- ").removePrefix("* ").trim(),
+                                                             color = Text1,
+                                                             fontSize = 13.sp,
+                                                             lineHeight = 18.sp
+                                                         )
+                                                     }
+                                                 }
+                                             }
+                                         } else {
+                                             Text(text = strings.loadingAnalysis, color = Text3, fontSize = 13.sp)
+                                         }
+                                     }
+                                 }
+                             }
+                         }
 
-                        // 4. Detected Appointment Card (or Add Appointment Card)
-                        if (summary.appointment != null && summary.appointment.status != "DISMISSED") {
-                            val appointment = summary.appointment
-                            item {
-                                val isConfirmed = appointment.status == "CONFIRMED" || appointment.status == "VALIDATED"
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Surface1)
-                                        .border(1.dp, BorderStrong, RoundedCornerShape(10.dp))
-                                        .padding(15.dp)
-                                ) {
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "RENDEZ-VOUS DÉTECTÉ",
-                                                color = Text2,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(5.dp))
-                                                    .background(if (isConfirmed) SuccessDim else WarnDim)
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (isConfirmed) "Confirmé" else "Proposé",
-                                                    color = if (isConfirmed) SuccessColor else WarnColor,
-                                                    fontSize = 10.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
+                         // 4. Detected Appointment Card (or Add Appointment Card)
+                         if (summary.appointment != null && summary.appointment.status != "DISMISSED") {
+                             val appointment = summary.appointment
+                             item {
+                                 val isConfirmed = appointment.status == "CONFIRMED" || appointment.status == "VALIDATED"
+                                 Box(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .clip(RoundedCornerShape(10.dp))
+                                         .background(Surface1)
+                                         .border(1.dp, BorderStrong, RoundedCornerShape(10.dp))
+                                         .padding(15.dp)
+                                 ) {
+                                     Column(modifier = Modifier.fillMaxWidth()) {
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             horizontalArrangement = Arrangement.SpaceBetween,
+                                             verticalAlignment = Alignment.CenterVertically
+                                         ) {
+                                             Text(
+                                                 text = strings.detectedAppointment.uppercase(),
+                                                 color = Text2,
+                                                 fontSize = 11.5.sp,
+                                                 fontWeight = FontWeight.Bold,
+                                                 letterSpacing = 0.5.sp
+                                             )
+                                             Box(
+                                                 modifier = Modifier
+                                                     .clip(RoundedCornerShape(5.dp))
+                                                     .background(if (isConfirmed) SuccessDim else WarnDim)
+                                                     .padding(horizontal = 8.dp, vertical = 3.dp)
+                                             ) {
+                                                 Text(
+                                                     text = if (isConfirmed) "✓" else "!",
+                                                     color = if (isConfirmed) SuccessColor else WarnColor,
+                                                     fontSize = 10.5.sp,
+                                                     fontWeight = FontWeight.Bold
+                                                 )
+                                             }
+                                         }
 
-                                        Spacer(modifier = Modifier.height(12.dp))
+                                         Spacer(modifier = Modifier.height(12.dp))
 
-                                        // 2x2 Grid
-                                        val dateStr = appointment.scheduledAt.substringBefore("T")
-                                        val timeStr = appointment.scheduledAt.substringAfter("T", "14:00").take(5)
+                                         // 2x2 Grid
+                                         val dateStr = appointment.scheduledAt.substringBefore("T")
+                                         val timeStr = appointment.scheduledAt.substringAfter("T", "14:00").take(5)
 
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                                        ) {
-                                            Row(modifier = Modifier.fillMaxWidth()) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(Surface2)
-                                                        .padding(9.dp, 11.dp)
-                                                ) {
-                                                    Column {
-                                                        Text(text = "DATE", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
-                                                        Text(text = dateStr, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
-                                                    }
-                                                }
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(Surface1)
-                                                        .padding(9.dp, 11.dp)
-                                                ) {
-                                                    Column {
-                                                        Text(text = "HEURE", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
-                                                        Text(text = timeStr, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
-                                                    }
-                                                }
-                                            }
-                                            Row(modifier = Modifier.fillMaxWidth()) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(Surface1)
-                                                        .padding(9.dp, 11.dp)
-                                                ) {
-                                                    Column {
-                                                        Text(text = "TITRE", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
-                                                        Text(text = appointment.title ?: "Suivi contrat", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
-                                                    }
-                                                }
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .background(Surface2)
-                                                        .padding(9.dp, 11.dp)
-                                                ) {
-                                                    Column {
-                                                        Text(text = "INTERLOCUTEUR", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
-                                                        Text(text = appointment.contactName ?: "Contact", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
-                                                    }
-                                                }
-                                            }
-                                        }
+                                         Column(
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .clip(RoundedCornerShape(8.dp))
+                                                 .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                                         ) {
+                                             Row(modifier = Modifier.fillMaxWidth()) {
+                                                 Box(
+                                                     modifier = Modifier
+                                                         .weight(1f)
+                                                         .background(Surface2)
+                                                         .padding(9.dp, 11.dp)
+                                                 ) {
+                                                     Column {
+                                                         Text(text = "DATE", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                         Text(text = dateStr, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
+                                                     }
+                                                 }
+                                                 Box(
+                                                     modifier = Modifier
+                                                         .weight(1f)
+                                                         .background(Surface1)
+                                                         .padding(9.dp, 11.dp)
+                                                 ) {
+                                                     Column {
+                                                         Text(text = "TIME", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                         Text(text = timeStr, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
+                                                     }
+                                                 }
+                                             }
+                                             Row(modifier = Modifier.fillMaxWidth()) {
+                                                 Box(
+                                                     modifier = Modifier
+                                                         .weight(1f)
+                                                         .background(Surface1)
+                                                         .padding(9.dp, 11.dp)
+                                                 ) {
+                                                     Column {
+                                                         Text(text = "TITLE", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                         Text(text = appointment.title ?: "CRM Meeting", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
+                                                     }
+                                                 }
+                                                 Box(
+                                                     modifier = Modifier
+                                                         .weight(1f)
+                                                         .background(Surface2)
+                                                         .padding(9.dp, 11.dp)
+                                                 ) {
+                                                     Column {
+                                                         Text(text = "CONTACT", color = Text3, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                         Text(text = appointment.contactName ?: "Contact", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
+                                                     }
+                                                 }
+                                             }
+                                         }
 
-                                        Spacer(modifier = Modifier.height(13.dp))
+                                         Spacer(modifier = Modifier.height(13.dp))
 
-                                        // Appt Actions
-                                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(Text1)
-                                                    .clickable { viewModel.validateAppointment() }
-                                                    .padding(vertical = 11.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = if (isConfirmed) "Rendez-vous synchronisé ✓" else "Confirmer et synchroniser l'agenda",
-                                                    color = BgColor,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.5.sp
-                                                )
-                                            }
+                                         // Appt Actions
+                                         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                             Box(
+                                                 modifier = Modifier
+                                                     .fillMaxWidth()
+                                                     .clip(RoundedCornerShape(8.dp))
+                                                     .background(Text1)
+                                                     .clickable { viewModel.validateAppointment() }
+                                                     .padding(vertical = 11.dp),
+                                                 contentAlignment = Alignment.Center
+                                             ) {
+                                                 Text(
+                                                     text = strings.confirmAppointment,
+                                                     color = BgColor,
+                                                     fontWeight = FontWeight.Bold,
+                                                     fontSize = 12.5.sp
+                                                 )
+                                             }
 
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .border(1.dp, BorderStrong, RoundedCornerShape(8.dp))
-                                                    .clickable { showVoiceDialog = true }
-                                                    .padding(vertical = 10.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(text = "Modifier le RDV", color = Text2, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
-                                            }
+                                             Box(
+                                                 modifier = Modifier
+                                                     .fillMaxWidth()
+                                                     .clip(RoundedCornerShape(8.dp))
+                                                     .border(1.dp, BorderStrong, RoundedCornerShape(8.dp))
+                                                     .clickable { showVoiceDialog = true }
+                                                     .padding(vertical = 10.dp),
+                                                 contentAlignment = Alignment.Center
+                                             ) {
+                                                 Text(text = strings.editSummary, color = Text2, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
+                                             }
 
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable { viewModel.dismissAppointment() }
-                                                    .padding(vertical = 6.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(text = "Ignorer ce RDV", color = Text3, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // No appointment detected -> Allow manual creation
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Surface1)
-                                        .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                                        .padding(14.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text("Aucun rendez-vous détecté", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                            Text("Créer un RDV associé à cet appel", color = Text3, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(Surface2)
-                                                .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
-                                                .clickable { showVoiceDialog = true }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Add, contentDescription = null, tint = Text1, modifier = Modifier.size(13.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Ajouter RDV", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                                             Box(
+                                                 modifier = Modifier
+                                                     .fillMaxWidth()
+                                                     .clickable { viewModel.dismissAppointment() }
+                                                     .padding(vertical = 6.dp),
+                                                 contentAlignment = Alignment.Center
+                                             ) {
+                                                 Text(text = strings.dismissAppointment, color = Text3, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                             }
+                                         }
+                                     }
+                                 }
+                             }
+                         } else {
+                             // No appointment detected -> Allow manual creation
+                             item {
+                                 Box(
+                                     modifier = Modifier
+                                         .fillMaxWidth()
+                                         .clip(RoundedCornerShape(10.dp))
+                                         .background(Surface1)
+                                         .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                         .padding(14.dp)
+                                 ) {
+                                     Row(
+                                         modifier = Modifier.fillMaxWidth(),
+                                         horizontalArrangement = Arrangement.SpaceBetween,
+                                         verticalAlignment = Alignment.CenterVertically
+                                     ) {
+                                         Column(modifier = Modifier.weight(1f)) {
+                                             Text(strings.noAppointments, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                             Text(strings.addAppointment, color = Text3, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+                                         }
+                                         Box(
+                                             modifier = Modifier
+                                                 .clip(RoundedCornerShape(7.dp))
+                                                 .background(Surface2)
+                                                 .border(1.dp, BorderColor, RoundedCornerShape(7.dp))
+                                                 .clickable { showVoiceDialog = true }
+                                                 .padding(horizontal = 10.dp, vertical = 6.dp)
+                                         ) {
+                                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                                 Icon(Icons.Default.Add, contentDescription = null, tint = Text1, modifier = Modifier.size(13.dp))
+                                                 Spacer(modifier = Modifier.width(4.dp))
+                                                 Text(strings.addAppointment, color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                             }
+                                         }
+                                     }
+                                 }
+                             }
+                         }
 
-                        // 5. Validation Button at the bottom
-                        item {
-                            val isValidated = summary.status == "VALIDATED"
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isValidated) SuccessDim else Text1)
-                                    .clickable(enabled = !isValidated) { viewModel.validateSummary() }
-                                    .padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (isValidated) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = SuccessColor, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                    }
-                                    Text(
-                                        text = if (isValidated) "Résumé validé et archivé" else "Valider et approuver le résumé",
-                                        color = if (isValidated) SuccessColor else BgColor,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.5.sp
-                                    )
-                                }
-                            }
-                        }
+                         // 5. Validation Button at the bottom
+                         item {
+                             val isValidated = summary.status == "VALIDATED"
+                             Box(
+                                 modifier = Modifier
+                                     .fillMaxWidth()
+                                     .clip(RoundedCornerShape(10.dp))
+                                     .background(if (isValidated) SuccessDim else Text1)
+                                     .clickable(enabled = !isValidated) { viewModel.validateSummary() }
+                                     .padding(vertical = 14.dp),
+                                 contentAlignment = Alignment.Center
+                             ) {
+                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                     if (isValidated) {
+                                         Icon(Icons.Default.Check, contentDescription = null, tint = SuccessColor, modifier = Modifier.size(16.dp))
+                                         Spacer(modifier = Modifier.width(6.dp))
+                                     }
+                                     Text(
+                                         text = if (isValidated) "✓ ${strings.validateSummary}" else strings.validateSummary,
+                                         color = if (isValidated) SuccessColor else BgColor,
+                                         fontWeight = FontWeight.Bold,
+                                         fontSize = 13.5.sp
+                                     )
+                                 }
+                             }
+                         }
 
-                        // 6. Transcript Block
-                        item {
-                            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                                Text(
-                                    text = "TRANSCRIPTION DE L'APPEL",
-                                    color = Text2,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
+                         // 6. Transcript Block
+                         item {
+                             Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                                 Text(
+                                     text = strings.audioTranscript.uppercase(),
+                                     color = Text2,
+                                     fontSize = 11.5.sp,
+                                     fontWeight = FontWeight.Bold,
+                                     letterSpacing = 0.5.sp,
+                                     modifier = Modifier.padding(bottom = 12.dp)
+                                 )
 
-                                val segments = transcript?.speakerSegments
-                                if (!segments.isNullOrEmpty()) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                        segments.forEach { seg ->
-                                            val isAgent = seg.speaker == "agent" || seg.speaker == "SPEAKER_00"
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = if (isAgent) Arrangement.Start else Arrangement.End
-                                            ) {
-                                                Column(modifier = Modifier.widthIn(max = 280.dp)) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(
-                                                                RoundedCornerShape(
-                                                                    topStart = 11.dp,
-                                                                    topEnd = 11.dp,
-                                                                    bottomStart = if (isAgent) 3.dp else 11.dp,
-                                                                    bottomEnd = if (isAgent) 11.dp else 3.dp
-                                                                )
-                                                            )
-                                                            .background(if (isAgent) Surface1 else Surface2)
-                                                            .border(1.dp, BorderColor, RoundedCornerShape(11.dp))
-                                                            .padding(horizontal = 12.dp, vertical = 9.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = seg.text,
-                                                            color = Text1,
-                                                            fontSize = 12.5.sp,
-                                                            lineHeight = 17.sp
-                                                        )
-                                                    }
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(top = 4.dp, start = 4.dp, end = 4.dp),
-                                                        horizontalArrangement = if (isAgent) Arrangement.Start else Arrangement.End,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = if (isAgent) "Agent · ${String.format(Locale.getDefault(), "%.1f", seg.start)}s" else "${String.format(Locale.getDefault(), "%.1f", seg.start)}s · Contact",
-                                                            color = Text3,
-                                                            fontSize = 9.5.sp,
-                                                            fontFamily = FontFamily.Monospace
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    val raw = transcript?.rawText?.trim()
-                                    if (!raw.isNullOrBlank() && raw != "...") {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(Surface1)
-                                                .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                                                .padding(14.dp)
-                                        ) {
-                                            Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
-                                        }
-                                    } else {
-                                        Text(text = "Aucune parole distincte détectée dans cet enregistrement.", color = Text3, fontSize = 12.5.sp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                                 val segments = transcript?.speakerSegments
+                                 if (!segments.isNullOrEmpty()) {
+                                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                         segments.forEach { seg ->
+                                             val isAgent = seg.speaker == "agent" || seg.speaker == "SPEAKER_00"
+                                             Row(
+                                                 modifier = Modifier.fillMaxWidth(),
+                                                 horizontalArrangement = if (isAgent) Arrangement.Start else Arrangement.End
+                                             ) {
+                                                 Column(modifier = Modifier.widthIn(max = 280.dp)) {
+                                                     Box(
+                                                         modifier = Modifier
+                                                             .clip(
+                                                                 RoundedCornerShape(
+                                                                     topStart = 11.dp,
+                                                                     topEnd = 11.dp,
+                                                                     bottomStart = if (isAgent) 3.dp else 11.dp,
+                                                                     bottomEnd = if (isAgent) 11.dp else 3.dp
+                                                                 )
+                                                             )
+                                                             .background(if (isAgent) Surface1 else Surface2)
+                                                             .border(1.dp, BorderColor, RoundedCornerShape(11.dp))
+                                                             .padding(horizontal = 12.dp, vertical = 9.dp)
+                                                     ) {
+                                                         Text(
+                                                             text = seg.text,
+                                                             color = Text1,
+                                                             fontSize = 12.5.sp,
+                                                             lineHeight = 17.sp
+                                                         )
+                                                     }
+                                                     Row(
+                                                         modifier = Modifier
+                                                             .fillMaxWidth()
+                                                             .padding(top = 4.dp, start = 4.dp, end = 4.dp),
+                                                         horizontalArrangement = if (isAgent) Arrangement.Start else Arrangement.End,
+                                                         verticalAlignment = Alignment.CenterVertically
+                                                     ) {
+                                                         Text(
+                                                             text = if (isAgent) "Agent · ${String.format(Locale.getDefault(), "%.1f", seg.start)}s" else "${String.format(Locale.getDefault(), "%.1f", seg.start)}s · Contact",
+                                                             color = Text3,
+                                                             fontSize = 9.5.sp,
+                                                             fontFamily = FontFamily.Monospace
+                                                         )
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
+                                 } else {
+                                     val raw = transcript?.rawText?.trim()
+                                     if (!raw.isNullOrBlank() && raw != "...") {
+                                         Box(
+                                             modifier = Modifier
+                                                 .fillMaxWidth()
+                                                 .clip(RoundedCornerShape(10.dp))
+                                                 .background(Surface1)
+                                                 .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                                                 .padding(14.dp)
+                                         ) {
+                                             Text(text = raw, color = Text1, fontSize = 13.sp, lineHeight = 19.sp)
+                                         }
+                                     } else {
+                                         Text(text = strings.noSpeechDetected, color = Text3, fontSize = 12.5.sp)
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 }
+             }
+         }
 
         // Voice Command Modal
         if (showVoiceDialog) {

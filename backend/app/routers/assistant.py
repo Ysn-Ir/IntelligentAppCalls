@@ -13,6 +13,7 @@ router = APIRouter(tags=["AI Assistant & Chatbot"])
 @router.post("/api/v1/assistant/chat")
 def chat_with_assistant(
     body: schemas.ChatRequest,
+    x_app_language: Optional[str] = Header(None),
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
@@ -23,12 +24,14 @@ def chat_with_assistant(
         contact_id=body.contact_id if hasattr(body, "contact_id") else None,
         db=db,
         session_id=body.session_id,
+        language=x_app_language,
     )
 
 @router.post("/api/v1/contacts/{contact_id}/chat")
 def chat_with_contact(
     contact_id: str,
     body: schemas.ChatRequest,
+    x_app_language: Optional[str] = Header(None),
     user_id: str = Depends(verify_token),
     db: Session = Depends(get_db),
 ):

@@ -434,6 +434,10 @@ fun AiAssistantSection(
     voipRepository: VoipRepository
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+
     var promptText by remember { mutableStateOf("") }
     var attachedFileName by remember { mutableStateOf<String?>(null) }
     var chatMessages by remember {
@@ -719,7 +723,7 @@ fun AiAssistantSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Assistant Intelligent Calls",
+                        text = strings.assistantTitle,
                         color = Text1,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -727,7 +731,7 @@ fun AiAssistantSection(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "gpt-4o · groq-llama-3.3",
+                        text = strings.assistantSubtitle,
                         color = Text3,
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -749,7 +753,7 @@ fun AiAssistantSection(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Historique", tint = Text2, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Menu, contentDescription = strings.chatHistory, tint = Text2, modifier = Modifier.size(16.dp))
                     }
 
                     Box(
@@ -761,7 +765,7 @@ fun AiAssistantSection(
                             .clickable { startNewConversation() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Nouveau", tint = AccentColor, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Add, contentDescription = strings.newChat, tint = AccentColor, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -785,7 +789,7 @@ fun AiAssistantSection(
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Tous les appels",
+                        text = strings.allCalls,
                         color = if (isGlobal) Text1 else Text2,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold

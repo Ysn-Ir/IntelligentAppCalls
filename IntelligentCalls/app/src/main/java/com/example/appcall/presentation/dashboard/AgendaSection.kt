@@ -46,6 +46,11 @@ import java.util.Locale
 @Composable
 fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository) {
     val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+    val appLocale = com.example.appcall.presentation.theme.getAppLocale(appLanguageCode)
+
     val coroutineScope = rememberCoroutineScope()
     var appointments by remember { mutableStateOf(localDatabase.getAgendaAppointments()) }
     var newTitle by remember { mutableStateOf("") }
@@ -100,12 +105,12 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
     // Live dynamic clock (e.g. 14:28:05)
     var currentTimeString by remember { mutableStateOf(SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())) }
-    var currentDateString by remember { mutableStateOf(SimpleDateFormat("EEEE d MMMM", Locale.FRENCH).format(Date()).replaceFirstChar { it.uppercase() }) }
+    var currentDateString by remember { mutableStateOf(SimpleDateFormat("EEEE d MMMM", appLocale).format(Date()).replaceFirstChar { it.uppercase() }) }
 
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            currentDateString = SimpleDateFormat("EEEE d MMMM", Locale.FRENCH).format(Date()).replaceFirstChar { it.uppercase() }
+            currentDateString = SimpleDateFormat("EEEE d MMMM", appLocale).format(Date()).replaceFirstChar { it.uppercase() }
             delay(1000)
         }
     }

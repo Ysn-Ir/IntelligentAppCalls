@@ -55,6 +55,10 @@ enum class TaskFilter {
 @Composable
 fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository) {
     val context = LocalContext.current
+    val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
+    val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
+    val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
+
     val coroutineScope = rememberCoroutineScope()
     var tasks by remember { mutableStateOf(localDatabase.getTasks()) }
     var selectedFilter by remember { mutableStateOf(TaskFilter.ALL) }
@@ -127,14 +131,14 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
             ) {
                 Column {
                     Text(
-                        text = "TÂCHES DÉTECTÉES PAR L'IA",
+                        text = strings.tasksHeader,
                         color = Text3,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
                     Text(
-                        text = "${tasks.count { !it.completed }} tâche(s) en attente",
+                        text = "${tasks.count { !it.completed }} ${strings.pendingTasksFilter.lowercase()}",
                         color = Text2,
                         fontSize = 11.sp
                     )
@@ -152,7 +156,7 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                         Icon(Icons.Default.Add, contentDescription = null, tint = Text1, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Ajouter",
+                            text = strings.addTask,
                             color = Text1,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
@@ -169,9 +173,9 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val filters = listOf(
-                    TaskFilter.ALL to "Toutes (${tasks.size})",
-                    TaskFilter.PENDING to "En cours (${tasks.count { !it.completed }})",
-                    TaskFilter.COMPLETED to "Terminées (${tasks.count { it.completed }})"
+                    TaskFilter.ALL to "${strings.allTasksFilter} (${tasks.size})",
+                    TaskFilter.PENDING to "${strings.pendingTasksFilter} (${tasks.count { !it.completed }})",
+                    TaskFilter.COMPLETED to "${strings.completedTasksFilter} (${tasks.count { it.completed }})"
                 )
                 filters.forEach { (filter, label) ->
                     val isSelected = selectedFilter == filter
