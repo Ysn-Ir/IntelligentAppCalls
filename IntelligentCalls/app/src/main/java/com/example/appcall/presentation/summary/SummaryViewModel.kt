@@ -63,6 +63,16 @@ class SummaryViewModel @Inject constructor(
 
     fun resolveAndFetchAudio(callId: String, context: android.content.Context) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // 1. Check direct database file mapping first
+            val directMapping = localDatabase.getFileForCall(callId)
+            if (directMapping != null) {
+                val f = java.io.File(directMapping.path)
+                if (f.exists() && f.length() > 512) {
+                    _audioFile.value = f
+                    return@launch
+                }
+            }
+
             val targetDirs = listOf(
                 java.io.File(context.filesDir, "recordings"),
                 java.io.File(context.filesDir, "recordings_native"),
@@ -83,8 +93,8 @@ class SummaryViewModel @Inject constructor(
             val cleanId = callId.removePrefix("native-")
             val matchedLocal = allFiles.firstOrNull {
                 it.name.contains(callId, ignoreCase = true) ||
-                it.name.contains(prefix, ignoreCase = true) ||
-                (cleanId.isNotBlank() && it.name.contains(cleanId, ignoreCase = true))
+                (prefix.length >= 6 && it.name.contains(prefix, ignoreCase = true)) ||
+                (cleanId.isNotBlank() && cleanId.length >= 6 && it.name.contains(cleanId, ignoreCase = true))
             }
 
             if (matchedLocal != null && matchedLocal.exists() && matchedLocal.length() > 512) {

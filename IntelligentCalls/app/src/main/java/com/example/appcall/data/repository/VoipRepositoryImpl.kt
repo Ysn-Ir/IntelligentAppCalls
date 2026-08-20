@@ -260,7 +260,7 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun getCallHistory(): Result<List<CallHistoryItemDto>> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
-        return try {
+        val serverList = try {
             val response = apiService.getCallHistory(auth)
             if (response.isSuccessful && response.body() != null) {
                 val list = response.body()!!
@@ -276,27 +276,44 @@ class VoipRepositoryImpl @Inject constructor(
                         endedAt = item.endedAt
                     )
                 }
-                Result.success(list)
-            } else {
-                Result.failure(Exception("Failed to fetch call history: ${response.code()}"))
-            }
+                list
+            } else emptyList()
         } catch (e: Exception) {
-            // Read call history from local SQLite DB
-            val localItems = localDatabase.getCallHistory().map { item ->
-                val phone = if (item.contactId.startsWith("+") || item.contactId.any { it.isDigit() }) item.contactId else null
-                CallHistoryItemDto(
-                    id = item.id,
-                    contactId = item.contactId,
-                    direction = item.direction,
-                    status = item.status,
-                    startedAt = item.startedAt,
-                    endedAt = item.endedAt,
-                    contactName = item.contactName,
-                    phoneNumber = phone
-                )
-            }
-            Result.success(localItems)
+            emptyList()
         }
+
+        // Read all local items from SQLite database
+        val localItems = localDatabase.getCallHistory().map { item ->
+            val phone = if (item.contactId.startsWith("+") || item.contactId.any { it.isDigit() }) item.contactId else null
+            val summary = localDatabase.getCallSummary(item.id)
+            CallHistoryItemDto(
+                id = item.id,
+                contactId = item.contactId,
+                direction = item.direction,
+                status = item.status,
+                startedAt = item.startedAt,
+                endedAt = item.endedAt,
+                contactName = item.contactName,
+                phoneNumber = phone,
+                summaryPreview = summary?.summaryText,
+                sentiment = summary?.sentiment ?: "NEUTRAL",
+                intent = summary?.intent ?: "GENERAL_INQUIRY",
+                tags = summary?.tags ?: emptyList()
+            )
+        }
+
+        // Merge server and local items (server items take precedence for metadata, local-only items are preserved)
+        val serverIds = serverList.map { it.id }.toSet()
+        val combined = serverList.toMutableList()
+        localItems.forEach { local ->
+            if (!serverIds.contains(local.id)) {
+                combined.add(local)
+            }
+        }
+
+        // Sort by startedAt descending so newest calls are ALWAYS at the top!
+        val sorted = combined.sortedByDescending { it.startedAt ?: "" }
+        return Result.success(sorted)
     }
 
     override suspend fun validateAppointment(callId: String): Result<Unit> {

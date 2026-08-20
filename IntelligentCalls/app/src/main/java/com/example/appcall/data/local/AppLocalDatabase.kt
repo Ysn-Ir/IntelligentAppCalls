@@ -684,6 +684,22 @@ class AppLocalDatabase @Inject constructor(
         return list
     }
 
+    fun getFileForCall(callId: String): LocalFileItem? {
+        val db = readableDatabase
+        val cursor = db.query(TABLE_FILES, null, "$KEY_FILE_ID = ?", arrayOf(callId), null, null, null)
+        cursor.use {
+            if (it.moveToFirst()) {
+                return LocalFileItem(
+                    id = it.getString(it.getColumnIndexOrThrow(KEY_FILE_ID)),
+                    name = it.getString(it.getColumnIndexOrThrow(KEY_FILE_NAME)),
+                    path = it.getString(it.getColumnIndexOrThrow(KEY_FILE_PATH_STORED)),
+                    size = it.getString(it.getColumnIndexOrThrow(KEY_FILE_SIZE))
+                )
+            }
+        }
+        return null
+    }
+
     // --- Sync Queue Operations ---
 
     fun addToSyncQueue(callId: String, actionType: String, filePath: String? = null, payload: String? = null) {

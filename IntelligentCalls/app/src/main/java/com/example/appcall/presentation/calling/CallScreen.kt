@@ -44,7 +44,7 @@ fun CallScreen(
     var contactSearchQuery by remember { mutableStateOf("") }
     var showContactDialer by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedTab, callState) {
         viewModel.loadCallHistory()
     }
 
