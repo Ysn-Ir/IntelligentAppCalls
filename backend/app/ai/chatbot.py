@@ -214,8 +214,8 @@ def chat(
         else:
             active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
             if active_key.startswith("gsk_"):
-                primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
-                candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768", "gemma2-9b-it"]
+                primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b")
+                candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "allam-2-7b"]
             else:
                 primary_model = OPENAI_MODEL
                 candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
