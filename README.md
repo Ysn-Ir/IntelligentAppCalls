@@ -20,11 +20,26 @@ For detailed, in-depth architectural and operational guides, refer to the specia
 | :--- | :--- | :---: |
 | 🏛️ **Architecture Guide** | Full Clean Architecture diagrams, Mermaid sequence flows, offline sync protocols, SQLite v9 schema, and the complete 35 REST & WebSocket API specification. | [**Read ARCHITECTURE.md**](ARCHITECTURE.md) |
 | 🌐 **Hosting & Deployment** | Production setup on **Render.com**, PostgreSQL schema configuration, Docker Compose, Nginx SSL, zero-recompilation server routing, and cloud VoIP integration. | [**Read HOSTING_AND_DEPLOYMENT_GUIDE.md**](HOSTING_AND_DEPLOYMENT_GUIDE.md) |
-| 📜 **Engineering & Incident Log** | Detailed chronological record of all 15 production incidents, root-cause analyses, token limit mitigations, and solutions. | [**Read PROJECT_HISTORY_LOG.md**](PROJECT_HISTORY_LOG.md) |
+| 📜 **Engineering & Incident Log** | Detailed chronological record of all 16 production incidents, root-cause analyses, token limit mitigations, and solutions. | [**Read PROJECT_HISTORY_LOG.md**](PROJECT_HISTORY_LOG.md) |
 | 📱 **Android Client Docs** | Samsung Knox elevation, Shizuku ADB permissions, background call interception service, and Gradle build instructions. | [**Read IntelligentCalls/README.md**](IntelligentCalls/README.md) |
 | ⚙️ **Backend Server Docs** | FastAPI server configuration, environment variables, Groq/Ollama LLM dual-inference, and VoIP webhook bridges. | [**Read backend/README.md**](backend/README.md) |
 | 🖥️ **Web Dashboard Docs** | Next.js 16 / React 19 CRM analytics dashboard, live WebSocket audio transcription viewer, and GDPR export portal. | [**Read dashboard/README.md**](dashboard/README.md) |
-| 📦 **Production APK Download** | Compiled binary of the latest release (`VerbAI-Call-v2.0.0.apk`) ready for direct phone installation. | [**Download APK (v2.0.0)**](releases/VerbAI-Call-v2.0.0.apk) |
+| 📦 **Production APK (v2.0.0)** | Direct download of the compiled standalone Android release binary (`VerbAI-Call-v2.0.0.apk`). | [**Download APK (v2.0.0)**](releases/VerbAI-Call-v2.0.0.apk) · [**Raw Direct Link**](https://github.com/Ysn-Ir/IntelligentAppCalls/raw/main/releases/VerbAI-Call-v2.0.0.apk) |
+
+---
+
+## 🚀 Latest Release: `v2.0.0` Highlights
+
+The latest `v2.0.0` release introduces key UI/UX and architectural enhancements:
+
+* 🎨 **Unified Adaptive Launcher Icon**: Redesigned vector foreground (`ic_launcher_foreground.xml`) centered within Android's `66dp` safe zone, eliminating circular mask clipping across Samsung One UI, Pixel, and Xiaomi launchers, plus multi-density WebP mipmaps (`mdpi` to `xxxhdpi`).
+* 🖼️ **Framed In-App Logo**: The Login screen logo is framed in a rounded glass badge with `ContentScale.Fit`, cyan glow, and 5-tap developer server override gesture.
+* 📅 **Overhauled Agenda Experience**:
+  - **Formatted Date & Time**: Clear dual pills (`📅 Sam. 22 août 2026` • `⏰ 14:30`) replacing raw ISO strings.
+  - **Rich Meeting Cards**: Contact avatar initials, full caller name, phone number, and status tags (`✓ Confirmé` / `⏳ Détecté (IA)`).
+  - **Overflow-Proof Layout**: Responsive weighted action bar (`✓ Valider`, `📅 Calendrier`, `📞 Appeler`, `🗑 Supprimer`) that scales across all screen sizes.
+* 🛡️ **Shizuku & Accessibility Guidance**: Complete setup instructions for 100% 2-way call audio capture on Android 11–15 without root.
+* ☁️ **Cloud Backend on Render**: Default connection configured to `https://intelligent-calls-api.onrender.com` with zero recompilation needed to switch servers.
 
 ---
 

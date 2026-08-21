@@ -243,7 +243,17 @@
 * **Solution Implemented**:
   - Moved `user_message` definition before the LLM execution loop.
   - Increased completion `max_tokens` to `2048` and added `_extract_json_payload` to strip `<think>` tags and parse nested JSON.
-  - Replaced naive substring matching with regex word boundaries `\b` (`re.search(r'(?:\b|^)' + re.escape(pat) + r'(?:\b|$)', text)`), eliminating false-positive sentiment classifications.
+### Incident #16: Android Launcher Adaptive Mask Icon Cropping & Agenda UI Overflow
+* **Date**: 2026-08-21
+* **Severity**: High (Visual / UX)
+* **Root Cause**:
+  - Launcher icon foreground vector contained text placed outside the `66dp` safe circle, causing Android circular/squircle adaptive masks to cut off the bottom of the logo.
+  - Login screen logo lacked rounded container styling and `ContentScale.Fit`.
+  - Agenda screen item cards used fixed, unweighted button layouts and displayed raw unformatted ISO datetime strings (`2026-08-22T14:30:00`), leading to horizontal component overflow and missing caller metadata.
+* **Solution Implemented**:
+  - Redesigned `ic_launcher_foreground.xml` centered inside the `24..84` safe zone and generated multi-density WebP mipmaps (`mdpi` to `xxxhdpi`).
+  - Wrapped Login screen logo in a glassmorphic badge (`RoundedCornerShape(20.dp)`) with `ContentScale.Fit`.
+  - Overhauled `AgendaSection.kt` with formatted date/time pills (`📅 Sam. 22 août 2026` • `⏰ 14:30`), contact avatar initials, phone badges, and responsive weighted action buttons (`✓ Valider`, `📅 Calendrier`, `📞 Appeler`, `🗑 Supprimer`).
 
 ---
 
