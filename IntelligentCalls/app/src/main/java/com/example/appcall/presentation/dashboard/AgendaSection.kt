@@ -2,6 +2,10 @@ package com.example.appcall.presentation.dashboard
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.provider.CalendarContract
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -19,7 +23,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,9 +37,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.local.AppLocalDatabase
+import com.example.appcall.data.local.LocalAgendaItem
 import com.example.appcall.data.notification.AppNotificationManager
 import com.example.appcall.domain.repository.VoipRepository
 import com.example.appcall.presentation.theme.*
@@ -76,7 +85,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
     fun openCalendarPicker() {
         val cal = Calendar.getInstance()
-        android.app.DatePickerDialog(
+        DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
                 val pickedCal = Calendar.getInstance().apply {
@@ -92,7 +101,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
 
     fun openClockPicker() {
         val cal = Calendar.getInstance()
-        android.app.TimePickerDialog(
+        TimePickerDialog(
             context,
             { _, hourOfDay, minute ->
                 selectedTime = String.format(Locale.getDefault(), "%02d:%02d", hourOfDay, minute)
@@ -103,7 +112,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         ).show()
     }
 
-    // Live dynamic clock (e.g. 14:28:05)
+    // Live dynamic clock
     var currentTimeString by remember { mutableStateOf(SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())) }
     var currentDateString by remember { mutableStateOf(SimpleDateFormat("EEEE d MMMM", appLocale).format(Date()).replaceFirstChar { it.uppercase() }) }
 
@@ -152,17 +161,34 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         }
     }
 
+    fun formatAgendaDateTime(isoStr: String): Pair<String, String> {
+        return try {
+            val clean = isoStr.replace("T", " ").trim()
+            val inFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+            val parsedDate = inFormat.parse(clean.take(16))
+            if (parsedDate != null) {
+                val dateFormat = SimpleDateFormat("EEE d MMM yyyy", appLocale)
+                val timeFormat = SimpleDateFormat("HH:mm", appLocale)
+                Pair(dateFormat.format(parsedDate).replaceFirstChar { it.uppercase() }, timeFormat.format(parsedDate))
+            } else {
+                Pair(isoStr.take(10), isoStr.drop(11).take(5))
+            }
+        } catch (e: Exception) {
+            Pair(isoStr.take(10), isoStr.drop(11).take(5))
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
     ) {
-        // Top Fade & Digital Clock Header
+        // Top Header & Digital Clock
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(BgColor)
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -173,7 +199,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     Text(
                         text = currentTimeString,
                         color = Text1,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
                         letterSpacing = (-0.5).sp
@@ -186,26 +212,26 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isAddingAgenda) DangerDim else Surface1)
-                        .border(1.dp, if (isAddingAgenda) DangerColor else BorderColor, RoundedCornerShape(8.dp))
-                        .clickable { isAddingAgenda = !isAddingAgenda }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                Button(
+                    onClick = { isAddingAgenda = !isAddingAgenda },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isAddingAgenda) DangerDim else ElectricViolet
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = if (isAddingAgenda) "✕ ${strings.close}" else "＋ ${strings.addAppointment}",
-                        color = if (isAddingAgenda) DangerColor else Text1,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
+                        color = if (isAddingAgenda) DangerColor else Color.White,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Dynamic Day Strip Picker with Filter
+            // Dynamic Day Strip Picker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -217,17 +243,18 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                 val isAllSelected = selectedDayIso == null
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isAllSelected) Text1 else Surface1)
-                        .border(1.dp, if (isAllSelected) Text1 else BorderColor, RoundedCornerShape(9.dp))
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isAllSelected) NeonTeal else Surface1)
+                        .border(1.dp, if (isAllSelected) NeonTeal else BorderColor, RoundedCornerShape(10.dp))
                         .clickable { selectedDayIso = null }
-                        .padding(horizontal = 10.dp, vertical = 11.dp),
+                        .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = strings.allTasksFilter.uppercase(),
-                        color = if (isAllSelected) BgColor else Text2,
-                        fontSize = 10.5.sp,
+                        color = if (isAllSelected) Color.Black else Text2,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -239,36 +266,36 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     Box(
                         modifier = Modifier
                             .width(46.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (isActive) Text1 else Surface1)
-                            .border(1.dp, if (isActive) Text1 else if (day.isToday) BorderStrong else BorderColor, RoundedCornerShape(9.dp))
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isActive) ElectricViolet else Surface1)
+                            .border(1.dp, if (isActive) ElectricViolet else if (day.isToday) NeonTeal else BorderColor, RoundedCornerShape(10.dp))
                             .clickable {
                                 selectedDayIso = if (selectedDayIso == day.isoDate) null else day.isoDate
                             }
-                            .padding(vertical = 7.dp),
+                            .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = day.dayName,
-                                color = if (isActive) BgColor.copy(alpha = 0.7f) else Text3,
+                                color = if (isActive) Color.White.copy(alpha = 0.8f) else Text3,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "${day.dayNum}",
-                                color = if (isActive) BgColor else if (day.isToday) AccentColor else Text1,
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 1.dp)
+                                color = if (isActive) Color.White else if (day.isToday) NeonTeal else Text1,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             if (count > 0) {
                                 Box(
                                     modifier = Modifier
-                                        .padding(top = 2.dp)
-                                        .size(5.dp)
+                                        .padding(top = 1.dp)
+                                        .size(4.dp)
                                         .clip(CircleShape)
-                                        .background(if (isActive) BgColor else AccentColor)
+                                        .background(if (isActive) Color.White else NeonTeal)
                                 )
                             }
                         }
@@ -278,44 +305,153 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         }
 
         // ── COLLAPSIBLE APPOINTMENT CREATION DRAWER ──
-        if (isAddingAgenda) {
-            Box(
+        AnimatedVisibility(
+            visible = isAddingAgenda,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface1)
-                    .border(1.dp, BorderStrong, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0x1F293754)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong)
             ) {
-                Column {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = strings.planAppointment,
-                        color = Text3,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
+                        text = "📅 ${strings.planAppointment}",
+                        color = NeonTeal,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Row(
+                    OutlinedTextField(
+                        value = newTitle,
+                        onValueChange = { newTitle = it },
+                        placeholder = { Text(strings.appointmentTitlePlaceholder, color = Text3, fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonTeal,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Text1,
+                            unfocusedTextColor = Text1
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Day Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = newTitle,
-                            onValueChange = { newTitle = it },
-                            placeholder = { Text(strings.appointmentTitlePlaceholder, color = Text3, fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BorderStrong,
-                                unfocusedBorderColor = BorderColor,
-                                focusedTextColor = Text1,
-                                unfocusedTextColor = Text1
+                        Text(strings.dayLabel, color = Text3, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        listOf(
+                            0 to strings.today,
+                            1 to strings.tomorrow,
+                            2 to strings.afterTomorrow,
+                            7 to strings.oneWeek
+                        ).forEach { (offset, label) ->
+                            val isSel = customSelectedDateStr == null && selectedDayOffset == offset
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) NeonTeal else Surface2)
+                                    .clickable {
+                                        customSelectedDateStr = null
+                                        selectedDayOffset = offset
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSel) Color.Black else Text2,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (customSelectedDateStr != null) NeonTeal else Surface2)
+                                .clickable { openCalendarPicker() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = customSelectedDateStr?.let { "📅 $it" } ?: strings.calendarPicker,
+                                color = if (customSelectedDateStr != null) Color.Black else Text2,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Time Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.hourLabel, color = Text3, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        listOf("09:00", "11:00", "14:00", "16:30", "18:00").forEach { time ->
+                            val isSel = selectedTime == time
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) ElectricViolet else Surface2)
+                                    .clickable { selectedTime = time }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = time,
+                                    color = if (isSel) Color.White else Text2,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Surface2)
+                                .clickable { openClockPicker() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "⏰ $selectedTime",
+                                color = Text2,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "RDV: $dynamicScheduledAt",
+                            color = NeonTeal,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+
                         Button(
                             onClick = {
                                 if (newTitle.isNotBlank()) {
@@ -345,116 +481,12 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Text1),
-                            shape = RoundedCornerShape(8.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricViolet),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(strings.validate, color = BgColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(strings.validate, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Day Chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(strings.dayLabel, color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        listOf(
-                            0 to strings.today,
-                            1 to strings.tomorrow,
-                            2 to strings.afterTomorrow,
-                            7 to strings.oneWeek
-                        ).forEach { (offset, label) ->
-                            val isSel = customSelectedDateStr == null && selectedDayOffset == offset
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSel) Text1 else Surface2)
-                                    .clickable {
-                                        customSelectedDateStr = null
-                                        selectedDayOffset = offset
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSel) BgColor else Text2,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (customSelectedDateStr != null) Text1 else Surface2)
-                                .clickable { openCalendarPicker() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = customSelectedDateStr?.let { "📅 $it" } ?: strings.calendarPicker,
-                                color = if (customSelectedDateStr != null) BgColor else Text2,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Time Chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(strings.hourLabel, color = Text3, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        listOf("09:00", "11:00", "14:00", "16:30", "18:00").forEach { time ->
-                            val isSel = selectedTime == time
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSel) Text1 else Surface2)
-                                    .clickable { selectedTime = time }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = time,
-                                    color = if (isSel) BgColor else Text2,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Surface2)
-                                .clickable { openClockPicker() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "⏰ $selectedTime (Modifier)",
-                                color = Text2,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "📅 RDV prévu : $dynamicScheduledAt",
-                        color = AccentText,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
                 }
             }
         }
@@ -467,7 +499,7 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val emptyMsg = if (selectedDayIso != null) "Aucun rendez-vous pour ce jour ($selectedDayIso)" else "Aucun rendez-vous dans l'agenda"
+                val emptyMsg = if (selectedDayIso != null) "Aucun rendez-vous pour le $selectedDayIso" else "Aucun rendez-vous planifié dans l'agenda"
                 Text(
                     text = emptyMsg,
                     color = Text3,
@@ -477,183 +509,240 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(filteredAppointments) { appt ->
                     val isConfirmed = appt.status?.contains("CONFIRM", ignoreCase = true) == true || appt.status?.contains("VALID", ignoreCase = true) == true
-                    val statusText = if (isConfirmed) "Confirmé" else "Proposé"
+                    val statusText = if (isConfirmed) "✓ Confirmé" else "⏳ Détecté (IA)"
                     val (tagBg, tagColor) = if (isConfirmed) Pair(SuccessDim, SuccessColor) else Pair(WarnDim, WarnColor)
+                    val (dateFormatted, timeFormatted) = formatAgendaDateTime(appt.scheduledAt)
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Surface1)
-                            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
-                            .padding(14.dp)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0x1F293754)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isConfirmed) BorderColor else WarnDim)
                     ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            // Top Row: Date Pill & Status Badge
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = appt.title.takeIf { it.isNotBlank() } ?: "Rendez-vous de suivi",
-                                    color = Text1,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Surface2)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "📅 $dateFormatted",
+                                            color = Text1,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Surface2)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "⏰ $timeFormatted",
+                                            color = NeonTeal,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
                                             .background(tagBg)
-                                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
                                         Text(
                                             text = statusText,
                                             color = tagColor,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
 
                                     // Delete appointment button
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(Surface2)
-                                            .clickable {
-                                                coroutineScope.launch {
-                                                    localDatabase.deleteAgendaAppointment(appt.id)
-                                                    appointments = localDatabase.getAgendaAppointments()
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
+                                    IconButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                localDatabase.deleteAgendaAppointment(appt.id)
+                                                appointments = localDatabase.getAgendaAppointments()
+                                            }
+                                        },
+                                        modifier = Modifier.size(28.dp)
                                     ) {
-                                        Text("🗑", fontSize = 10.sp)
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete Appointment",
+                                            tint = Text3,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }
 
-                            val callerInfo = "${appt.contactName ?: "Contact"} · ${if (!appt.phoneNumber.isNullOrBlank()) appt.phoneNumber else appt.scheduledAt}"
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Meeting Title
                             Text(
-                                text = callerInfo,
-                                color = Text3,
-                                fontSize = 11.5.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(top = 8.dp)
+                                text = appt.title.takeIf { it.isNotBlank() } ?: "Rendez-vous de suivi",
+                                color = Text1,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Divider(color = BorderColor, thickness = 1.dp)
-                            Spacer(modifier = Modifier.height(11.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
+                            // Contact / Origin Information Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                // Contact Avatar Circle
+                                val initials = (appt.contactName?.take(2) ?: "CO").uppercase()
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(ElectricViolet.copy(alpha = 0.3f))
+                                        .border(1.dp, ElectricViolet, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initials,
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
                                 Text(
-                                    text = "#${appt.callId ?: appt.id.take(12)}",
-                                    color = Text3,
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace
+                                    text = appt.contactName ?: "Contact",
+                                    color = Text1,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                                 )
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    if (!isConfirmed) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(SuccessDim)
-                                                .border(1.dp, SuccessColor, RoundedCornerShape(7.dp))
-                                                .clickable {
-                                                    coroutineScope.launch {
-                                                        localDatabase.saveAgendaAppointment(
-                                                            id = appt.id,
-                                                            title = appt.title,
-                                                            scheduledAt = appt.scheduledAt,
-                                                            status = "CONFIRMED",
-                                                            contactName = appt.contactName,
-                                                            phoneNumber = appt.phoneNumber
-                                                        )
-                                                        appointments = localDatabase.getAgendaAppointments()
-                                                        appt.callId?.let { cId ->
-                                                            voipRepository.validateAppointment(cId)
-                                                        }
-                                                    }
-                                                }
-                                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "Valider",
-                                                color = SuccessColor,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
+                                if (!appt.phoneNumber.isNullOrBlank()) {
+                                    Text(
+                                        text = appt.phoneNumber,
+                                        color = Text3,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
 
-                                    // Sync with Calendar Button
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(7.dp))
-                                            .background(Surface2)
-                                            .border(1.dp, BorderStrong, RoundedCornerShape(7.dp))
-                                            .clickable {
-                                                try {
-                                                    val calIntent = android.content.Intent(android.content.Intent.ACTION_INSERT).apply {
-                                                        data = android.provider.CalendarContract.Events.CONTENT_URI
-                                                        putExtra(android.provider.CalendarContract.Events.TITLE, appt.title.takeIf { it.isNotBlank() } ?: "Rendez-vous")
-                                                        putExtra(android.provider.CalendarContract.Events.DESCRIPTION, "Call with ${appt.contactName ?: "Contact"} · ${appt.phoneNumber ?: ""}")
-                                                        try {
-                                                            val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US)
-                                                            val parsed = format.parse(appt.scheduledAt.take(16))
-                                                            if (parsed != null) {
-                                                                putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, parsed.time)
-                                                                putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, parsed.time + 3600000)
-                                                            }
-                                                        } catch (_: Exception) {}
-                                                    }
-                                                    context.startActivity(calIntent)
-                                                } catch (e: Exception) {
-                                                    android.widget.Toast.makeText(context, "Calendar: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Divider(color = BorderColor.copy(alpha = 0.5f), thickness = 1.dp)
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Bottom Responsive Action Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // If unconfirmed, offer direct Validation
+                                if (!isConfirmed) {
+                                    Button(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                localDatabase.saveAgendaAppointment(
+                                                    id = appt.id,
+                                                    title = appt.title,
+                                                    scheduledAt = appt.scheduledAt,
+                                                    status = "CONFIRMED",
+                                                    contactName = appt.contactName,
+                                                    phoneNumber = appt.phoneNumber
+                                                )
+                                                appointments = localDatabase.getAgendaAppointments()
+                                                appt.callId?.let { cId ->
+                                                    voipRepository.validateAppointment(cId)
                                                 }
+                                                Toast.makeText(context, "✅ Rendez-vous validé !", Toast.LENGTH_SHORT).show()
                                             }
-                                            .padding(horizontal = 9.dp, vertical = 6.dp)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = SuccessDim),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.weight(1f)
                                     ) {
-                                        Text(
-                                            text = "📅",
-                                            fontSize = 11.5.sp
-                                        )
+                                        Text("✓ Valider", color = SuccessColor, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                     }
+                                }
 
-                                    if (!appt.phoneNumber.isNullOrBlank()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(Surface2)
-                                                .border(1.dp, BorderStrong, RoundedCornerShape(7.dp))
-                                                .clickable {
-                                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
-                                                        data = android.net.Uri.parse("tel:${appt.phoneNumber}")
+                                // Sync with Native Android Calendar
+                                OutlinedButton(
+                                    onClick = {
+                                        try {
+                                            val calIntent = Intent(Intent.ACTION_INSERT).apply {
+                                                data = CalendarContract.Events.CONTENT_URI
+                                                putExtra(CalendarContract.Events.TITLE, appt.title.takeIf { it.isNotBlank() } ?: "Rendez-vous")
+                                                putExtra(CalendarContract.Events.DESCRIPTION, "Appel avec ${appt.contactName ?: "Contact"} · ${appt.phoneNumber ?: ""}")
+                                                try {
+                                                    val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
+                                                    val parsed = format.parse(appt.scheduledAt.take(16))
+                                                    if (parsed != null) {
+                                                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, parsed.time)
+                                                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, parsed.time + 3600000)
                                                     }
-                                                    context.startActivity(intent)
-                                                }
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "Rappeler",
-                                                color = Text1,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
+                                                } catch (_: Exception) {}
+                                            }
+                                            context.startActivity(calIntent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Calendrier: ${e.message}", Toast.LENGTH_SHORT).show()
                                         }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderStrong),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.weight(1.2f)
+                                ) {
+                                    Text("📅 Calendrier", color = Text1, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                                }
+
+                                // Call back contact if number exists
+                                if (!appt.phoneNumber.isNullOrBlank()) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_DIAL).apply {
+                                                data = Uri.parse("tel:${appt.phoneNumber}")
+                                            }
+                                            context.startActivity(intent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ElectricViolet),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("📞 Appeler", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -668,5 +757,3 @@ fun AgendaSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepositor
         }
     }
 }
-
-

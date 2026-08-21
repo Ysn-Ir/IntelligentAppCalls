@@ -61,7 +61,7 @@ fun CallHistoryScreen(
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
             containerColor = Surface1,
-            title = {
+            title = {   
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = DangerColor, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
