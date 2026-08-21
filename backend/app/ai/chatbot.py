@@ -206,10 +206,18 @@ def chat(
     reply = None
     if client:
         active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-        primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
-        candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b"]
+        if active_key.startswith("gsk_"):
+            primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
+            candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        else:
+            primary_model = OPENAI_MODEL
+            candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
 
-        for model in candidates:
+        # Deduplicate candidates while preserving order
+        seen = set()
+        unique_candidates = [c for c in candidates if c and not (c in seen or seen.add(c))]
+
+        for model in unique_candidates:
             try:
                 response = client.chat.completions.create(
                     model=model,
@@ -221,7 +229,7 @@ def chat(
                 logger.info(f"Chatbot response generated successfully with model: {model}")
                 break
             except Exception as e:
-                logger.warning(f"Groq model {model} attempt failed: {e}")
+                logger.warning(f"AI model {model} attempt failed: {e}")
                 continue
 
     if not reply:

@@ -139,10 +139,17 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
 Analyze this call transcript carefully. Detect the true sentiment, intent, key actions, appointments, and hashtags. Return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
 
     active_key = api_key
-    primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b") if active_key.startswith("gsk_") else OPENAI_MODEL
-    candidates = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b"]
+    if active_key.startswith("gsk_"):
+        primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
+        candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+    else:
+        primary_model = OPENAI_MODEL
+        candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
 
-    for model in candidates:
+    seen = set()
+    unique_candidates = [c for c in candidates if c and not (c in seen or seen.add(c))]
+
+    for model in unique_candidates:
         try:
             response = client.chat.completions.create(
                 model=model,
