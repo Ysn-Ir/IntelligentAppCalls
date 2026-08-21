@@ -117,6 +117,8 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
         from openai import OpenAI
     except ImportError:
         logger.error("openai package not installed. Run: pip install openai")
+        return _fallback_summary(raw_text)
+
     # Format transcript for the model
     transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
 

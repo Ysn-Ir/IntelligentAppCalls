@@ -240,10 +240,11 @@ To ensure crystal-clear 2-way call audio on Samsung Galaxy devices running Andro
 - **Coffre-fort Audio**: Local voice recordings list with in-app play/pause (`▶ / ❚❚`) and direct file sharing (`⬇`).
 - **RGPD Privacy**: Live JSON data export (`Article 15`) and local storage voice data purge with confirmation (`Droit à l'oubli`).
 
-### 6. 🤖 AI Assistant RAG Chat
-- Query all call transcripts and CRM data using Groq LLaMA / GPT-4o.
-- Filter chat context by specific contact or search across all calls.
-- Sources citation badge indicating which call the answer was derived from.
+### 6. 🤖 AI Assistant RAG Chat & Hybrid Cloud/Local Inference
+- **Dual Inference Support**: Switch seamlessly between **Groq Cloud AI** (`openai/gpt-oss-20b`, `120b`, `qwen/qwen3.6-27b`, `allam-2-7b`) and **Local Ollama** (`llama3.3`, `llama3.1:8b`, `mistral`, `qwen2.5:7b`, `deepseek-r1:8b`, `phi4`) with zero cloud rate limits.
+- **Model Discovery Endpoint**: Query active models dynamically via `GET /api/v1/ai/models`.
+- **RAG Context Integration**: Real-time factual queries across user tasks, agenda items, contacts book, call recordings, and pgvector embeddings with strict `user_id` tenant isolation.
+- **Sources Citation**: Citation badges indicating verbatim transcript excerpts and call timestamps.
 
 ### 7. ⚙️ Settings (Paramètres, Profil & Multi-Fournisseur VoIP)
 - **Mon Profil & Identifiants**: View active account avatar/initials, edit user information (Prénom, Nom, Email, Téléphone), and change account password securely with old password validation.

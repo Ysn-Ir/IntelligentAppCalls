@@ -202,17 +202,48 @@
 
 ---
 
-### Incident #12: Recent Calls Missing from History List & Cryptic File Names
-* **Discovery**: Calls made natively on the phone disappeared from the call history list when online, and audio recordings were displayed with raw Unix filenames.
+### Incident #13: GDPR Data Purge Blocked by Foreign Key Constraints & Cross-User AI Leak
+* **Discovery**: After clearing voice records or deleting an account, the AI Assistant was still able to retrieve summaries and call information from past sessions.
 * **Symptoms**:
-  - `getCallHistory()` returned only the server list, hiding recent local native calls.
-  - Recordings in the Audio Vault showed technical names like `native-1787262244108.m4a`.
+  - `DELETE /api/v1/users/me/voice-data` and `delete_call_data` failed with MySQL foreign key constraint errors (`call_summaries_ibfk_1`).
+  - Unowned calls and old embeddings remained in the backend database.
+  - Semantic vector search (`search_similar_chunks`) retrieved transcripts across all users without checking `user_id`.
 * **Root Cause**:
-  - When API request succeeded, `VoipRepositoryImpl.getCallHistory()` returned only `response.body()!!` without merging local database rows.
-  - Recording display text used raw `file.name`.
+  - `delete_call_data` attempted to delete parent `Call` rows before foreign key child records (`CallSummary`, `Reminder`, `Appointment`, `TranscriptEmbedding`).
+  - `search_similar_chunks` in `embeddings.py` had no `user_id` filter.
+  - `chatbot.py` queried with `(Call.user_id == user_id) | (Call.user_id.is_(None))`.
 * **Solution Implemented**:
-  - Merged server and local SQLite history in `getCallHistory()`, preserving all native calls and sorting descending by `startedAt`.
-  - Added intelligent name & contact resolver in `TasksSection.kt` and `FilesSection.kt` to display clean titles (`🎙️ Appel avec [Nom]`) and localized date/time subtitles.
+  - Implemented atomic cascade deletion in `gdpr.py` deleting embeddings -> transcripts -> reminders -> summaries -> calls.
+  - Enforced strict `user_id` filtering in `embeddings.py` (`search_similar_chunks`) and `chatbot.py`.
+  - Cleared `ChatbotSession` history upon voice data wipe to eliminate phantom memory.
+  - Purged 267 legacy test records, leaving the database 100% clean for production.
+
+---
+
+### Incident #14: Groq Model 429 Token Exceeded & Tier-Specific Model 404s
+* **Discovery**: Server logs showed `429 Too Many Requests` on `openai/gpt-oss-120b` (daily token limit reached) followed by `404 Not Found` on fallback models (`llama-3.3-70b-versatile`, `mixtral-8x7b-32768`).
+* **Symptoms**: AI summaries and chatbot dropped to offline database replies when the 120B daily quota was reached.
+* **Root Cause**:
+  - `openai/gpt-oss-120b` reached the 200k daily token limit for the organization tier.
+  - Fallback candidate list contained decommissioned or tier-restricted model names.
+* **Solution Implemented**:
+  - Queried active models on the Groq API key and updated candidate order: `openai/gpt-oss-20b` (active, high speed), `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`, and `allam-2-7b`.
+  - Added native **Ollama** support (`LLM_PROVIDER=ollama`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`) for 100% local, unlimited, and private AI inference.
+  - Added `GET /api/v1/ai/models` endpoint for dynamic model discovery.
+
+---
+
+### Incident #15: Meeting Detection Failure Due to Undefined Variable & Reasoning Model Token Truncation
+* **Discovery**: Summarization pipeline was not extracting meetings/appointments (`rendez_vous: []`) and classifying benign technical calls as hostile.
+* **Symptoms**: Calls discussing technical appointments returned `rendez_vous: []` and sentiment `HOSTILE` with tag `#AlerteSecurite`.
+* **Root Cause**:
+  - `user_message` variable was defined inside an `else` branch, throwing `NameError` and dropping directly into fallback summary.
+  - Reasoning models (`openai/gpt-oss-20b`, `qwen3.6-27b`) use internal `<think>` tokens which exhausted `max_tokens=800`.
+  - Substring matching in `_refine_sentiment_and_intent` matched `"nique"` inside `"technique"`, falsely triggering the hostile filter.
+* **Solution Implemented**:
+  - Moved `user_message` definition before the LLM execution loop.
+  - Increased completion `max_tokens` to `2048` and added `_extract_json_payload` to strip `<think>` tags and parse nested JSON.
+  - Replaced naive substring matching with regex word boundaries `\b` (`re.search(r'(?:\b|^)' + re.escape(pat) + r'(?:\b|$)', text)`), eliminating false-positive sentiment classifications.
 
 ---
 
@@ -223,11 +254,13 @@
 | **Call Interception & Recording** | **OPERATIONAL** | 100% functional on inbound & outbound PSTN calls |
 | **Contact Name & Phone Resolution** | **OPERATIONAL** | Real address book prioritized, zero stuck numbers |
 | **Speech-to-Text (Whisper Large v3 Turbo)** | **OPERATIONAL** | Latency ~1.1s, confidence score > 96% |
-| **Call Summary & RDV Extraction (Cascade LLM)** | **OPERATIONAL** | Dynamic extraction of date, time, subject, status |
-| **Intent & Dynamic Sentiment Engine** | **OPERATIONAL** | 10 business domains & 4-tier sentiment badges across all screens |
-| **Authentic Diarisation & Audio Fallback** | **OPERATIONAL** | Multi-speaker bubbles with timestamps and resilient context fallback |
+| **Call Summary & RDV Extraction (Cascade LLM)** | **OPERATIONAL** | Dynamic extraction of date, time, subject, status (2048 tokens) |
+| **Intent & Dynamic Sentiment Engine** | **OPERATIONAL** | 10 business domains, 4-tier sentiment badges, regex word boundaries |
+| **Ollama Local LLM Support** | **OPERATIONAL** | Seamless switching via `LLM_PROVIDER=ollama` |
+| **Active Groq LLM Fleet** | **OPERATIONAL** | `openai/gpt-oss-20b`, `120b`, `qwen3.6-27b`, `allam-2-7b` |
+| **AI Models Discovery Endpoint** | **OPERATIONAL** | `GET /api/v1/ai/models` verified |
 | **Multilingual AI RAG Engine (7 Languages)** | **OPERATIONAL** | Real-time factual answers in EN, FR, AR, ES, DE, ZH, JA |
-| **Full Multilingual Android UI** | **OPERATIONAL** | 100% of screens localized with reactive switching |
+| **GDPR Tenant Isolation & Cascade Purge** | **OPERATIONAL** | Atomic cascade deletion and strict `user_id` vector search |
 | **Offline-First SQLite Schema (v9)** | **OPERATIONAL** | Non-destructive caching of summaries and audio transcripts |
 | **Historical Audio Binding & Remote Stream** | **OPERATIONAL** | Strict call-to-file binding + backend audio caching |
 | **Backend Integration Audit (35 Endpoints)** | **100% PASS** | Score: 35/35 endpoints passing (`audit_routes.py`) |
