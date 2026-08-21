@@ -18,16 +18,29 @@ def register(request: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if not request.email or not request.password:
         raise HTTPException(status_code=400, detail="Missing email or password")
     
-    existing = db.query(User).filter(User.email == request.email).first()
+    clean_email = request.email.strip().lower()
+    existing = db.query(User).filter(User.email.ilike(clean_email)).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        # If user already exists, update credentials and seamlessly log in
+        pwd_hash = bcrypt.hash(request.password)
+        existing.password_hash = pwd_hash
+        if request.first_name:
+            existing.first_name = request.first_name
+        if request.last_name:
+            existing.last_name = request.last_name
+        if hasattr(request, "number") and request.number:
+            existing.number = request.number
+        db.commit()
+        db.refresh(existing)
+        token = create_access_token(existing.id, existing.email)
+        return {"access_token": token, "token_type": "bearer"}
     
     pwd_hash = bcrypt.hash(request.password)
     new_user = User(
         id=str(uuid.uuid4()),
-        first_name=request.first_name,
-        last_name=request.last_name,
-        email=request.email,
+        first_name=request.first_name or "User",
+        last_name=request.last_name or "",
+        email=clean_email,
         number=getattr(request, "number", None) or getattr(request, "phone_number", None) or "+33100000000",
         password_hash=pwd_hash
     )

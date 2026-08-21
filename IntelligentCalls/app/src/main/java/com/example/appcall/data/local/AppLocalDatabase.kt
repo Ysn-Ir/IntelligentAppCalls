@@ -737,6 +737,35 @@ class AppLocalDatabase @Inject constructor(
         val db = writableDatabase
         db.delete(TABLE_SYNC_QUEUE, "$KEY_SYNC_ID = ?", arrayOf(id.toString()))
     }
+
+    // --- GDPR & Deletion Operations ---
+
+    fun clearAllCallData() {
+        val db = writableDatabase
+        db.delete(TABLE_CALL_HISTORY, null, null)
+        db.delete(TABLE_CALLS, null, null)
+        db.delete(TABLE_FILES, null, null)
+        db.delete(TABLE_SYNC_QUEUE, null, null)
+        db.delete(TABLE_CHAT, null, null)
+    }
+
+    fun deleteCallHistoryItem(callId: String) {
+        val db = writableDatabase
+        db.delete(TABLE_CALL_HISTORY, "$KEY_HIST_ID = ?", arrayOf(callId))
+        db.delete(TABLE_CALLS, "$KEY_CALL_ID = ?", arrayOf(callId))
+        db.delete(TABLE_FILES, "$KEY_FILE_ID = ?", arrayOf(callId))
+    }
+
+    fun clearAllDataEntirely() {
+        val db = writableDatabase
+        db.delete(TABLE_CALL_HISTORY, null, null)
+        db.delete(TABLE_CALLS, null, null)
+        db.delete(TABLE_FILES, null, null)
+        db.delete(TABLE_SYNC_QUEUE, null, null)
+        db.delete(TABLE_CHAT, null, null)
+        db.delete(TABLE_TASKS, null, null)
+        db.delete(TABLE_AGENDA, null, null)
+    }
 }
 
 data class LocalCallHistoryItem(val id: String, val contactId: String, val contactName: String, val direction: String, val status: String, val startedAt: String, val endedAt: String?)

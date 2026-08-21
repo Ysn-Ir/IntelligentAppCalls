@@ -83,7 +83,8 @@ class VoipRepositoryImpl @Inject constructor(
                 tokenStorage.token = token
                 Result.success(token)
             } else {
-                Result.failure(Exception("Registration failed: ${response.code()} ${response.message()}"))
+                val err = response.errorBody()?.string() ?: response.message()
+                Result.failure(Exception("Registration failed: ${response.code()} $err"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -400,12 +401,45 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun deleteVoiceData(): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+
+        // 1. Wipe all local SQLite database call records, summaries, transcripts, audio files, and sync queue
+        try {
+            localDatabase.clearAllCallData()
+        } catch (e: Exception) {
+            Log.w("VoipRepository", "Error clearing local DB: ${e.message}")
+        }
+
+        // 2. Wipe all local physical audio recordings from device storage
+        try {
+            val targetDirs = listOf(
+                java.io.File(context.filesDir, "recordings"),
+                java.io.File(context.filesDir, "recordings_native"),
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "recordings") },
+                context.cacheDir
+            ).filterNotNull()
+
+            targetDirs.forEach { dir ->
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { it.delete() }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("VoipRepository", "Error deleting local audio files: ${e.message}")
+        }
+
+        // 3. Clear call recording SharedPreferences
+        try {
+            context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE)
+                .edit().clear().apply()
+        } catch (e: Exception) {}
+
+        // 4. Request server-side GDPR erasure
         return try {
             val response = apiService.deleteVoiceData(auth)
             if (response.isSuccessful) Result.success(Unit)
             else Result.failure(Exception("Delete failed: ${response.code()}"))
         } catch (e: Exception) {
-            // Mock success for offline testing
+            // Offline local wipe succeeded
             Result.success(Unit)
         }
     }

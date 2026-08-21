@@ -78,4 +78,11 @@ class CallViewModel @Inject constructor(
             }
         }
     }
+
+    fun clearCallHistory() {
+        viewModelScope.launch {
+            voipRepository.deleteVoiceData()
+            _callHistory.value = emptyList()
+        }
+    }
 }

@@ -25,7 +25,8 @@ import com.example.appcall.presentation.theme.*
 fun CallHistoryScreen(
     callHistory: List<CallHistoryItemDto>,
     onCallClick: (String) -> Unit,
-    onFabClick: (() -> Unit)? = null
+    onFabClick: (() -> Unit)? = null,
+    onClearAllCalls: (() -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
@@ -34,6 +35,7 @@ fun CallHistoryScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterIndex by remember { mutableIntStateOf(0) } // 0 = Tous, 1 = Manqués, 2 = Avec résumé
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     val filteredList = remember(callHistory, searchQuery, selectedFilterIndex) {
         callHistory.filter { item ->
@@ -50,6 +52,27 @@ fun CallHistoryScreen(
 
             matchesSearch && matchesFilter
         }
+    }
+
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            containerColor = Surface1,
+            title = { Text("Effacer l'historique d'appels", color = Text1, fontWeight = FontWeight.Bold) },
+            text = { Text("Êtes-vous sûr de vouloir supprimer tous les appels et leurs enregistrements ? Cette action est irréversible (RGPD Art. 17).", color = Text2, fontSize = 12.sp) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onClearAllCalls?.invoke()
+                        showClearHistoryDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
+                ) { Text(strings.delete, color = Text1) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) { Text(strings.close, color = Text3) }
+            }
+        )
     }
 
     Box(
@@ -79,20 +102,43 @@ fun CallHistoryScreen(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(SuccessColor)
-                        )
-                        Text(
-                            text = strings.callHistorySynchronized,
-                            color = Text3,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        if (callHistory.isNotEmpty() && onClearAllCalls != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(DangerColor.copy(alpha = 0.15f))
+                                    .clickable { showClearHistoryDialog = true }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Effacer tout",
+                                    color = DangerColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(SuccessColor)
+                            )
+                            Text(
+                                text = strings.callHistorySynchronized,
+                                color = Text3,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
 
