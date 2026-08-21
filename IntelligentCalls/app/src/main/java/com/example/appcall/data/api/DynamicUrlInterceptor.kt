@@ -19,7 +19,7 @@ class DynamicUrlInterceptor @Inject constructor(
         context.getSharedPreferences("network_settings", Context.MODE_PRIVATE)
 
     var customBaseUrl: String?
-        get() = prefs.getString("custom_base_url", null)
+        get() = prefs.getString("custom_base_url", "https://intelligent-calls-api.onrender.com")
         set(value) {
             prefs.edit().putString("custom_base_url", value).apply()
         }

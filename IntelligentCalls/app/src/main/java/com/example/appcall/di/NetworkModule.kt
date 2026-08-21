@@ -29,7 +29,7 @@ object NetworkConfig {
         get() = "127.0.0.1"
 
     val defaultBaseUrl: String
-        get() = "http://$hostIp:8000/api/v1/"
+        get() = "https://intelligent-calls-api.onrender.com/api/v1/"
 }
 
 @Module
