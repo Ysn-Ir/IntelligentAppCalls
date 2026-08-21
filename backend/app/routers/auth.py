@@ -1,11 +1,11 @@
 import os
 import uuid
 import logging
+import bcrypt
 from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.orm import Session
-from passlib.hash import bcrypt
 from ..database import User, get_db
 from .. import schemas
 from .deps import verify_token, create_access_token
@@ -13,54 +13,80 @@ from .deps import verify_token, create_access_token
 router = APIRouter(tags=["Auth & Users"])
 logger = logging.getLogger("intelligent_calls.auth")
 
+def hash_password(password: str) -> str:
+    """Hashes a password securely using direct native bcrypt."""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plaintext password against a stored bcrypt hash."""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        try:
+            from passlib.hash import bcrypt as pb_bcrypt
+            return pb_bcrypt.verify(plain_password, hashed_password)
+        except Exception:
+            return False
+
 @router.post("/api/v1/auth/register", response_model=schemas.LoginResponse)
 def register(request: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if not request.email or not request.password:
         raise HTTPException(status_code=400, detail="Missing email or password")
     
     clean_email = request.email.strip().lower()
-    existing = db.query(User).filter(User.email.ilike(clean_email)).first()
-    if existing:
-        # If user already exists, update credentials and seamlessly log in
-        pwd_hash = bcrypt.hash(request.password)
-        existing.password_hash = pwd_hash
-        if request.first_name:
-            existing.first_name = request.first_name
-        if request.last_name:
-            existing.last_name = request.last_name
-        if hasattr(request, "number") and request.number:
-            existing.number = request.number
+    try:
+        existing = db.query(User).filter(User.email.ilike(clean_email)).first()
+        if existing:
+            # If user already exists, update credentials and seamlessly log in
+            existing.password_hash = hash_password(request.password)
+            if request.first_name:
+                existing.first_name = request.first_name
+            if request.last_name:
+                existing.last_name = request.last_name
+            if hasattr(request, "number") and request.number:
+                existing.number = request.number
+            db.commit()
+            db.refresh(existing)
+            token = create_access_token(existing.id, existing.email)
+            return {"access_token": token, "token_type": "bearer"}
+        
+        pwd_hash = hash_password(request.password)
+        new_user = User(
+            id=str(uuid.uuid4()),
+            first_name=request.first_name or "User",
+            last_name=request.last_name or "",
+            email=clean_email,
+            number=getattr(request, "number", None) or getattr(request, "phone_number", None) or "+33100000000",
+            password_hash=pwd_hash
+        )
+        db.add(new_user)
         db.commit()
-        db.refresh(existing)
-        token = create_access_token(existing.id, existing.email)
+        db.refresh(new_user)
+        
+        token = create_access_token(new_user.id, new_user.email)
         return {"access_token": token, "token_type": "bearer"}
-    
-    pwd_hash = bcrypt.hash(request.password)
-    new_user = User(
-        id=str(uuid.uuid4()),
-        first_name=request.first_name or "User",
-        last_name=request.last_name or "",
-        email=clean_email,
-        number=getattr(request, "number", None) or getattr(request, "phone_number", None) or "+33100000000",
-        password_hash=pwd_hash
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    token = create_access_token(new_user.id, new_user.email)
-    return {"access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error during registration for {clean_email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @router.post("/api/v1/auth/login", response_model=schemas.LoginResponse)
 def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
     if not request.email or not request.password:
         raise HTTPException(status_code=400, detail="Missing email or password")
     
-    user = db.query(User).filter(User.email == request.email).first()
+    clean_email = request.email.strip().lower()
+    user = db.query(User).filter(User.email.ilike(clean_email)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found. Please sign up first.")
     
-    if not user.password_hash or not bcrypt.verify(request.password, user.password_hash):
+    if not user.password_hash or not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token(user.id, user.email)
@@ -153,8 +179,8 @@ def change_password(req: schemas.PasswordChangeRequest, user_id: str = Depends(v
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
     if user.password_hash:
-        if not bcrypt.verify(req.old_password, user.password_hash):
+        if not verify_password(req.old_password, user.password_hash):
             raise HTTPException(status_code=400, detail="Ancien mot de passe incorrect")
-    user.password_hash = bcrypt.hash(req.new_password)
+    user.password_hash = hash_password(req.new_password)
     db.commit()
     return {"message": "Mot de passe mis à jour avec succès"}

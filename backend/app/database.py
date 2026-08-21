@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey, Text, Float, Integer, JSON
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, ForeignKey, Text, Float, Integer, JSON, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 # pgvector support (optional — falls back gracefully if not installed)
