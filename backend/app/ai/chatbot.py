@@ -58,6 +58,10 @@ Strict Operating Rules:
 def _get_openai():
     try:
         from openai import OpenAI
+        llm_provider = os.getenv("LLM_PROVIDER", "").lower()
+        if llm_provider == "ollama" or (not os.getenv("GROQ_API_KEY") and not os.getenv("OPENAI_API_KEY") and os.getenv("OLLAMA_MODEL")):
+            return OpenAI(api_key="ollama", base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+
         api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
         if not api_key:
             return None
@@ -203,13 +207,18 @@ def chat(
     client = _get_openai()
     reply = None
     if client:
-        active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-        if active_key.startswith("gsk_"):
-            primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
-            candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        llm_provider = os.getenv("LLM_PROVIDER", "").lower()
+        if llm_provider == "ollama" or (not os.getenv("GROQ_API_KEY") and not os.getenv("OPENAI_API_KEY") and os.getenv("OLLAMA_MODEL")):
+            primary_model = os.getenv("OLLAMA_MODEL", "llama3.3")
+            candidates = [primary_model, "llama3.3", "llama3.1", "mistral", "qwen2.5:7b", "deepseek-r1:8b"]
         else:
-            primary_model = OPENAI_MODEL
-            candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
+            active_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+            if active_key.startswith("gsk_"):
+                primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
+                candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768", "gemma2-9b-it"]
+            else:
+                primary_model = OPENAI_MODEL
+                candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
 
         # Deduplicate candidates while preserving order
         seen = set()

@@ -119,32 +119,32 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
         logger.error("openai package not installed. Run: pip install openai")
         return _fallback_summary(raw_text)
 
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        logger.warning("No API key set — using offline fallback summary.")
-        return _fallback_summary(raw_text)
+    llm_provider = os.getenv("LLM_PROVIDER", "").lower()
+    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3.3")
 
-    base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=OPENAI_TIMEOUT)
-
-    # Format transcript for the model
-    transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
-
-    user_message = f"""Here is the transcription of a phone call:
-
----
-{transcript_text}
----
-
-Analyze this call transcript carefully. Detect the true sentiment, intent, key actions, appointments, and hashtags. Return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
-
-    active_key = api_key
-    if active_key.startswith("gsk_"):
-        primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
-        candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+    if llm_provider == "ollama" or (not os.getenv("GROQ_API_KEY") and not os.getenv("OPENAI_API_KEY") and os.getenv("OLLAMA_MODEL")):
+        client = OpenAI(api_key="ollama", base_url=ollama_base_url, timeout=OPENAI_TIMEOUT)
+        candidates = [ollama_model, "llama3.3", "llama3.1", "mistral", "qwen2.5:7b", "deepseek-r1:8b"]
     else:
-        primary_model = OPENAI_MODEL
-        candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+        if not api_key:
+            logger.warning("No API key set — using offline fallback summary.")
+            return _fallback_summary(raw_text)
+
+        base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=OPENAI_TIMEOUT)
+
+        # Format transcript for the model
+        transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
+
+        active_key = api_key
+        if active_key.startswith("gsk_"):
+            primary_model = os.getenv("GROQ_CHAT_MODEL", "llama-3.3-70b-versatile")
+            candidates = [primary_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        else:
+            primary_model = OPENAI_MODEL
+            candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
 
     seen = set()
     unique_candidates = [c for c in candidates if c and not (c in seen or seen.add(c))]
