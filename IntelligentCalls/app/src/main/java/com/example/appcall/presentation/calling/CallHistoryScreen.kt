@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.unit.sp
 import com.example.appcall.data.model.CallHistoryItemDto
 import com.example.appcall.presentation.theme.*
@@ -26,7 +28,8 @@ fun CallHistoryScreen(
     callHistory: List<CallHistoryItemDto>,
     onCallClick: (String) -> Unit,
     onFabClick: (() -> Unit)? = null,
-    onClearAllCalls: (() -> Unit)? = null
+    onClearAllCalls: (() -> Unit)? = null,
+    onDeleteCall: ((String) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val netPrefs = remember { context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE) }
@@ -58,8 +61,14 @@ fun CallHistoryScreen(
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
             containerColor = Surface1,
-            title = { Text("Effacer l'historique d'appels", color = Text1, fontWeight = FontWeight.Bold) },
-            text = { Text("Êtes-vous sûr de vouloir supprimer tous les appels et leurs enregistrements ? Cette action est irréversible (RGPD Art. 17).", color = Text2, fontSize = 12.sp) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = DangerColor, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(strings.clearHistory, color = Text1, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = { Text(strings.clearHistoryConfirm, color = Text2, fontSize = 12.sp) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -67,7 +76,7 @@ fun CallHistoryScreen(
                         showClearHistoryDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = DangerColor)
-                ) { Text(strings.delete, color = Text1) }
+                ) { Text(strings.delete, color = Text1, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) { Text(strings.close, color = Text3) }
@@ -107,18 +116,28 @@ fun CallHistoryScreen(
                         if (callHistory.isNotEmpty() && onClearAllCalls != null) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(DangerColor.copy(alpha = 0.15f))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DangerColor.copy(alpha = 0.12f))
+                                    .border(1.dp, DangerColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                     .clickable { showClearHistoryDialog = true }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Effacer tout",
-                                    color = DangerColor,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = DangerColor,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = strings.clearHistory,
+                                        color = DangerColor,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
 
@@ -233,7 +252,12 @@ fun CallHistoryScreen(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     items(filteredList) { item ->
-                        CallHistoryRow(item = item, onClick = { onCallClick(item.id) })
+                        CallHistoryRow(
+                            item = item,
+                            onClick = { onCallClick(item.id) },
+                            onDeleteCall = onDeleteCall,
+                            strings = strings
+                        )
                     }
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
@@ -263,7 +287,9 @@ fun CallHistoryScreen(
 @Composable
 fun CallHistoryRow(
     item: CallHistoryItemDto,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteCall: ((String) -> Unit)? = null,
+    strings: TranslationStrings
 ) {
     val displayName = item.contactName?.takeIf { it.isNotBlank() }
         ?: item.phoneNumber?.takeIf { it.isNotBlank() }
@@ -349,13 +375,33 @@ fun CallHistoryRow(
                         )
                     }
 
-                    if (timeText.isNotBlank()) {
-                        Text(
-                            text = timeText,
-                            color = Text3,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (timeText.isNotBlank()) {
+                            Text(
+                                text = timeText,
+                                color = Text3,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        if (onDeleteCall != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Surface2)
+                                    .clickable { onDeleteCall(item.id) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = strings.delete,
+                                    tint = DangerColor,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

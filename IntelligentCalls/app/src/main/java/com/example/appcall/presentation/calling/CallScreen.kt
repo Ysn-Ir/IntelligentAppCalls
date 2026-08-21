@@ -127,7 +127,8 @@ fun CallScreen(
                     callHistory = callHistory,
                     onCallClick = onNavigateToSummary,
                     onFabClick = { showContactDialer = true },
-                    onClearAllCalls = { viewModel.clearCallHistory() }
+                    onClearAllCalls = { viewModel.clearCallHistory() },
+                    onDeleteCall = { viewModel.deleteCall(it) }
                 )
             } else {
                 // Contacts List View

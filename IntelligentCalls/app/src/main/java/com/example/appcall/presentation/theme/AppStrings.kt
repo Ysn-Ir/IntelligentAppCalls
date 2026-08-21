@@ -213,7 +213,10 @@ data class TranslationStrings(
     val passwordUpdatedSuccess: String,
     val profileUpdatedSuccess: String,
     val aiWelcomeMessage: String,
-    val aiNewConversationStarted: String
+    val aiNewConversationStarted: String,
+    val clearHistory: String,
+    val clearHistoryConfirm: String,
+    val recordingDeleted: String
 )
 
 val EnglishStrings = TranslationStrings(
@@ -387,7 +390,10 @@ val EnglishStrings = TranslationStrings(
     passwordUpdatedSuccess = "Password updated successfully",
     profileUpdatedSuccess = "Profile updated successfully",
     aiWelcomeMessage = "Hello! I am your AI assistant. You can ask me questions across all your calls or target a specific contact.",
-    aiNewConversationStarted = "New conversation started! Ask a question about your calls."
+    aiNewConversationStarted = "New conversation started! Ask a question about your calls.",
+    clearHistory = "Clear All",
+    clearHistoryConfirm = "Are you sure you want to permanently erase all calls and audio recordings? This action cannot be undone (GDPR Art. 17).",
+    recordingDeleted = "Recording and database entry permanently deleted"
 )
 
 val FrenchStrings = TranslationStrings(
@@ -561,7 +567,10 @@ val FrenchStrings = TranslationStrings(
     passwordUpdatedSuccess = "Mot de passe modifié avec succès",
     profileUpdatedSuccess = "Profil mis à jour",
     aiWelcomeMessage = "Bonjour ! Je suis votre assistant IA. Vous pouvez me poser des questions sur l'ensemble de vos appels ou cibler un contact spécifique.",
-    aiNewConversationStarted = "Nouvelle conversation démarrée ! Posez votre question sur l'ensemble de vos appels."
+    aiNewConversationStarted = "Nouvelle conversation démarrée ! Posez votre question sur l'ensemble de vos appels.",
+    clearHistory = "Effacer tout",
+    clearHistoryConfirm = "Êtes-vous sûr de vouloir supprimer tous les appels et leurs enregistrements ? Cette action est irréversible (RGPD Art. 17).",
+    recordingDeleted = "Enregistrement et données associés supprimés"
 )
 
 val ArabicStrings = TranslationStrings(
@@ -735,7 +744,10 @@ val ArabicStrings = TranslationStrings(
     passwordUpdatedSuccess = "تم تعديل كلمة المرور بنجاح",
     profileUpdatedSuccess = "تم تحديث الملف الشخصي",
     aiWelcomeMessage = "مرحباً! أنا مساعدك الذكي. يمكنك طرح أسئلة حول جميع مكالماتك أو تحديد جهة اتصال معينة.",
-    aiNewConversationStarted = "بدأت محادثة جديدة! اطرح سؤالك حول مكالماتك."
+    aiNewConversationStarted = "بدأت محادثة جديدة! اطرح سؤالك حول مكالماتك.",
+    clearHistory = "مسح الكل",
+    clearHistoryConfirm = "هل أنت متأكد من رغبتك في حذف جميع المكالمات والتسجيلات بشكل نهائي؟ هذا الإجراء لا يمكن التراجع عنه (المادة 17 RGPD).",
+    recordingDeleted = "تم حذف التسجيل والبيانات نهائياً"
 )
 
 val SpanishStrings = TranslationStrings(
@@ -909,7 +921,10 @@ val SpanishStrings = TranslationStrings(
     passwordUpdatedSuccess = "Contraseña modificada con éxito",
     profileUpdatedSuccess = "Perfil actualizado",
     aiWelcomeMessage = "¡Hola! Soy tu asistente de IA. Puedes hacerme preguntas sobre todas tus llamadas o seleccionar un contacto específico.",
-    aiNewConversationStarted = "¡Nueva conversación iniciada! Haz tu pregunta sobre tus llamadas."
+    aiNewConversationStarted = "¡Nueva conversación iniciada! Haz tu pregunta sobre tus llamadas.",
+    clearHistory = "Borrar todo",
+    clearHistoryConfirm = "¿Está seguro de que desea eliminar todas las llamadas y grabaciones? Esta acción es irreversible (Art. 17 RGPD).",
+    recordingDeleted = "Grabación y datos asociados eliminados permanentemente"
 )
 
 val GermanStrings = TranslationStrings(
@@ -1083,7 +1098,10 @@ val GermanStrings = TranslationStrings(
     passwordUpdatedSuccess = "Passwort erfolgreich geändert",
     profileUpdatedSuccess = "Profil aktualisiert",
     aiWelcomeMessage = "Hallo! Ich bin Ihr KI-Assistent. Sie können mir Fragen zu allen Ihren Anrufen stellen oder einen bestimmten Kontakt auswählen.",
-    aiNewConversationStarted = "Neues Gespräch gestartet! Stellen Sie Ihre Frage zu Ihren Anrufen."
+    aiNewConversationStarted = "Neues Gespräch gestartet! Stellen Sie Ihre Frage zu Ihren Anrufen.",
+    clearHistory = "Alles löschen",
+    clearHistoryConfirm = "Möchten Sie wirklich alle Anrufe und Aufnahmen unwiderruflich löschen? (Art. 17 DSGVO).",
+    recordingDeleted = "Aufnahme und Datenbankeintrag dauerhaft gelöscht"
 )
 
 val ChineseStrings = TranslationStrings(
@@ -1257,7 +1275,10 @@ val ChineseStrings = TranslationStrings(
     passwordUpdatedSuccess = "密码修改成功",
     profileUpdatedSuccess = "个人资料已更新",
     aiWelcomeMessage = "您好！我是您的AI助手。您可以向我询问所有通话的详情或指定联系人。",
-    aiNewConversationStarted = "新对话已开启！请输入有关通话的问题。"
+    aiNewConversationStarted = "新对话已开启！请输入有关通话的问题。",
+    clearHistory = "清空全部",
+    clearHistoryConfirm = "您确定要永久删除所有通话记录、录音及摘要吗？此操作无法撤销（GDPR 第17条）。",
+    recordingDeleted = "录音及关联数据库记录已彻底删除"
 )
 
 val JapaneseStrings = TranslationStrings(
@@ -1431,7 +1452,10 @@ val JapaneseStrings = TranslationStrings(
     passwordUpdatedSuccess = "パスワードを変更しました",
     profileUpdatedSuccess = "プロフィールを更新しました",
     aiWelcomeMessage = "こんにちは！AIアシスタントです。すべての通話に関する質問や、特定の連絡先について尋ねることができます。",
-    aiNewConversationStarted = "新しい会話が開始されました！通話に関する質問を入力してください。"
+    aiNewConversationStarted = "新しい会話が開始されました！通話に関する質問を入力してください。",
+    clearHistory = "すべて消去",
+    clearHistoryConfirm = "すべての通話履歴、音声録音、およびサマリーを完全に消去してもよろしいですか？この操作は取り消せません（GDPR 第17条）。",
+    recordingDeleted = "録音およびデータベース記録が完全に削除されました"
 )
 
 fun getAppStrings(languageCode: String): TranslationStrings {

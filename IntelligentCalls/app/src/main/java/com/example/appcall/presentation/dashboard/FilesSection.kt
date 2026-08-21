@@ -28,14 +28,19 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.appcall.data.local.AppLocalDatabase
 import com.example.appcall.presentation.theme.NeonTeal
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun FilesSection(localDatabase: AppLocalDatabase) {
+fun FilesSection(
+    localDatabase: AppLocalDatabase,
+    voipRepository: com.example.appcall.domain.repository.VoipRepository? = null
+) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val netPrefs = remember { context.getSharedPreferences("network_settings", Context.MODE_PRIVATE) }
     val appLanguageCode = remember { netPrefs.getString("app_language", "en") ?: "en" }
     val strings = com.example.appcall.presentation.theme.getAppStrings(appLanguageCode)
@@ -141,7 +146,7 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
             title = { Text(strings.gdprDeleteVoice, color = Color.White, fontWeight = FontWeight.Bold) },
-            text = { Text("Tous les enregistrements audio locaux seront définitivement effacés de cet appareil.", color = Color.LightGray) },
+            text = { Text(strings.clearHistoryConfirm, color = Color.LightGray) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -150,10 +155,14 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                         mediaPlayer = null
                         currentlyPlayingPath = null
 
-                        getRecordingsList().forEach { it.delete() }
-                        recordingFiles = getRecordingsList()
-                        showDeleteAllDialog = false
-                        Toast.makeText(context, strings.profileUpdatedSuccess, Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            localDatabase.clearAllCallData()
+                            voipRepository?.deleteVoiceData()
+                            getRecordingsList().forEach { it.delete() }
+                            recordingFiles = getRecordingsList()
+                            showDeleteAllDialog = false
+                            Toast.makeText(context, strings.recordingDeleted, Toast.LENGTH_SHORT).show()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                 ) {
@@ -405,11 +414,20 @@ fun FilesSection(localDatabase: AppLocalDatabase) {
                                         mediaPlayer = null
                                         currentlyPlayingPath = null
                                     }
-                                    if (file.delete()) {
+                                    coroutineScope.launch {
+                                        val historyList = localDatabase.getCallHistory()
+                                        val matchedItem = historyList.firstOrNull { h ->
+                                            file.name.contains(h.id, ignoreCase = true) ||
+                                            (h.id.length >= 6 && file.name.contains(h.id.take(6), ignoreCase = true))
+                                        }
+                                        if (matchedItem != null) {
+                                            localDatabase.deleteCallHistoryItem(matchedItem.id)
+                                            voipRepository?.deleteCallData(matchedItem.id)
+                                        }
+                                        localDatabase.deleteFile(file.name)
+                                        file.delete()
                                         recordingFiles = getRecordingsList()
-                                        Toast.makeText(context, strings.profileUpdatedSuccess, Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Impossible de supprimer", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, strings.recordingDeleted, Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.size(36.dp)

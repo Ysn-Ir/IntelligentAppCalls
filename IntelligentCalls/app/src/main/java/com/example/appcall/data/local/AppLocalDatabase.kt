@@ -177,23 +177,7 @@ class AppLocalDatabase @Inject constructor(
         db.execSQL(createFilesTable)
         db.execSQL(createCallHistoryTable)
         db.execSQL(createChatTable)
-
-        // Seed with initial mock data if empty
-        seedMockData(db)
         Log.d(TAG, "Local database tables created/verified successfully")
-    }
-
-    private fun seedMockData(db: SQLiteDatabase) {
-        try {
-            // Mock Tasks
-            db.execSQL("INSERT OR IGNORE INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-1', 'Appeler le client pour validation', 0)")
-            db.execSQL("INSERT OR IGNORE INTO $TABLE_TASKS ($KEY_TASK_ID, $KEY_TASK_TITLE, $KEY_TASK_COMPLETED) VALUES ('task-2', 'Préparer la présentation commerciale', 1)")
-
-            // Mock Agenda
-            db.execSQL("INSERT OR IGNORE INTO $TABLE_AGENDA ($KEY_AGENDA_ID, $KEY_AGENDA_TITLE, $KEY_AGENDA_DATE) VALUES ('agenda-1', 'Réunion d''équipe hebdomadaire', '2026-07-17T10:00:00Z')")
-        } catch (e: Exception) {
-            Log.w(TAG, "Mock data seeding skipped: ${e.message}")
-        }
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -753,7 +737,14 @@ class AppLocalDatabase @Inject constructor(
         val db = writableDatabase
         db.delete(TABLE_CALL_HISTORY, "$KEY_HIST_ID = ?", arrayOf(callId))
         db.delete(TABLE_CALLS, "$KEY_CALL_ID = ?", arrayOf(callId))
-        db.delete(TABLE_FILES, "$KEY_FILE_ID = ?", arrayOf(callId))
+        db.delete(TABLE_FILES, "$KEY_FILE_ID = ? OR $KEY_FILE_NAME LIKE ?", arrayOf(callId, "%$callId%"))
+    }
+
+    fun deleteFile(fileIdOrName: String) {
+        val db = writableDatabase
+        db.delete(TABLE_FILES, "$KEY_FILE_ID = ? OR $KEY_FILE_NAME = ?", arrayOf(fileIdOrName, fileIdOrName))
+        db.delete(TABLE_CALLS, "$KEY_CALL_ID = ?", arrayOf(fileIdOrName))
+        db.delete(TABLE_CALL_HISTORY, "$KEY_HIST_ID = ?", arrayOf(fileIdOrName))
     }
 
     fun clearAllDataEntirely() {

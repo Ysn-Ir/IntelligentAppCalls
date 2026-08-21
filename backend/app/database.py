@@ -199,38 +199,21 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_schema(engine)
     
-    # Seed demo records if requested for dev/test environment
-    should_seed = os.getenv("SEED_DEV_DATA", "true").lower() in ["true", "1", "yes"] or os.getenv("ENVIRONMENT") == "development"
-    if not should_seed:
-        return
-
+    # In production, do not seed mock data and purge any legacy fake records
     db = SessionLocal()
     try:
-        # Seed 1 user if empty
-        if db.query(User).count() == 0:
-            from passlib.hash import bcrypt
-            user = User(
-                id="test-user-uuid-1111",
-                first_name="Admin",
-                last_name="AppCall",
-                email="test@example.com",
-                number="+33100000000",
-                password_hash=bcrypt.hash("password")
-            )
-            db.add(user)
-            db.commit()
-            print("Seeded user test@example.com with password 'password'")
+        # Clean up any legacy fake contacts, tasks, agenda, files
+        fake_contact_ids = ["contact-1111", "contact-2222", "contact-3333"]
+        db.query(Contact).filter(Contact.id.in_(fake_contact_ids)).delete(synchronize_session=False)
 
-        # Seed 3 fake contacts if empty
-        if db.query(Contact).count() == 0:
-            contacts = [
-                Contact(id="contact-1111", first_name="Jean", last_name="Dupont", phone_number="+33612345678", email="jean.dupont@example.com", global_gdpr_consent=True),
-                Contact(id="contact-2222", first_name="Marie", last_name="Martin", phone_number="+33687654321", email="marie.martin@example.com", global_gdpr_consent=True),
-                Contact(id="contact-3333", first_name="Ahmed", last_name="Bensaid", phone_number="+33699887766", email="ahmed.bensaid@example.com", global_gdpr_consent=False)
-            ]
-            db.add_all(contacts)
-            db.commit()
-            print("Seeded 3 fake contacts")
+        fake_task_ids = ["task-uuid-1", "task-uuid-2"]
+        db.query(TaskModel).filter(TaskModel.id.in_(fake_task_ids)).delete(synchronize_session=False)
+
+        fake_agenda_ids = ["agenda-uuid-1", "agenda-uuid-2"]
+        db.query(AgendaModel).filter(AgendaModel.id.in_(fake_agenda_ids)).delete(synchronize_session=False)
+
+        fake_file_ids = ["file-uuid-1", "file-uuid-2"]
+        db.query(FileModel).filter(FileModel.id.in_(fake_file_ids)).delete(synchronize_session=False)
 
         # Clean up legacy mock calls if present
         try:
@@ -240,35 +223,11 @@ def init_db():
                 if call:
                     delete_call_data(legacy_id, db)
         except Exception:
-            db.rollback()
+            pass
 
-        if db.query(TaskModel).count() == 0:
-            # Seed Tasks
-            tasks = [
-                TaskModel(id="task-uuid-1", title="Appeler le client pour validation", completed=False),
-                TaskModel(id="task-uuid-2", title="Préparer la présentation commerciale", completed=True)
-            ]
-            db.add_all(tasks)
-            db.commit()
-            print("Seeded tasks records")
-
-            # Seed Agenda Calendar
-            agenda_items = [
-                AgendaModel(id="agenda-uuid-1", title="Réunion d'équipe hebdomadaire", scheduled_at=datetime.utcnow() + timedelta(days=1)),
-                AgendaModel(id="agenda-uuid-2", title="Point d'avancement technique", scheduled_at=datetime.utcnow() + timedelta(days=2))
-            ]
-            db.add_all(agenda_items)
-            db.commit()
-            print("Seeded agenda records")
-
-            # Seed Files Browser
-            files = [
-                FileModel(id="file-uuid-1", name="contrat_client.pdf", path="/documents/contrat_client.pdf", size="1.2 MB"),
-                FileModel(id="file-uuid-2", name="presentation_commerciale.pptx", path="/documents/presentation_commerciale.pptx", size="4.5 MB")
-            ]
-            db.add_all(files)
-            db.commit()
-            print("Seeded files records")
+        db.commit()
+    except Exception as e:
+        db.rollback()
     finally:
         db.close()
 

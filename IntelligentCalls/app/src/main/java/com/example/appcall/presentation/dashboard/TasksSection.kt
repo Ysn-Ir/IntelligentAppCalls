@@ -622,14 +622,24 @@ fun TasksSection(localDatabase: AppLocalDatabase, voipRepository: VoipRepository
                                             mediaPlayer = null
                                             currentlyPlayingPath = null
                                         }
-                                        if (file.delete()) {
+                                        coroutineScope.launch {
+                                            val historyList = localDatabase.getCallHistory()
+                                            val matchedItem = historyList.firstOrNull { h ->
+                                                file.name.contains(h.id, ignoreCase = true) ||
+                                                (h.id.length >= 6 && file.name.contains(h.id.take(6), ignoreCase = true)) ||
+                                                (h.id.startsWith("native-") && file.name.contains(h.id.removePrefix("native-"), ignoreCase = true))
+                                            }
+                                            if (matchedItem != null) {
+                                                localDatabase.deleteCallHistoryItem(matchedItem.id)
+                                                voipRepository.deleteCallData(matchedItem.id)
+                                            }
+                                            localDatabase.deleteFile(file.name)
+                                            file.delete()
                                             audioFiles = getRecordingsList()
-                                            Toast.makeText(context, "Enregistrement supprimé", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Impossible de supprimer le fichier", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, strings.recordingDeleted, Toast.LENGTH_SHORT).show()
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Erreur suppression: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Erreur: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                             contentAlignment = Alignment.Center

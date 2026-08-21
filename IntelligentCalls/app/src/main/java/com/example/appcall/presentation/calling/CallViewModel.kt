@@ -79,6 +79,13 @@ class CallViewModel @Inject constructor(
         }
     }
 
+    fun deleteCall(callId: String) {
+        viewModelScope.launch {
+            voipRepository.deleteCallData(callId)
+            _callHistory.value = _callHistory.value.filter { it.id != callId }
+        }
+    }
+
     fun clearCallHistory() {
         viewModelScope.launch {
             voipRepository.deleteVoiceData()

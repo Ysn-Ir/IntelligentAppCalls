@@ -897,9 +897,41 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun deleteCallData(callId: String): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+
+        // 1. Delete from local SQLite database (TABLE_CALL_HISTORY, TABLE_CALLS, TABLE_FILES)
+        try {
+            localDatabase.deleteCallHistoryItem(callId)
+        } catch (e: Exception) {
+            Log.w("VoipRepository", "Error deleting local call DB: ${e.message}")
+        }
+
+        // 2. Delete physical audio files from disk matching this call ID
+        try {
+            val targetDirs = listOf(
+                java.io.File(context.filesDir, "recordings"),
+                java.io.File(context.filesDir, "recordings_native"),
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "recordings") },
+                context.cacheDir
+            ).filterNotNull()
+
+            targetDirs.forEach { dir ->
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { f ->
+                        if (f.name.contains(callId, ignoreCase = true) ||
+                            (callId.length >= 6 && f.name.contains(callId.take(6), ignoreCase = true)) ||
+                            (callId.startsWith("native-") && f.name.contains(callId.removePrefix("native-"), ignoreCase = true))) {
+                            f.delete()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        // 3. Request server-side GDPR call data purge
         return try {
-            apiService.deleteCallData(auth, callId)
-            Result.success(Unit)
+            val response = apiService.deleteCallData(auth, callId)
+            if (response.isSuccessful) Result.success(Unit)
+            else Result.failure(Exception("Échec de la suppression de l'appel: ${response.code()}"))
         } catch (e: Exception) {
             Result.success(Unit)
         }
