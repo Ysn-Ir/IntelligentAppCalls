@@ -218,7 +218,72 @@ cd dashboard
 npm install
 npm run dev
 ```
-*Dashboard Portal:* `http://localhost:3000`
+---
+
+## 🛡️ Optimal Device Setup: Shizuku & Accessibility Guide
+
+Modern Android versions (Android 11, 12, 13, 14, and 15 / One UI 6 & 7) restrict standard 3rd-party apps from accessing the remote caller's downlink audio stream over cellular networks.
+
+**VerbAI call** overcomes these restrictions using a dual-privilege elevation architecture:
+
+```
+                               ┌────────────────────────────────────────────────────────┐
+                               │                    ANDROID DEVICE                      │
+                               │                                                        │
+                               │  ┌────────────────────────┐  ┌──────────────────────┐  │
+                               │  │   SHIZUKU FRAMEWORK    │  │ CALLACCESSIBILITYSVC │  │
+                               │  │ (Privileged ADB Shell) │  │  (Downlink Routing)  │  │
+                               │  └───────────┬────────────┘  └──────────┬───────────┘  │
+                               │              │                          │              │
+                               │              ▼                          ▼              │
+                               │  ┌──────────────────────────────────────────────────┐  │
+                               │  │              PHONECALLRECORDERSERVICE            │  │
+                               │  │      - Elevated Capture: AudioSource.VOICE_COMM   │  │
+                               │  │      - Hardware Acoustic Echo Cancellation (AEC) │  │
+                               │  │      - Automatic 2-Way Audio Stream Sync (.mp4)  │  │
+                               │  └──────────────────────────────────────────────────┘  │
+                               └────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 1. ♿ Enable the Accessibility Service (Mandatory)
+
+The `CallAccessibilityService` allows the app to detect telephony state transitions (`OFFHOOK`, `RINGING`, `IDLE`) without delay and route both speaker channels into the audio pipeline:
+
+1. On your phone, go to **Settings (Paramètres)** ➡️ **Accessibility (Accessibilité)** ➡️ **Installed Apps / Services (Applications installées)**.
+2. Find and tap **VerbAI call** (or `IntelligentCalls`).
+3. Toggle the switch to **ON** and tap **Allow / Autoriser** when prompted.
+4. **Turn OFF Wi-Fi Calling (VoWiFi)** in your SIM settings (Wi-Fi calling encrypts audio at the modem level and prevents hardware audio capture).
+
+---
+
+### 2. ⚡ Setup Shizuku for Elevated ADB Privileges (Recommended)
+
+**[Shizuku](https://shizuku.rikka.app/)** allows VerbAI call to execute system-level ADB commands directly on your device without needing root or keeping your phone connected to a computer:
+
+#### Why use Shizuku with VerbAI call?
+* **Captures 100% crystal-clear 2-way audio** on Samsung Galaxy, Google Pixel, Xiaomi, and OnePlus devices.
+* Grants `CAPTURE_AUDIO_OUTPUT`, `READ_PRIVILEGED_PHONE_STATE`, and `DUMP` permissions without a PC.
+* Prevents the Android battery manager (`Doze mode`) from terminating the background recorder during long phone calls.
+
+#### Step-by-Step Shizuku Activation:
+1. Install **Shizuku** from the [Google Play Store](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) or [GitHub Releases](https://github.com/RikkaApps/Shizuku/releases).
+2. Enable **Developer Options (Options de développement)** on your phone:
+   - Go to **Settings** ➡️ **About phone (À propos du téléphone)** ➡️ **Software information**.
+   - Tap **Build number (Numéro de version)** 7 times until developer mode is unlocked.
+3. Enable **Wireless Debugging (Débogage sans fil)** in Developer Options.
+4. Open **Shizuku** ➡️ tap **Pairing (Jumelage)** ➡️ tap Developer Options notification ➡️ enter the 6-digit wireless pairing code.
+5. In Shizuku, tap **Start (Démarrer)**.
+6. Open **VerbAI call** ➡️ navigate to **Paramètres (Settings)** ➡️ tap **Autoriser Shizuku**.
+
+---
+
+### 3. 🔋 Disable Battery Optimization
+
+To ensure Android never pauses background recording during long calls:
+1. Long press the **VerbAI call** icon on your home screen ➡️ tap **App Info (ℹ️)**.
+2. Go to **Battery (Batterie)** ➡️ select **Unrestricted (Non restreinte)**.
 
 ---
 

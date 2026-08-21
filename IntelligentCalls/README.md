@@ -329,6 +329,36 @@ All methods return `Response<T>` (Retrofit's `Response` wrapper) to allow manual
 
 ---
 
+#### [PhoneCallRecorderService.kt & CallAccessibilityService.kt](file:///c:/Users/khali/OneDrive/Bureau/intelligentCall/IntelligentCalls/app/src/main/java/com/example/appcall/data/calling/)
+
+Modern Android (Android 11 through Android 15 / Samsung One UI 6 & 7) restricts 3rd-party applications from directly capturing the remote caller's audio stream (downlink) over cellular modems.
+
+VerbAI call overcomes this with a **dual-elevation recording architecture**:
+
+1. **`CallAccessibilityService` (Accessibility Framework Elevation)**:
+   - Detects telephony state transitions (`OFFHOOK`, `RINGING`, `IDLE`) instantly without polling.
+   - Activates hardware-assisted acoustic echo cancellation (`AEC`) and audio loopback to capture both speaking parties (`Agent` + `Contact`).
+   - Setup: **Settings ➡️ Accessibility ➡️ Installed Apps ➡️ VerbAI call ➡️ Toggle ON**.
+
+2. **Shizuku Privilege Elevation (Privileged ADB Shell APIs)**:
+   - **Shizuku** allows VerbAI call to execute system-level ADB commands directly on the phone without requiring root or keeping the device connected to a computer.
+   - **Elevated Permissions Granted**:
+     - `android.permission.CAPTURE_AUDIO_OUTPUT`
+     - `android.permission.READ_PRIVILEGED_PHONE_STATE`
+     - `android.permission.DUMP`
+   - **Battery Management**: Excludes the call recording service from Android's aggressive `Doze mode` and background battery killing, ensuring zero missed recordings during long conversations.
+
+**Step-by-Step Shizuku Pairing & Activation Guide:**
+1. Install **Shizuku** from Google Play or [GitHub](https://github.com/RikkaApps/Shizuku/releases).
+2. Enable **Developer Options**: Go to *Settings ➡️ About Phone ➡️ Software Info ➡️ Tap "Build number" 7 times*.
+3. Enable **Wireless Debugging (Débogage sans fil)** in Developer Options.
+4. Open **Shizuku** ➡️ Tap **Pairing** ➡️ Enter the 6-digit wireless pairing code.
+5. In Shizuku, tap **Start (Démarrer)**.
+6. Open **VerbAI call** ➡️ Navigate to **Paramètres (Settings)** ➡️ Tap **Autoriser Shizuku**.
+7. In App Info, set **Battery** to **Unrestricted (Non restreinte)**.
+
+---
+
 #### [LiveTranscriptManager.kt](file:///c:/Users/khali/AndroidStudioProjects/appcall/app/src/main/java/com/example/appcall/data/calling/LiveTranscriptManager.kt)
 
 `@Singleton` managing the WebSocket connection to `WS /ws/calls/{id}/live-transcript`.
