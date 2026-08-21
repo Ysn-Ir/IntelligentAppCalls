@@ -835,16 +835,48 @@ class VoipRepositoryImpl @Inject constructor(
 
     override suspend fun deleteAccount(): Result<Unit> {
         val auth = tokenStorage.authHeader ?: "Bearer dummy_test_token"
+
+        // 1. Wipe all local SQLite database tables completely
+        try {
+            localDatabase.clearAllDataEntirely()
+        } catch (e: Exception) {
+            Log.w("VoipRepository", "Error clearing local DB: ${e.message}")
+        }
+
+        // 2. Wipe all local audio recordings
+        try {
+            val targetDirs = listOf(
+                java.io.File(context.filesDir, "recordings"),
+                java.io.File(context.filesDir, "recordings_native"),
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "recordings") },
+                context.cacheDir
+            ).filterNotNull()
+
+            targetDirs.forEach { dir ->
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { it.delete() }
+                }
+            }
+        } catch (e: Exception) {}
+
+        // 3. Clear all SharedPreferences & TokenStorage
+        try {
+            tokenStorage.clear()
+            context.getSharedPreferences("call_recording_prefs", android.content.Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            context.getSharedPreferences("network_settings", android.content.Context.MODE_PRIVATE)
+                .edit().clear().apply()
+        } catch (e: Exception) {}
+
+        // 4. Request server Art. 17 account erasure
         return try {
             val response = apiService.deleteAccount(auth)
             if (response.isSuccessful) {
-                tokenStorage.clear()
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("Échec de la suppression de compte: ${response.code()}"))
             }
         } catch (e: Exception) {
-            tokenStorage.clear()
             Result.success(Unit)
         }
     }
