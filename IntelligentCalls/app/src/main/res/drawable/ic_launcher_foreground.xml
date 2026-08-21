@@ -6,182 +6,113 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- ── 1. MAIN 3D "V" RIBBON EMBLEM ── -->
-    <!-- Left Wing of V -->
+    <!-- Ambient Center Glow behind Emblem -->
     <path
-        android:pathData="M27,24 C31,23 38,28 44,38 L51,52 C53,56 50,61 46,62 C41,63 36,58 33,52 L26,35 C24,29 25,25 27,24 Z">
+        android:pathData="M54,54 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="25"
-                android:startY="24"
-                android:endX="51"
-                android:endY="62"
+                android:centerX="54"
+                android:centerY="52"
+                android:gradientRadius="30"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#4D00E5FF" />
+                <item android:offset="0.7" android:color="#1A7C4DFF" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ── 1. MAIN 3D "V" EMBLEM (Centered in 24..84 Safe Zone) ── -->
+    
+    <!-- Left Wing of 3D "V" Ribbon -->
+    <path
+        android:pathData="M30,30 C34,28 42,34 48,46 L54,58 C56,62 53,67 48,68 C43,69 38,64 35,57 L28,40 C26,34 28,31 30,30 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="30"
+                android:endX="54"
+                android:endY="68"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#40C4FF" />
-                <item android:offset="0.5" android:color="#0091EA" />
+                <item android:offset="0.0" android:color="#00E5FF" />
+                <item android:offset="0.4" android:color="#0091EA" />
                 <item android:offset="1.0" android:color="#0D47A1" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Right Wing of V with Smooth Swirl -->
+    <!-- Right Wing of 3D "V" Ribbon (Dynamic Swirl) -->
     <path
-        android:pathData="M81,24 C77,23 70,28 64,38 L48,61 C45,66 42,67 39,64 C36,61 38,56 42,50 L61,29 C67,23 76,23 81,24 Z">
+        android:pathData="M78,30 C74,28 66,34 60,46 L46,67 C43,72 39,73 36,70 C33,67 35,62 39,55 L58,35 C64,29 73,29 78,30 Z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="81"
-                android:startY="24"
-                android:endX="39"
-                android:endY="67"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#00E5FF" />
-                <item android:offset="0.6" android:color="#2979FF" />
-                <item android:offset="1.0" android:color="#1565C0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Bottom Center Flow Fold -->
-    <path
-        android:pathData="M38,58 C42,65 47,68 53,65 C58,62 59,55 54,48 L46,37 L40,47 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="38"
-                android:startY="37"
-                android:endX="59"
-                android:endY="68"
+                android:startX="78"
+                android:startY="30"
+                android:endX="36"
+                android:endY="73"
                 android:type="linear">
                 <item android:offset="0.0" android:color="#80D8FF" />
-                <item android:offset="1.0" android:color="#0091EA" />
+                <item android:offset="0.3" android:color="#00B0FF" />
+                <item android:offset="0.7" android:color="#7C4DFF" />
+                <item android:offset="1.0" android:color="#651FFF" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- ── 2. PHONE HANDSET ICON ── -->
+    <!-- Bottom Center Shading Fold -->
     <path
-        android:pathData="M62,43 C60,43 58,45 58,47 C58,54 64,60 71,60 C73,60 75,58 75,56 L73,51 C73,50 71,49 70,50 L67,52 C64,50 62,48 60,45 L62,42 C63,41 62,39 61,39 Z"
-        android:fillColor="#00E5FF" />
-
-    <!-- ── 3. VOICE WAVEFORM AUDIO BARS ── -->
-    <!-- Bar 1 (Dot) -->
-    <path
-        android:pathData="M78,50 A1.5,1.5 0 1,0 78,47 A1.5,1.5 0 1,0 78,50 Z"
-        android:fillColor="#00E5FF" />
-
-    <!-- Bar 2 (Short) -->
-    <path
-        android:pathData="M82,45 L82,53"
-        android:strokeWidth="2.2"
-        android:strokeColor="#00E5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Bar 3 (Tall) -->
-    <path
-        android:pathData="M86,41 L86,57"
-        android:strokeWidth="2.4"
-        android:strokeColor="#00E5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Bar 4 (Medium) -->
-    <path
-        android:pathData="M90,43 L90,54"
-        android:strokeWidth="2.2"
-        android:strokeColor="#00E5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Bar 5 (Small) -->
-    <path
-        android:pathData="M94,47 L94,51"
-        android:strokeWidth="2"
-        android:strokeColor="#00E5FF"
-        android:strokeLineCap="round" />
-
-    <!-- ── 4. "VERBAI" TYPOGRAPHY ── -->
-    <!-- V -->
-    <path
-        android:pathData="M27,70 L32,83 L35,83 L40,70 L37,70 L33.5,79.5 L30,70 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- e -->
-    <path
-        android:pathData="M42,76 C42,73.5 44,72 46.5,72 C49,72 50.5,73.5 50.5,76 L44.5,76 C44.5,78 45.5,79 47,79 C48,79 48.8,78.5 49.2,77.8 L50.4,78.4 C49.6,79.8 48.2,80.5 46.8,80.5 C44,80.5 42,78.5 42,76 Z M48.2,74.5 C48,73.5 47.3,73 46.4,73 C45.3,73 44.6,73.7 44.5,74.5 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- r -->
-    <path
-        android:pathData="M52.5,72.5 L54.5,72.5 L54.5,74 C55,73 56,72.3 57.2,72.5 L57,74.5 C55.6,74.3 54.7,75.2 54.7,77 L54.7,83 L52.5,83 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- b -->
-    <path
-        android:pathData="M59,69 L61.2,69 L61.2,73 C62,72.2 63,72 64.2,72 C66.8,72 68.5,74 68.5,76.5 C68.5,79 66.8,81 64.2,81 C63,81 62,80.8 61.2,80 L61.2,83 L59,83 Z M63.7,73.8 C62.3,73.8 61.2,75 61.2,76.5 C61.2,78 62.3,79.2 63.7,79.2 C65.2,79.2 66.3,78 66.3,76.5 C66.3,75 65.2,73.8 63.7,73.8 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- a -->
-    <path
-        android:pathData="M70.5,76.5 C70.5,74 72,72 74.5,72 C75.8,72 76.8,72.6 77.3,73.5 L77.3,72.5 L79.3,72.5 L79.3,83 L77.3,83 L77.3,82 C76.8,82.8 75.8,83.5 74.5,83.5 C72,83.5 70.5,81.5 70.5,79 Z M74.8,73.8 C73.5,73.8 72.5,74.8 72.5,76.5 C72.5,78.2 73.5,79.2 74.8,79.2 C76.2,79.2 77.2,78.2 77.2,76.5 C77.2,74.8 76.2,73.8 74.8,73.8 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- i -->
-    <path
-        android:pathData="M81.5,72.5 L83.7,72.5 L83.7,83 L81.5,83 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- Cyan Dot on i -->
-    <path
-        android:pathData="M82.6,69.5 A1.6,1.6 0 1,0 82.6,66.3 A1.6,1.6 0 1,0 82.6,69.5 Z"
-        android:fillColor="#00E5FF" />
-
-    <!-- ── 5. "CALL" PILL BADGE ── -->
-    <!-- Left Accent Line -->
-    <path
-        android:pathData="M27,91.5 L37,91.5"
-        android:strokeWidth="1.2"
-        android:strokeColor="#00E5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Center Pill Background -->
-    <path
-        android:pathData="M43,87.5 L65,87.5 C67.5,87.5 69.5,89.5 69.5,92 C69.5,94.5 67.5,96.5 65,96.5 L43,96.5 C40.5,96.5 38.5,94.5 38.5,92 C38.5,89.5 40.5,87.5 43,87.5 Z">
+        android:pathData="M40,64 C44,70 49,73 55,70 C60,67 61,61 56,54 L48,44 L42,53 Z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="38.5"
-                android:startY="92"
-                android:endX="69.5"
-                android:endY="92"
+                android:startX="40"
+                android:startY="44"
+                android:endX="61"
+                android:endY="73"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#0072FF" />
-                <item android:offset="1.0" android:color="#00C6FF" />
+                <item android:offset="0.0" android:color="#A7FFEB" />
+                <item android:offset="0.5" android:color="#00B0FF" />
+                <item android:offset="1.0" android:color="#01579B" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- C A L L Letters in White -->
-    <!-- C -->
+    <!-- ── 2. PHONE CALL HANDSET (Overlaid Icon) ── -->
     <path
-        android:pathData="M45.5,90.2 C44.5,90.2 43.8,91 43.8,92 C43.8,93 44.5,93.8 45.5,93.8 C46.2,93.8 46.7,93.4 46.9,92.9 L47.8,93.3 C47.3,94.2 46.5,94.7 45.5,94.7 C43.8,94.7 42.6,93.5 42.6,92 C42.6,90.5 43.8,89.3 45.5,89.3 C46.5,89.3 47.3,89.8 47.8,90.7 L46.9,91.1 C46.7,90.6 46.2,90.2 45.5,90.2 Z"
-        android:fillColor="#FFFFFF" />
+        android:pathData="M66,48 C64,48 62,50 62,52 C62,59 68,65 75,65 C77,65 79,63 79,61 L77,56 C77,55 75,54 74,55 L71,57 C68,55 66,53 64,50 L66,47 C67,46 66,44 65,44 Z"
+        android:fillColor="#00E5FF" />
 
-    <!-- A -->
+    <!-- ── 3. AI ACOUSTIC WAVEFORM BARS ── -->
+    <!-- Wave Bar 1 -->
     <path
-        android:pathData="M51.2,89.5 L52.4,94.5 L51.3,94.5 L50.9,93.4 L49.5,93.4 L49.1,94.5 L48,94.5 L49.2,89.5 Z M50.2,90.8 L49.7,92.5 L50.7,92.5 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- L 1 -->
-    <path
-        android:pathData="M54.5,89.5 L55.6,89.5 L55.6,93.6 L57.5,93.6 L57.5,94.5 L54.5,94.5 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- L 2 -->
-    <path
-        android:pathData="M59.5,89.5 L60.6,89.5 L60.6,93.6 L62.5,93.6 L62.5,94.5 L59.5,94.5 Z"
-        android:fillColor="#FFFFFF" />
-
-    <!-- Right Accent Line -->
-    <path
-        android:pathData="M71,91.5 L81,91.5"
-        android:strokeWidth="1.2"
+        android:pathData="M81,51 L81,58"
+        android:strokeWidth="2.2"
         android:strokeColor="#00E5FF"
         android:strokeLineCap="round" />
+
+    <!-- Wave Bar 2 (High Energy) -->
+    <path
+        android:pathData="M85,47 L85,62"
+        android:strokeWidth="2.4"
+        android:strokeColor="#80D8FF"
+        android:strokeLineCap="round" />
+
+    <!-- Wave Bar 3 -->
+    <path
+        android:pathData="M89,50 L89,59"
+        android:strokeWidth="2.2"
+        android:strokeColor="#00E5FF"
+        android:strokeLineCap="round" />
+
+    <!-- Wave Bar 4 (Tip) -->
+    <path
+        android:pathData="M93,53 L93,56"
+        android:strokeWidth="1.8"
+        android:strokeColor="#00E5FF"
+        android:strokeLineCap="round" />
+
+    <!-- ── 4. TOP AI INTELLIGENCE SPARK (Star) ── -->
+    <path
+        android:pathData="M76,26 L77,29 L80,30 L77,31 L76,34 L75,31 L72,30 L75,29 Z"
+        android:fillColor="#FFD700" />
 
 </vector>
