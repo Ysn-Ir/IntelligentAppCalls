@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: intelligent-calls-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: intelligent-calls-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: GROQ_CHAT_MODEL
+        value: openai/gpt-oss-20b
+      - key: GROQ_WHISPER_MODEL
+        value: whisper-large-v3-turbo
+      - key: LLM_PROVIDER
+        value: groq
+      - key: STORAGE_MODE
+        value: local
+      - key: UPLOAD_DIR
+        value: ./uploads
+
+databases:
+  - name: intelligent-calls-db
+    databaseName: appcall_db
+    user: appcall_user
+    plan: free
