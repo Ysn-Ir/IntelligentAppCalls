@@ -117,7 +117,16 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
         from openai import OpenAI
     except ImportError:
         logger.error("openai package not installed. Run: pip install openai")
-        return _fallback_summary(raw_text)
+    # Format transcript for the model
+    transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
+
+    user_message = f"""Here is the transcription of a phone call:
+
+---
+{transcript_text}
+---
+
+Analyze this call transcript carefully. Detect the true sentiment, intent, key actions, appointments (date, time, title), and hashtags. Return the required JSON in {LANGUAGE_LABELS.get(target_lang, 'English')}."""
 
     llm_provider = os.getenv("LLM_PROVIDER", "").lower()
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
@@ -135,9 +144,6 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
         base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1") if api_key.startswith("gsk_") else None
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=OPENAI_TIMEOUT)
 
-        # Format transcript for the model
-        transcript_text = _build_transcript_text(speaker_segments) if speaker_segments else raw_text
-
         active_key = api_key
         if active_key.startswith("gsk_"):
             primary_model = os.getenv("GROQ_CHAT_MODEL", "openai/gpt-oss-120b")
@@ -146,6 +152,24 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
             primary_model = OPENAI_MODEL
             candidates = [primary_model, "gpt-4o-mini", "gpt-4o"]
 
+    def _extract_json_payload(content: str) -> dict:
+        if not content:
+            raise ValueError("Empty LLM content")
+        import re
+        # Strip chain-of-thought tags (<think>...</think>)
+        cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        if "```json" in cleaned:
+            cleaned = cleaned.split("```json")[-1].split("```")[0].strip()
+        elif "```" in cleaned:
+            cleaned = cleaned.split("```")[-1].split("```")[0].strip()
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            match = re.search(r'(\{[\s\S]*\})', cleaned)
+            if match:
+                return json.loads(match.group(1))
+            raise
+
     seen = set()
     unique_candidates = [c for c in candidates if c and not (c in seen or seen.add(c))]
 
@@ -153,16 +177,15 @@ def summarize_transcript(raw_text: str, speaker_segments: list, language: Option
         try:
             response = client.chat.completions.create(
                 model=model,
-                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": get_system_prompt(target_lang)},
                     {"role": "user", "content": user_message},
                 ],
                 temperature=0.1,
-                max_tokens=800,
+                max_tokens=2048,
             )
-            content = response.choices[0].message.content
-            result = json.loads(content)
+            content = response.choices[0].message.content or ""
+            result = _extract_json_payload(content)
             result = _refine_sentiment_and_intent(transcript_text, result, target_lang)
             logger.info(f"AI summary generated with {model} (lang={target_lang}): sentiment={result.get('sentiment')}, "
                         f"intent={result.get('intent')}, tags={result.get('tags')}, rendez_vous={len(result.get('rendez_vous', []))}")
@@ -247,14 +270,21 @@ def _refine_sentiment_and_intent(raw_text: str, result: dict, language: str = "e
         "شكرا", "ممتاز", "رائع", "موافق", "اتفاق", "مبروك", "بكل سرور", "صافي", "تمام"
     ]
 
-    is_hostile = any(pat in text_lower for pat in hostile_patterns)
-    is_appointment = any(pat in text_lower for pat in appointment_patterns)
-    is_logistics = any(pat in text_lower for pat in logistics_patterns)
-    is_sales = any(pat in text_lower for pat in sales_patterns)
-    is_support = any(pat in text_lower for pat in support_patterns)
-    is_billing = any(pat in text_lower for pat in billing_patterns)
-    is_negative = any(pat in text_lower for pat in negative_patterns)
-    is_positive = any(pat in text_lower for pat in positive_patterns)
+    import re
+    def _matches_any(patterns, text):
+        for pat in patterns:
+            if re.search(r'(?:\b|^)' + re.escape(pat) + r'(?:\b|$)', text):
+                return True
+        return False
+
+    is_hostile = _matches_any(hostile_patterns, text_lower)
+    is_appointment = _matches_any(appointment_patterns, text_lower)
+    is_logistics = _matches_any(logistics_patterns, text_lower)
+    is_sales = _matches_any(sales_patterns, text_lower)
+    is_support = _matches_any(support_patterns, text_lower)
+    is_billing = _matches_any(billing_patterns, text_lower)
+    is_negative = _matches_any(negative_patterns, text_lower)
+    is_positive = _matches_any(positive_patterns, text_lower)
 
     curr_sentiment = str(result.get("sentiment", "NEUTRAL")).upper()
 
