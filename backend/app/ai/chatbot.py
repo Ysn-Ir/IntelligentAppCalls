@@ -129,19 +129,17 @@ def chat(
     history = json.loads(session.messages) if session.messages else []
 
     # 2. Fetch User Real Data Context: Tasks
-    tasks = db.query(Task).filter((Task.user_id == user_id) | (Task.user_id.is_(None))).all()
+    tasks = db.query(Task).filter(Task.user_id == user_id).all()
     tasks_text = "\n".join([
         f"- [{'Terminée' if t.completed else 'En cours'}] {t.title}" for t in tasks
     ]) if tasks else "(Aucune tâche enregistrée)"
 
     # 3. Fetch User Real Data Context: Agenda & Appointments
-    agenda_items = db.query(Agenda).filter((Agenda.user_id == user_id) | (Agenda.user_id.is_(None))).all()
-    user_contacts = db.query(Contact).filter((Contact.user_id == user_id) | (Contact.user_id.is_(None))).all()
+    agenda_items = db.query(Agenda).filter(Agenda.user_id == user_id).all()
+    user_contacts = db.query(Contact).filter(Contact.user_id == user_id).all()
     contact_map = {c.id: f"{c.first_name} {c.last_name}" for c in user_contacts}
 
-    appointments = db.query(Appointment).filter(
-        (Appointment.user_id == user_id) | (Appointment.user_id.is_(None))
-    ).all()
+    appointments = db.query(Appointment).filter(Appointment.user_id == user_id).all()
 
     agenda_parts = [f"- {a.title} prévu le {a.scheduled_at}" for a in agenda_items]
     for app in appointments:
@@ -167,7 +165,7 @@ def chat(
     calls_text = "\n".join(call_summaries_parts) if call_summaries_parts else "(Aucun appel récent)"
 
     # 6. Semantic search for relevant chunks
-    chunks = search_similar_chunks(message, contact_id, db, top_k=4)
+    chunks = search_similar_chunks(message, contact_id, db, top_k=4, user_id=user_id)
     chunks_parts = []
     for chunk in chunks:
         date_label = chunk["call_date"][:10] if chunk.get("call_date") else "date inconnue"

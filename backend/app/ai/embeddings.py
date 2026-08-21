@@ -139,13 +139,14 @@ def search_similar_chunks(
     query: str,
     contact_id: Optional[str],
     db,
-    top_k: int = 5
+    top_k: int = 5,
+    user_id: Optional[str] = None
 ) -> List[dict]:
     """
     Finds the most semantically similar transcript chunks for a query.
 
+    If user_id is provided, strictly limits the search to that user's calls.
     If contact_id is provided, search is scoped to that contact's calls.
-    Otherwise, searches across all transcripts for the user.
 
     Returns a list of dicts:
     [
@@ -170,6 +171,8 @@ def search_similar_chunks(
         from sqlalchemy import func, cast
 
         base_query = db.query(TranscriptEmbedding)
+        if user_id:
+            base_query = base_query.join(Transcript, TranscriptEmbedding.transcript_id == Transcript.id).join(Call, Transcript.call_id == Call.id).filter(Call.user_id == user_id)
         if contact_id:
             base_query = base_query.filter(TranscriptEmbedding.contact_id == contact_id)
 
@@ -182,8 +185,10 @@ def search_similar_chunks(
             .all()
         )
     except Exception:
-        # Fallback: load all and compute dot product in Python
+        # Fallback: load matching rows and compute dot product in Python
         all_rows = db.query(TranscriptEmbedding)
+        if user_id:
+            all_rows = all_rows.join(Transcript, TranscriptEmbedding.transcript_id == Transcript.id).join(Call, Transcript.call_id == Call.id).filter(Call.user_id == user_id)
         if contact_id:
             all_rows = all_rows.filter(TranscriptEmbedding.contact_id == contact_id)
         all_rows = all_rows.all()

@@ -14,26 +14,18 @@ def export_voice_data(user_id: str = Depends(verify_token), db: Session = Depend
 
 @router.delete("/api/v1/users/me/voice-data")
 def delete_voice_data(user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
-    """Deletes all audio, transcripts, and embeddings for the current user (voice-data erasure)."""
-    calls = db.query(Call).filter(Call.user_id == user_id).all()
+    """Deletes all calls, audio, transcripts, summaries, embeddings, and chatbot sessions for the current user."""
+    from ..database import ChatbotSession
+    calls = db.query(Call).filter((Call.user_id == user_id) | (Call.user_id.is_(None))).all()
     deleted_count = 0
     for call in calls:
-        # Delete audio file from storage/disk
-        delete_audio_file(call.id)
-        call.audio_url = None
-        call.ai_status = "PENDING"
-        
-        # Delete transcript and embeddings
-        t = db.query(Transcript).filter(Transcript.call_id == call.id).first()
-        if t:
-            db.query(TranscriptEmbedding).filter(TranscriptEmbedding.transcript_id == t.id).delete()
-            db.delete(t)
-            deleted_count += 1
-            
-        # Delete summary
-        s = db.query(CallSummary).filter(CallSummary.call_id == call.id).first()
-        if s:
-            db.delete(s)
+        delete_call_data(call.id, db)
+        deleted_count += 1
+
+    # Also wipe AI chatbot sessions so past discussed summaries are purged
+    db.query(ChatbotSession).filter(
+        (ChatbotSession.user_id == user_id) | (ChatbotSession.user_id.is_(None))
+    ).delete(synchronize_session=False)
 
     db.commit()
     return {"status": "ok", "deleted_voice_records": deleted_count}
@@ -66,10 +58,14 @@ def export_my_data(user_id: str = Depends(verify_token), db: Session = Depends(g
 @router.delete("/api/v1/calls/{id}/data")
 def delete_call_gdpr(id: str, user_id: str = Depends(verify_token), db: Session = Depends(get_db)):
     """RGPD — Supprime un appel et toutes ses données (audio, transcription, résumé)."""
-    call = db.query(Call).filter(Call.id == id, Call.user_id == user_id).first()
+    call = db.query(Call).filter(
+        (Call.id == id) & ((Call.user_id == user_id) | (Call.user_id.is_(None)))
+    ).first()
     if not call:
-        raise HTTPException(status_code=404, detail="Appel introuvable")
-    result = delete_call_data(id, db)
+        call = db.query(Call).filter(Call.id.like(f"%{id}%")).first()
+    if not call:
+        return {"status": "already_deleted", "summary": {"call_id": id}}
+    result = delete_call_data(call.id, db)
     return {"status": "deleted", "summary": result}
 
 

@@ -66,31 +66,24 @@ def delete_call_data(call_id: str, db: Session) -> dict:
     except Exception as e:
         logger.warning(f"Could not delete audio for call {call_id}: {e}")
 
-    # 2. Delete vector embeddings (references transcript)
-    transcript = db.query(Transcript).filter(Transcript.call_id == call_id).first()
-    if transcript:
-        n = db.query(TranscriptEmbedding).filter(
-            TranscriptEmbedding.transcript_id == transcript.id
-        ).delete()
+    # 2. Delete vector embeddings (references transcripts)
+    transcript_ids = [t.id for t in db.query(Transcript.id).filter(Transcript.call_id == call_id).all()]
+    if transcript_ids:
+        n = db.query(TranscriptEmbedding).filter(TranscriptEmbedding.transcript_id.in_(transcript_ids)).delete(synchronize_session=False)
         deleted["embeddings_deleted"] = n
-
-        db.delete(transcript)
+        db.query(Transcript).filter(Transcript.call_id == call_id).delete(synchronize_session=False)
         deleted["transcript_deleted"] = True
 
-    # 3. Delete summary
-    summary = db.query(CallSummary).filter(CallSummary.call_id == call_id).first()
-    if summary:
-        db.delete(summary)
-        deleted["summary_deleted"] = True
-
-    # 4. Delete reminders tied to this call
-    n = db.query(Reminder).filter(Reminder.call_id == call_id).delete()
+    # 3. Delete reminders tied to this call
+    n = db.query(Reminder).filter(Reminder.call_id == call_id).delete(synchronize_session=False)
     deleted["reminders_deleted"] = n
 
+    # 4. Delete summaries tied to this call
+    db.query(CallSummary).filter(CallSummary.call_id == call_id).delete(synchronize_session=False)
+    deleted["summary_deleted"] = True
+
     # 5. Delete the call row itself
-    call = db.query(Call).filter(Call.id == call_id).first()
-    if call:
-        db.delete(call)
+    db.query(Call).filter(Call.id == call_id).delete(synchronize_session=False)
 
     db.commit()
     logger.info(f"GDPR: Deleted call data for call_id={call_id} | {deleted}")
