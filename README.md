@@ -1,58 +1,114 @@
-# IntelligentAppCalls 📞🤖
+# VerbAI call 📞🤖
+### Enterprise AI-Powered Telephony, Real-Time Speech Diarization & Dual-Engine LLM Intelligence
 
-> 📖 **Read the [Detailed Architecture Documentation (ARCHITECTURE.md)](ARCHITECTURE.md) for full Mermaid diagrams, offline dataflows, and all 35 API endpoints.**  
-> 📜 **Read the [Engineering & Incident Resolution Log (PROJECT_HISTORY_LOG.md)](PROJECT_HISTORY_LOG.md) for the complete technology matrix and root-cause solutions.**  
-> 🌐 **Read the [Hosting & Deployment Guide (HOSTING_AND_DEPLOYMENT_GUIDE.md)](HOSTING_AND_DEPLOYMENT_GUIDE.md) for production setup, database schemas, and zero-recompilation server routing.**
+[![Android](https://img.shields.io/badge/Android-15%20(API%2035)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](IntelligentCalls/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.20-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](IntelligentCalls/)
+[![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](IntelligentCalls/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](backend/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](backend/)
+[![Groq & Ollama](https://img.shields.io/badge/AI%20Engine-Groq%20%7C%20Ollama-F55036?style=for-the-badge&logo=openai&logoColor=white)](backend/app/ai/)
+[![Render](https://img.shields.io/badge/Render-Deploy%20Ready-46E3B7?style=for-the-badge&logo=render&logoColor=black)](render.yaml)
+[![Audit](https://img.shields.io/badge/Audit%20Score-35%2F35%20(100%25)-brightgreen?style=for-the-badge)](backend/audit_routes.py)
 
-**IntelligentAppCalls** is a state-of-the-art, voice-first intelligent telephony & productivity platform designed in strict accordance with **Cahier des Charges — Partie 6 (Appels intelligents & architecture technique)**:
-1. **Couche 1 — Application Client (Android Jetpack Compose)**: WhatsApp-style streamlined UI centralizing the 6 core modules: **To do list**, **Agenda**, **Assistant IA**, **Fichiers**, **Nouveau contact**, and **Paramètres**.
-2. **Couche 2 — Couche Vocale & VoIP**: Integrated VoIP (Twilio / WebRTC), automated PSTN call recording with Samsung Knox elevation, planned reminders, and scheduled file sharing.
-3. **Couche 3 — Moteur IA Multi-Lingue (Whisper + Groq / OpenAI)**: Authentic multi-speaker speech diarisation, 10-domain intent classification (Threats, Appointments, Quotes, Logistics, Billing, Complaints, Support), dynamic sentiment analysis (Hostile, Negative, Positive, Neutral), and dynamic date-aware French appointment extraction.
-4. **Couche 4 — Backend & Données (FastAPI + MySQL / SQLite v9 Cache)**: 35/35 fully operational REST endpoints & WebSocket live transcript streaming, offline-first local SQLite schema (v9) with non-destructive caching, and GDPR Art. 15–20 data sovereignty.
+---
+
+## 📚 Master Documentation Index
+
+For detailed, in-depth architectural and operational guides, refer to the specialized documentation modules:
+
+| Document | Description & Key Topics | Link |
+| :--- | :--- | :---: |
+| 🏛️ **Architecture Guide** | Full Clean Architecture diagrams, Mermaid sequence flows, offline sync protocols, SQLite v9 schema, and the complete 35 REST & WebSocket API specification. | [**Read ARCHITECTURE.md**](ARCHITECTURE.md) |
+| 🌐 **Hosting & Deployment** | Production setup on **Render.com**, PostgreSQL schema configuration, Docker Compose, Nginx SSL, zero-recompilation server routing, and cloud VoIP integration. | [**Read HOSTING_AND_DEPLOYMENT_GUIDE.md**](HOSTING_AND_DEPLOYMENT_GUIDE.md) |
+| 📜 **Engineering & Incident Log** | Detailed chronological record of all 15 production incidents, root-cause analyses, token limit mitigations, and solutions. | [**Read PROJECT_HISTORY_LOG.md**](PROJECT_HISTORY_LOG.md) |
+| 📱 **Android Client Docs** | Samsung Knox elevation, Shizuku ADB permissions, background call interception service, and Gradle build instructions. | [**Read IntelligentCalls/README.md**](IntelligentCalls/README.md) |
+| ⚙️ **Backend Server Docs** | FastAPI server configuration, environment variables, Groq/Ollama LLM dual-inference, and VoIP webhook bridges. | [**Read backend/README.md**](backend/README.md) |
+| 🖥️ **Web Dashboard Docs** | Next.js 16 / React 19 CRM analytics dashboard, live WebSocket audio transcription viewer, and GDPR export portal. | [**Read dashboard/README.md**](dashboard/README.md) |
+| 📦 **Production APK Download** | Compiled binary of the latest release (`VerbAI-Call-v2.0.0.apk`) ready for direct phone installation. | [**Download APK (v2.0.0)**](releases/VerbAI-Call-v2.0.0.apk) |
 
 ---
 
 ## 🌟 System Architecture
 
+**VerbAI call** is designed in accordance with **Cahier des Charges — Partie 6 (Appels intelligents & architecture technique)**, organized into 4 cohesive layers:
+
 ```
-                               ┌────────────────────────────────────────────────────────┐
-                               │                    ANDROID DEVICE                      │
-                               │  (Samsung Galaxy S21 / Android 15 / One UI 7)         │
-                               │                                                        │
-                               │   ┌──────────────────┐   ┌──────────────────────────┐  │
-                               │   │  Jetpack Compose │   │ CallAccessibilityService │  │
-                               │   │    Dark UI       │   │   (Knox Mic Elevation)   │  │
-                               │   └────────┬─────────┘   └────────────┬─────────────┘  │
-                               │            │                          │                │
-                               │   ┌────────▼─────────┐   ┌────────────▼─────────────┐  │
-                               │   │ CallingManager & │   │ PhoneCallRecorderService │  │
-                               │   │ Local SQLite DB  │──▶│  (Auto 2-Way Recording)  │  │
-                               │   └────────┬─────────┘   └────────────┬─────────────┘  │
-                               └────────────┼──────────────────────────┼────────────────┘
-                                            │                          │
-                                   HTTP API │        Multipart Audio   │
-                                   Payloads │        Upload (.mp4)     │
-                                            ▼                          ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 FASTAPI PYTHON BACKEND                                 │
+│                     COUCHE 1 — APPLICATION CLIENT MOBILE (ANDROID)                     │
+│  (Samsung Galaxy / Android 15 / One UI 7 — Jetpack Compose Dark Glassmorphism)         │
 │                                                                                        │
-│   ┌───────────────────────────────┐               ┌────────────────────────────────┐   │
-│   │    FastAPI Endpoints (v1)     │               │        AI Engine (Groq)        │   │
-│   │  /calls, /contacts, /agenda   │──────────────▶│  - Whisper STT (Transcription) │   │
-│   │  /tasks, /summary, /chat      │               │  - French Date & RDV Extraction│   │
-│   └───────────────┬───────────────┘               │  - Call Summarization & RAG    │   │
-│                   │                               └────────────────────────────────┘   │
-│   ┌───────────────▼───────────────┐                                                    │
-│   │    MySQL / SQLite Database    │◀───────────────────────────────────────────────────┘   │
-│   │  Calls, Agenda, Tasks, RGPD   │                                                    │
-│   └───────────────▲───────────────┘                                                    │
-└───────────────────┼────────────────────────────────────────────────────────────────────┘
-                    │ REST API / WebSocket
-┌───────────────────┴────────────────────────────────────────────────────────────────────┐
-│                             NEXT.JS 16 WEB DASHBOARD                                   │
-│            CRM Analytics • Call Playback • AI Chatbot • GDPR Compliance                │
+│   ┌───────────────────────┐   ┌────────────────────────┐   ┌───────────────────────┐   │
+│   │    Jetpack Compose    │   │ CallAccessibilitySvc   │   │ DynamicUrlInterceptor │   │
+│   │  (6 Core Modules UI)  │   │  (Knox Mic Elevation)  │   │ (Zero-Recompile URL)  │   │
+│   └───────────┬───────────┘   └───────────┬────────────┘   └───────────┬───────────┘   │
+│               │                           │                            │               │
+│   ┌───────────▼───────────┐   ┌───────────▼────────────┐   ┌───────────▼───────────┐   │
+│   │  CallingManager &     │   │ PhoneCallRecorderSvc   │   │  OfflineSyncManager   │   │
+│   │  AppLocalDatabase(v9) │──▶│ (2-Way PSTN & VoIP)    │──▶│  (Non-Destructive)    │   │
+│   └───────────┬───────────┘   └───────────┬────────────┘   └───────────┬───────────┘   │
+└───────────────┼───────────────────────────┼────────────────────────────┼───────────────┘
+                │                           │                            │
+                │ HTTPS REST API            │ Multipart Audio Upload     │ WebSocket Stream
+                │ (Token-Based Auth)        │ (.mp4 / .m4a)              │ (Live Diarization)
+                ▼                           ▼                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        COUCHE 2 & 4 — BACKEND SERVEUR (FASTAPI)                        │
+│                     (Python 3.12 • Uvicorn ASGI • Production-Ready)                    │
+│                                                                                        │
+│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+│   │ Modular Routers: /auth • /calls • /contacts • /agenda • /tasks • /files        │   │
+│   │ /assistant • /gdpr • /webhooks (Twilio/Vonage/Telnyx/SIP) • /ws                │   │
+│   └───────────────────────┬────────────────────────────────┬───────────────────────┘   │
+│                           │                                │                           │
+│   ┌───────────────────────▼───────────────┐   ┌────────────▼───────────────────────┐   │
+│   │      PostgreSQL (Render) / MySQL      │   │   Object Storage (Local / MinIO)   │   │
+│   │  Users • Calls • Transcripts • Agenda │   │   Audio Vault & Export Recordings  │   │
+│   └───────────────────────┬───────────────┘   └────────────────────────────────────┘   │
+└───────────────────────────┼────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                    COUCHE 3 — MOTEUR D'INTELLIGENCE ARTIFICIELLE                       │
+│                                                                                        │
+│   ┌────────────────────────────────────────┐   ┌───────────────────────────────────┐   │
+│   │    GROQ CLOUD INFERENCE (Primary)      │   │     OLLAMA LOCAL LLM (Offline)    │   │
+│   │ - Whisper Large v3 Turbo (STT)         │   │ - LLaMA 3.3 / Mistral / DeepSeek  │   │
+│   │ - GPT-OSS 20B / 120B & Qwen 3.6 27B    │   │ - 100% Private, Zero Cloud Limits │   │
+│   │ - Strict ISO-8601 RDV & Intent Engine  │   │ - Seamless Provider Fallback      │   │
+│   └────────────────────────────────────────┘   └───────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🚀 Key Highlights & Capabilities
+
+### 1. 📞 Automatic 2-Way PSTN & VoIP Call Recording
+- **Zero-Touch Interception**: Automatically records incoming and outgoing phone calls in the background using Samsung Knox microphone elevation and `CallAccessibilityService`.
+- **Contact Resolution**: Resolves contact names and numbers directly from the device's native address book with zero stuck or hardcoded numbers.
+- **Universal Cloud Telephony**: Compatible with Twilio, Telnyx, Plivo, Vonage, SignalWire, and custom SIP PBX systems.
+
+### 2. 🧠 Dual-Engine AI Intelligence (Groq Cloud + Local Ollama)
+- **Fast Speech-to-Text**: Groq `whisper-large-v3-turbo` with multi-speaker diarization (`Agent` vs. `Contact`) and confidence scoring (>96%).
+- **French Date & Meeting Extractor**: Automatically parses relative terms (*"demain à 14h30"*, *"vendredi prochain"*) into exact ISO-8601 datetime entries and synchronizes with the user's Agenda.
+- **Sentiment & Intent Classification**: 10 enterprise domains (Threats, Appointments, Quotes, Logistics, Billing, Complaints, Support) with regex word boundaries (`\b`) preventing false positives.
+- **Local Ollama Inference**: Switch to self-hosted models (`llama3.3`, `mistral`, `deepseek-r1`, `phi4`) via `LLM_PROVIDER=ollama`.
+- **Model Discovery API**: Real-time supported model inspection via `GET /api/v1/ai/models`.
+
+### 3. 🤖 Contextual RAG AI Assistant
+- Conversational chat assistant answering natural language questions across the user's recorded calls, transcripts, agenda meetings, and tasks.
+- Strict `user_id` tenant isolation across pgvector semantic embeddings and SQL context layers.
+- Verbatim citation badges referencing source call timestamps.
+
+### 4. 🔒 Enterprise Security & GDPR Sovereignty
+- **Article 15 (Data Portability)**: Generates comprehensive JSON exports of all user profile data, contacts, call logs, and transcripts.
+- **Article 17 (Right to Erasure)**: Atomic cascade deletion permanently purges audio files, transcripts, vector embeddings, reminders, and summaries without foreign key locks.
+- **Native Cryptography**: Direct Python 3.12 `bcrypt` password hashing without deprecated `passlib` version dependencies.
+
+### 5. 🔄 Zero-Recompilation Dynamic Server Routing
+- **Default Cloud Backend**: The compiled APK points automatically to your Render cloud deployment (`https://intelligent-calls-api.onrender.com`).
+- **Secret 5-Tap Developer Modal**: Tapping the **VerbAI logo 5 times** on the Login screen opens an administrative server configuration modal to switch endpoints (Render Cloud, Local USB, Wi-Fi) on the fly without recompiling.
+- **Settings Override**: Switch backend endpoints at any time in **Paramètres $\rightarrow$ Serveur & Connectivité**.
 
 ---
 
@@ -63,203 +119,155 @@ IntelligentAppCalls/
 ├── IntelligentCalls/            # Native Android Client (Kotlin / Jetpack Compose / Hilt)
 │   ├── app/
 │   │   ├── src/main/java/com/example/appcall/
-│   │   │   ├── data/
-│   │   │   │   ├── calling/    # CallingManager, PhoneCallRecorderService, Accessibility
-│   │   │   │   ├── local/      # AppLocalDatabase (SQLite v6), SyncWorker
-│   │   │   │   └── repository/ # VoipRepositoryImpl (Device contacts, API sync)
-│   │   │   ├── presentation/
-│   │   │   │   ├── calling/    # CallScreen, CallHistoryScreen (Real contacts, no mocks)
-│   │   │   │   ├── dashboard/  # TasksSection (Compact), AgendaSection (Compact dynamic RDV)
-│   │   │   │   └── summary/    # SummaryScreen (AI Appointment card, French actions)
-│   │   │   └── di/             # Hilt Dependency Injection Modules
-│   │   └── AndroidManifest.xml # Permissions (READ_CONTACTS, RECORD_AUDIO, ACCESSIBILITY)
+│   │   │   ├── data/           # CallingManager, PhoneCallRecorderService, AppLocalDatabase (v9)
+│   │   │   ├── presentation/   # Jetpack Compose Screens (Login, Calls, Summary, Agenda, Tasks)
+│   │   │   └── di/             # Hilt Network & Repository Modules
+│   │   └── AndroidManifest.xml # Permissions (Knox Audio, PhoneState, Contacts, Notifications)
 │   └── build.gradle.kts
 │
-├── backend/                     # FastAPI Python Backend (AI Telephony Server)
+├── backend/                     # FastAPI Python 3.12 Server (AI Telephony Backend)
 │   ├── app/
-│   │   ├── ai/
-│   │   │   ├── summarizer.py   # Groq dynamic date-aware French appointment extractor
-│   │   │   ├── transcriber.py  # Audio transcription engine
-│   │   │   └── embeddings.py   # Vector embeddings & RAG search
-│   │   ├── database.py         # SQLAlchemy models (Calls, Agenda, Tasks, Transcripts)
-│   │   ├── gdpr.py             # GDPR Art. 15 (Export), Art. 17 (Right to Erasure)
-│   │   ├── schemas.py          # Pydantic DTOs
-│   │   └── main.py             # FastAPI router & audio ingestion
-│   ├── requirements.txt
-│   └── .env
+│   │   ├── ai/                 # Summarizer (Groq/Ollama), Transcriber (Whisper), Embeddings (RAG)
+│   │   ├── routers/            # 35 Modular Endpoints (Auth, Calls, Agenda, Tasks, Assistant, GDPR)
+│   │   ├── database.py         # SQLAlchemy ORM Models & PostgreSQL Adapter
+│   │   ├── gdpr.py             # GDPR Atomic Cascade Purge & JSON Export
+│   │   └── main.py             # ASGI Application Entrypoint
+│   ├── audit_routes.py         # 35/35 Automated Endpoint Test Suite
+│   ├── requirements.txt        # Production Dependencies
+│   └── .env.example            # Environment Variables Template
 │
-└── dashboard/                   # Web Dashboard (Next.js 16 / React 19 / TypeScript)
-    ├── src/
-    │   ├── app/                # App Router (/contacts, /calls, /chat, /gdpr)
-    │   ├── lib/api.ts          # REST client with automatic dev bearer authorization
-    │   └── globals.css         # Dark glassmorphic design tokens
-    └── package.json
+├── dashboard/                   # Web CRM Dashboard (Next.js 16 / React 19 / TypeScript)
+│   ├── src/app/                # App Router (/calls, /chat, /contacts, /gdpr)
+│   └── src/lib/api.ts          # Unified REST Client
+│
+├── releases/                    # Production Release Binaries
+│   └── VerbAI-Call-v2.0.0.apk  # Standalone Android APK (v2.0.0)
+│
+├── ARCHITECTURE.md              # In-Depth Technical Architecture & Flowcharts
+├── HOSTING_AND_DEPLOYMENT_GUIDE.md # Production Deployment on Render & VPS
+├── PROJECT_HISTORY_LOG.md       # Engineering Incidents #1-#15 Resolution Log
+└── render.yaml                  # Render.com Infrastructure-as-Code Blueprint
 ```
 
 ---
 
-## 🚀 Complete Startup & Connection Guide
+## ⚡ Quickstart Guide
 
-### Step 1: Find Your Computer's Wi-Fi IP Address
+### 1. Deploy the Backend to Render (1-Click)
 
-Open a terminal (PowerShell or Command Prompt) on your PC and run:
-```powershell
-ipconfig
-```
-Look for **`Wireless LAN adapter Wi-Fi`** ➡️ **`IPv4 Address`** (for example: `192.168.1.12`).
+1. Fork or push this repository to GitHub.
+2. In [Render Dashboard](https://dashboard.render.com), create a **PostgreSQL** database named `intelligent-calls-db`.
+3. Create a new **Web Service**:
+   - **Root Directory**: `backend`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. Set the following environment variables:
+   ```ini
+   DATABASE_URL=<your-internal-render-postgres-url>
+   JWT_SECRET=your_super_secret_jwt_key_32bytes
+   GROQ_API_KEY=gsk_your_groq_api_key
+   GROQ_CHAT_MODEL=openai/gpt-oss-20b
+   GROQ_WHISPER_MODEL=whisper-large-v3-turbo
+   LLM_PROVIDER=groq
+   ```
+5. Test your live endpoint: `https://<your-service>.onrender.com/health` $\rightarrow$ `{"status": "ok"}`.
+
+*(For detailed VPS, Docker, and Cloudflare tunnel options, see [HOSTING_AND_DEPLOYMENT_GUIDE.md](HOSTING_AND_DEPLOYMENT_GUIDE.md)).*
 
 ---
 
-### Step 2: Start the FastAPI AI Backend
+### 2. Run the Backend Locally
 
-Navigate to the `backend/` folder:
 ```powershell
+# Navigate to backend directory
 cd backend
-```
 
-Activate your Python virtual environment (or create one if needed):
-```powershell
-# Create virtualenv (first time only)
+# Create & activate virtual environment
 python -m venv venv
-
-# Activate on Windows PowerShell / CMD:
 .\venv\Scripts\activate
-# (On Linux / macOS: source venv/bin/activate)
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Run the 35/35 audit test suite
+python audit_routes.py
+
+# Launch FastAPI development server
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-Start the backend server on **`0.0.0.0`** so that devices on your local network can reach it:
-```powershell
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-> [!IMPORTANT]
-> **Why `--host 0.0.0.0` is required:**
-> If you run `uvicorn` without `--host 0.0.0.0`, it binds only to `127.0.0.1` (localhost) and refuses connections from your mobile phone.
->
-> When Windows Defender Firewall prompts you, click **"Allow access" / "Autoriser"** for Private networks.
-
-*Interactive API Swagger Documentation is available at:* **`http://localhost:8000/docs`**
+*Interactive Swagger Documentation:* `http://localhost:8000/docs`
 
 ---
 
-### Step 3: Configure the Android App
+### 3. Install the Android App on Your Device
 
-Open the **IntelligentCalls** app on your phone:
+#### Option A: Direct APK Install
+Download [**VerbAI-Call-v2.0.0.apk**](releases/VerbAI-Call-v2.0.0.apk) directly to your phone and tap to install.
 
-#### Option A: Wi-Fi Mode (Recommended)
-1. Tap the **⚙️ Paramètres** tab at the bottom right.
-2. In **URL du serveur**, enter your computer's IP address and port:
-   ```text
-   http://192.168.1.12:8000
-   ```
-   *(Replace `192.168.1.12` with your actual Wi-Fi IPv4 address from Step 1).*
-3. Tap **Enregistrer** (Save).
-4. Tap **🔄 Tester**. You should see:
-   ```text
-   ✅ Backend connecté (HTTP 200)
-   ```
-
-#### Option B: USB Cable Mode (ADB Reverse)
-If your phone is plugged in via USB with USB Debugging enabled:
-1. On your PC terminal, run:
-   ```powershell
-   adb reverse tcp:8000 tcp:8000
-   ```
-2. In the app's **⚙️ Paramètres** tab, tap **🔌 Mode USB** (`http://127.0.0.1:8000`).
-3. Tap **Enregistrer** (Save), then **🔄 Tester**.
-
----
-
-### Step 4: Build & Install the Android App (If updating)
-
-From the project root:
+#### Option B: Install via ADB
 ```powershell
-cd IntelligentCalls
-.\gradlew.bat :app:assembleDebug
-```
-To install on your connected device:
-```powershell
-adb install -r .\app\build\outputs\apk\debug\app-debug.apk
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r "releases\VerbAI-Call-v2.0.0.apk"
 ```
 
 ---
 
-### Step 5: Start the Next.js Web Dashboard
+### 4. Run the Web Dashboard
 
-Open a new terminal and navigate to `dashboard/`:
 ```powershell
 cd dashboard
 npm install
 npm run dev
 ```
-*Open your browser at:* **`http://localhost:3000`**
+*Dashboard Portal:* `http://localhost:3000`
 
 ---
 
-## 🔒 Samsung S21 / Android 15 Knox 2-Way Recording Configuration
+## 📊 API Route Verification Matrix
 
-To ensure crystal-clear 2-way call audio on Samsung Galaxy devices running Android 14 / 15:
+All 35 production routes are tested and validated by [`audit_routes.py`](backend/audit_routes.py):
 
-1. Go to **Settings (Paramètres téléphone)** ➡️ **Accessibility (Accessibilité)** ➡️ **Installed Apps (Applications installées)**.
-2. Tap **IntelligentCalls** and toggle **ON** (`CallAccessibilityService`).
-3. Ensure **Wi-Fi Calling (Appels Wi-Fi)** is **OFF** in your quick settings panel.
-4. Make or receive any phone call. The app will automatically record the audio into `Appel_<Contact>_<YYYY-MM-DD_HH-mm>.mp4` and send it to the AI pipeline for instant transcription and appointment extraction.
-
----
-
-## 📱 Features Overview
-
-### 1. 📞 Appels & Contacts
-- **Top Tab Switcher**: Seamlessly switch between `📞 Historique` and `👥 Contacts`.
-- **Search & Filter**: Live contact search and call filter tabs (`Tous`, `Manqués`, `Avec résumé`).
-- **100% Automatic Background Recording**: Intercepts PSTN calls automatically in the background without blocking modal dialogs.
-- **Sleek UI Badges**: Clean typographic pills with status dots (`● Audio HD`, `● Positif`, `#RDV`, `#IA`).
-- **Direct Calling**: One-tap native SIM call (`📱`) or VoIP call.
-
-### 2. 📝 Call Analysis & Summary
-- **Interactive Audio Engine**: Real `MediaPlayer` with dynamic waveform progress, seek-on-tap, elapsed/total timers, speed adjustment (`1×`, `1.5×`, `2×`), and native audio export (`⬇`).
-- **Live AI Summary Card**: Formatted bullet points extracted from conversation context.
-- **Appointment Extraction**: 2x2 grid displaying Date, Time, Title, and Contact with `Valider RDV` and `Modifier` options.
-- **Dual-Speaker Transcript**: Live speaker bubbles with timestamps, confidence scores, and real-time backend updates.
-
-### 3. 🔔 Native Notifications Engine (`AppNotificationManager`)
-- **Agenda Reminders**: Native high-priority Android notifications for confirmed & upcoming appointments (`📅 Rappel RDV: [Titre] à [Heure] avec [Contact]`).
-- **Task Alerts**: Instant notifications when new action items or tasks are created.
-- **Post-Call AI Summary Notification**: One-tap notification arriving as soon as a call is recorded and transcribed, opening directly into the call's AI summary screen.
-
-### 4. 📅 Smart Agenda with Dynamic Day-Filtering
-- **Dynamic Weekday Calculator**: Automatically generates current week cards (`LUN 18`, `MAR 19`, `MER 20`...) with live appointment counters.
-- **Day-by-Day Filter**: Filter appointments by clicking any day card or select `"TOUS"` to view everything.
-- **`＋ Nouveau RDV` Creator**: Collapsible drawer with quick day chips (`Aujourd'hui`, `Demain`, `+1 sem`), native DatePicker, quick time chips (`09:00`, `14:00`, `18:00`), and native TimePicker with instant notification dispatch.
-
-### 5. 📋 Tasks & Audio Vault
-- **Tâches IA & Création Manuelle**: Extracted action items with checkboxes, source call tags, and `＋ Ajouter` button with local notification alerts.
-- **Coffre-fort Audio**: Local voice recordings list with in-app play/pause (`▶ / ❚❚`) and direct file sharing (`⬇`).
-- **RGPD Privacy**: Live JSON data export (`Article 15`) and local storage voice data purge with confirmation (`Droit à l'oubli`).
-
-### 6. 🤖 AI Assistant RAG Chat & Hybrid Cloud/Local Inference
-- **Dual Inference Support**: Switch seamlessly between **Groq Cloud AI** (`openai/gpt-oss-20b`, `120b`, `qwen/qwen3.6-27b`, `allam-2-7b`) and **Local Ollama** (`llama3.3`, `llama3.1:8b`, `mistral`, `qwen2.5:7b`, `deepseek-r1:8b`, `phi4`) with zero cloud rate limits.
-- **Model Discovery Endpoint**: Query active models dynamically via `GET /api/v1/ai/models`.
-- **RAG Context Integration**: Real-time factual queries across user tasks, agenda items, contacts book, call recordings, and pgvector embeddings with strict `user_id` tenant isolation.
-- **Sources Citation**: Citation badges indicating verbatim transcript excerpts and call timestamps.
-
-### 7. ⚙️ Settings (Paramètres, Profil & Multi-Fournisseur VoIP)
-- **Mon Profil & Identifiants**: View active account avatar/initials, edit user information (Prénom, Nom, Email, Téléphone), and change account password securely with old password validation.
-- **Universal Cloud Telephony & Multi-VoIP**: Full support for any cloud VoIP provider with dynamic switching:
-  - 🔵 **Twilio** (TwiML Dual-Channel HD + REST Call Bridge)
-  - 🟢 **Telnyx** (TeXML + Call Control v2 API)
-  - 🟣 **Plivo** (Plivo XML + Voice API)
-  - 🟠 **Vonage / Nexmo** (NCCO JSON + Voice Application API)
-  - ⚪ **SignalWire** (SWML / TwiML)
-  - 🏢 **SIP Trunk / PBX Gateway** (Asterisk, FreePBX, 3CX, Cisco Webhook Ingestion)
-- **Shizuku API Elevation**: Live Shizuku ADB service connection detector and permission granter.
-- **Server URL & Connectivity**: USB / Wi-Fi mode selector with instant connection tester (`/health`).
-- **GDPR Privacy Suite**: Article 15 JSON data export and Article 17 full account & audio records purge (`Droit à l'oubli`).
+| Method | Endpoint Path | Function & Scope | Audit Result |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/health` | Server Healthcheck & Engine Metadata | **PASS** |
+| `POST` | `/api/v1/auth/register` | User Registration with Native Bcrypt | **PASS** |
+| `POST` | `/api/v1/auth/login` | JWT Access Token Issuance | **PASS** |
+| `POST` | `/api/v1/auth/refresh` | Token Refresh Endpoint | **PASS** |
+| `GET` | `/api/v1/users/me` | User Profile & Identifiers | **PASS** |
+| `PUT` | `/api/v1/users/me` | Profile Information Update | **PASS** |
+| `PUT` | `/api/v1/users/me/password` | Secure Password Change | **PASS** |
+| `GET` | `/api/v1/voip/token` | Twilio VoIP & Native PSTN Token | **PASS** |
+| `GET` | `/api/v1/contacts` | Address Book Synchronization | **PASS** |
+| `POST` | `/api/v1/contacts` | Create Contact Record | **PASS** |
+| `PATCH` | `/api/v1/contacts/{id}/gdpr-consent` | Update Contact Consent Flag | **PASS** |
+| `POST` | `/api/v1/calls` | Initialize Call Record | **PASS** |
+| `GET` | `/api/v1/calls/{id}` | Retrieve Single Call Details | **PASS** |
+| `GET` | `/api/v1/calls` | User Call History List | **PASS** |
+| `POST` | `/api/v1/calls/{id}/consent` | Real-Time Voice Recording Consent | **PASS** |
+| `POST` | `/api/v1/calls/{id}/end` | Finalize Call Duration | **PASS** |
+| `GET` | `/api/v1/calls/{id}/transcript` | Full Multi-Speaker Transcript | **PASS** |
+| `GET` | `/api/v1/calls/{id}/summary` | AI Summary & Extracted RDV | **PASS** |
+| `POST` | `/api/v1/calls/{id}/summary/validate` | Confirm AI-Detected Appointment | **PASS** |
+| `POST` | `/api/v1/calls/{id}/summary/edit` | Manually Edit Summary Text | **PASS** |
+| `GET` | `/api/v1/calls/{id}/ai-status` | AI Processing Status Polling | **PASS** |
+| `GET` | `/api/v1/agenda` | Agenda Meetings & Filtered Dates | **PASS** |
+| `POST` | `/api/v1/agenda` | Create New Appointment | **PASS** |
+| `GET` | `/api/v1/reminders` | Planned Reminders List | **PASS** |
+| `GET` | `/api/v1/tasks` | Extracted AI Action Items | **PASS** |
+| `POST` | `/api/v1/tasks` | Create Action Item | **PASS** |
+| `PUT` | `/api/v1/tasks/{id}` | Update / Complete Task | **PASS** |
+| `GET` | `/api/v1/files` | Audio Recordings Vault List | **PASS** |
+| `POST` | `/api/v1/files` | Multipart Audio File Upload | **PASS** |
+| `GET` | `/api/v1/ai/models` | Active AI Models Discovery | **PASS** |
+| `GET` | `/api/v1/me/export` | GDPR Art. 15 Full Data Portability | **PASS** |
+| `GET` | `/api/v1/users/me/voice-data/export` | Voice Metadata Export | **PASS** |
+| `DELETE`| `/api/v1/users/me/voice-data` | GDPR Art. 17 Atomic Voice Purge | **PASS** |
+| `POST` | `/webhooks/twilio/voice` | TwiML Ingestion & Call Bridge | **PASS** |
+| `POST` | `/webhooks/vonage/voice` | NCCO Webhook Ingestion | **PASS** |
+| `POST` | `/webhooks/recording-complete` | Universal Audio Processing Trigger | **PASS** |
+| `WS` | `/api/v1/ws/calls/{id}/live-transcript`| Real-Time Diarization WebSocket | **PASS** |
 
 ---
 
 ## 📄 License
-Distributed under the MIT License.
+
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
